@@ -426,6 +426,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   const [username, setUsername] = useState("You");
   const [state, setState] = useState<DraftStateResponse | null>(null);
   const [busyPick, setBusyPick] = useState<number | null>(null);
+  /** Prevent the 8s auto-refresh from overwriting optimistic pick UI mid-request. */
+  const pickInFlightRef = useRef(false);
   const [undoLastPickBusy, setUndoLastPickBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Name typed into the commissioner-editable draft-board cell. */
@@ -669,6 +671,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     if (!activeLeagueId) return;
     const tick = async () => {
       if (cancelled) return;
+      if (pickInFlightRef.current) return;
       await loadState();
     };
     tick();
@@ -696,6 +699,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     if (!useProxy && !normalPick) return;
 
     setBusyPick(playerId);
+    pickInFlightRef.current = true;
     setError(null);
     try {
       const body = useProxy
@@ -804,6 +808,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
       setError(e?.message ?? "Pick failed");
     } finally {
       setBusyPick(null);
+      pickInFlightRef.current = false;
     }
   }
 
