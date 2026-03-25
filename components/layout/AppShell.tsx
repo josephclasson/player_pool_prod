@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   patchPlayerPoolSessionSeasonYear,
   PLAYER_POOL_IDENTITY_CHANGE_EVENT,
+  readCommissionerSecretFromSession,
   readPlayerPoolSession
 } from "@/lib/player-pool-session";
 import { hrefWithLeagueId, poolRouteIsPublic } from "@/lib/pool-navigation";
@@ -158,7 +159,10 @@ function BottomTabNav({
   navItems: readonly { href: string; label: string; icon: LucideIcon }[];
 }) {
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background/80 border-t border-border/70 backdrop-blur-xl z-40">
+    <nav
+      className="md:hidden fixed bottom-0 left-0 right-0 bg-background/80 border-t border-border/70 backdrop-blur-xl z-40"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
       <div className="flex overflow-x-auto">
         {navItems.map((t) => {
           const active = pathname.startsWith(t.href);
@@ -168,7 +172,7 @@ function BottomTabNav({
               key={t.href}
               type="button"
               onClick={() => onNavigate(t.href)}
-              className="flex-1 min-w-[4.25rem] py-2 flex flex-col items-center justify-center gap-1 transition-colors shrink-0"
+              className="flex-1 min-w-[4.25rem] min-h-[44px] py-2 flex flex-col items-center justify-center gap-1 transition-colors shrink-0"
             >
               <div
                 className={[
@@ -200,6 +204,23 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
+  const [commUnlocked, setCommUnlocked] = useState(() => readCommissionerSecretFromSession().length > 0);
+
+  useEffect(() => {
+    const sync = () => setCommUnlocked(readCommissionerSecretFromSession().length > 0);
+    window.addEventListener(PLAYER_POOL_IDENTITY_CHANGE_EVENT, sync);
+    window.addEventListener("focus", sync);
+    sync();
+    return () => {
+      window.removeEventListener(PLAYER_POOL_IDENTITY_CHANGE_EVENT, sync);
+      window.removeEventListener("focus", sync);
+    };
+  }, []);
+
+  const navTabsEffective = commUnlocked
+    ? navTabs
+    : navTabs.filter((t) => t.href !== "/commissioner");
+
   const navigateWithLeague = (href: string) => {
     const pathOnly = href.split("?")[0] ?? href;
     if (poolRouteIsPublic(pathOnly)) {
@@ -215,11 +236,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="flex min-h-screen text-foreground">
+    <div className="safe-area-wrapper flex min-h-screen text-foreground">
       <SidebarNav
         pathname={pathname}
         onNavigate={navigateWithLeague}
-        navItems={navTabs}
+        navItems={navTabsEffective}
         compactFooter={pathname !== "/"}
       />
 
@@ -244,7 +265,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </main>
 
-      <BottomTabNav pathname={pathname} onNavigate={navigateWithLeague} navItems={navTabs} />
+      <BottomTabNav pathname={pathname} onNavigate={navigateWithLeague} navItems={navTabsEffective} />
     </div>
   );
 }

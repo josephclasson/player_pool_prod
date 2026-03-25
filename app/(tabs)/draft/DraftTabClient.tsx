@@ -1227,8 +1227,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   return (
     <div className="pool-page-stack pool-page-stack-tight flex min-h-0 flex-1 flex-col">
       <div className="pool-hero pool-hero-databallr shrink-0">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
-          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
+          <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
             <div
               className="h-9 w-9 shrink-0 rounded-md bg-accent/15 border border-accent/40 flex items-center justify-center"
               aria-hidden

@@ -987,7 +987,7 @@ export function CommissionerForm() {
             <div className="space-y-2 rounded-lg border border-border/50 bg-background/40 p-3">
               <div className="text-xs font-semibold uppercase tracking-wide text-foreground/55">3 · One day at a time</div>
               <p className="pool-text-muted-sm text-sm">Uses the game date at the top (or today if empty).</p>
-              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
                 <Button onClick={syncNow} disabled={!leagueKey || syncBusy || tournamentSyncBusy} size="md">
                   {syncBusy ? "Syncing…" : "Sync this day only"}
                 </Button>

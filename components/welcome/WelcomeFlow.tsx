@@ -75,7 +75,7 @@ export function WelcomeFlow() {
     }
   }, [leagueField]);
 
-  const finish = useCallback(() => {
+  const finish = useCallback(async () => {
     const lid = resolvedLeagueId ?? leagueField.trim();
     if (!lid || !teamId || teams.length === 0) {
       setErr("Select which owner you are.");
@@ -90,7 +90,25 @@ export function WelcomeFlow() {
     });
     writeStoredActiveLeagueId(lid);
     window.dispatchEvent(new Event(PLAYER_POOL_IDENTITY_CHANGE_EVENT));
-    router.replace(`/draft?leagueId=${encodeURIComponent(lid)}`);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/draft/${encodeURIComponent(lid)}/state`);
+      if (res.ok) {
+        const j = (await res.json()) as {
+          draftRoom?: { status?: string | null } | null;
+        };
+        if (String(j?.draftRoom?.status ?? "") === "completed") {
+          router.replace(`/leaderboard?leagueId=${encodeURIComponent(lid)}`);
+          return;
+        }
+      }
+      router.replace(`/draft?leagueId=${encodeURIComponent(lid)}`);
+    } catch {
+      // If we cannot check draft status, keep the original behavior.
+      router.replace(`/draft?leagueId=${encodeURIComponent(lid)}`);
+    } finally {
+      setBusy(false);
+    }
   }, [resolvedLeagueId, leagueField, teamId, teams, router, resolvedSeasonYear]);
 
   const switchPool = useCallback(() => {
@@ -211,7 +229,7 @@ export function WelcomeFlow() {
               <Button type="button" variant="outline" onClick={() => setStep(1)}>
                 Back
               </Button>
-              <Button type="button" onClick={finish}>
+              <Button type="button" onClick={() => void finish()} disabled={busy}>
                 Enter pool
               </Button>
             </div>

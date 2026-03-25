@@ -878,6 +878,117 @@ body {
   border-color: rgb(var(--pool-stats-accent) / 0.35);
 }
 
+@media (max-width: 768px) {
+  .safe-area-wrapper {
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* iOS input sizing: avoid auto-zoom + keep Apple HIG touch targets. */
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    min-height: 48px;
+    font-size: 16px !important;
+    border-radius: 10px;
+    padding: 0 14px;
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  /* iOS-like typography. */
+  body,
+  .pool-hero,
+  .pool-panel,
+  .pool-text-title,
+  .pool-text-muted,
+  .pool-text-muted-sm,
+  .pool-text-faint {
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Make primary-ish buttons feel tappable. */
+  button,
+  [role="button"],
+  a[role="button"] {
+    min-height: 44px;
+    min-width: 44px;
+    touch-action: manipulation;
+  }
+
+  .pool-btn-ghost,
+  .pool-btn-outline-cta,
+  .pool-btn-primary-cta,
+  button.pool-btn,
+  button {
+    transition: transform 0.08s ease;
+  }
+
+  .pool-btn-ghost:active,
+  .pool-btn-outline-cta:active,
+  .pool-btn-primary-cta:active,
+  button:active {
+    transform: scale(0.97);
+  }
+
+  /* Avoid “hover-only” interaction feel on touch devices. */
+  .pool-btn-ghost:active:not(:disabled) {
+    background: rgb(var(--pool-stats-accent) / 0.12);
+    border-color: rgb(var(--pool-stats-accent) / 0.35);
+  }
+
+  .pool-player-row:active:not(:disabled),
+  .pool-picker-row:active,
+  .pool-filter-chip:active,
+  .pool-more-link:active {
+    border-color: rgb(var(--pool-stats-accent) / 0.35);
+  }
+
+  .pool-player-row:active:not(:disabled) {
+    background: rgb(var(--pool-stats-accent) / 0.1);
+  }
+
+  .pool-filter-chip:active {
+    border-color: rgb(var(--pool-stats-accent) / 0.35);
+  }
+
+  .pool-more-link:active {
+    background: rgb(var(--pool-stats-accent) / 0.1);
+    border-color: rgb(var(--pool-stats-accent) / 0.35);
+  }
+
+  /* Convert modal sheets into bottom sheets on mobile. */
+  .pool-modal-sheet {
+    left: 0 !important;
+    right: 0 !important;
+    top: auto !important;
+    width: 100% !important;
+    bottom: env(safe-area-inset-bottom);
+    max-height: 90vh;
+    border-radius: 16px 16px 0 0;
+  }
+
+  .pool-modal-overlay {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* iOS momentum scrolling on common overflow containers. */
+  [class*="overflow-auto"],
+  [class*="overflow-x-auto"],
+  [class*="overflow-y-auto"] {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Primary CTA buttons should be easy to tap. */
+  .pool-btn-primary-cta,
+  .pool-next-cta {
+    width: 100%;
+    min-height: 52px;
+    font-size: 16px !important;
+    border-radius: 12px;
+  }
+}
+
 .pool-btn-ghost:disabled {
   opacity: 0.55;
 }
