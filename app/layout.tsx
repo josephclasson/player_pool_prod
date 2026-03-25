@@ -30,7 +30,10 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  viewportFit: "cover"
+  viewportFit: "cover",
+  /** Fit-to-width by default; explicit caps so iOS/Android allow pinch-zoom (avoid implicit maximum-scale=1). */
+  maximumScale: 5,
+  userScalable: true
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

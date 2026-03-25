@@ -1444,7 +1444,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
           </div>
         )}
 
-        {!isFinal && (
+        {Boolean(state?.draftRoom) && !isFinal && (
           <div
             className={`mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] ${
               yourTurn || (commissionerProxyMode && state?.viewerCanCommissionerPick)
@@ -1453,8 +1453,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
             }`}
           >
             <span className="font-medium text-foreground">
-              R{state?.currentTurn.roundNumber ?? 1} · P{state?.currentTurn.pickNumberInRound ?? 1}/
-              {state?.draftOrder?.length ?? "—"} · #{state?.draftRoom?.currentPickOverall ?? "—"}
+              R{state.currentTurn.roundNumber} · P{state.currentTurn.pickNumberInRound}/{state.draftOrder.length} · #
+              {state.draftRoom.currentPickOverall}
             </span>
             <span>
               Clock: <span className="font-semibold text-foreground">{onClockOwnerName}</span>
@@ -1513,6 +1513,12 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
 
         <div className="mt-3 flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           {!isFinal ? (
+            activeLeagueId && !state?.draftRoom && !draftLoadError ? (
+              <div className="pool-subpanel flex min-h-[12rem] min-w-0 flex-1 flex-col justify-center py-8 px-3">
+                <p className="text-center text-[11px] text-muted-foreground mb-4">Loading draft room…</p>
+                <PoolTableSkeleton rows={12} />
+              </div>
+            ) : (
             <>
               <div className="pool-subpanel flex min-h-0 min-w-0 flex-1 flex-col py-2">
                 <div className="mb-2 flex shrink-0 flex-wrap items-baseline justify-between gap-2 px-1">
@@ -1848,6 +1854,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                 </div>
               </div>
             </>
+            )
           ) : (
             <div className="pool-subpanel py-2">
               <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2 px-1 text-[11px] text-muted-foreground">
