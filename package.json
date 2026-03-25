@@ -1,0 +1,45 @@
+{
+  "name": "ncaa-player-pool",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "typecheck": "tsc --noEmit",
+    "start": "next start",
+    "lint": "next lint",
+    "worker": "ts-node --project tsconfig.scripts.json scripts/worker.ts",
+    "seed": "ts-node --project tsconfig.scripts.json scripts/seed.ts",
+    "generate:team-reference": "ts-node --project tsconfig.scripts.json scripts/generate-ncaa-team-reference.ts",
+    "export:tournament-scoring-csv": "ts-node --project tsconfig.scripts.json scripts/export-ncaa-mens-tournament-scoring-csv.ts",
+    "instance:dev": "powershell -ExecutionPolicy Bypass -File ./scripts/create-dev-instance.ps1",
+    "instance:prod": "powershell -ExecutionPolicy Bypass -File ./scripts/create-production-instance.ps1",
+    "supabase": "supabase"
+  },
+  "dependencies": {
+    "@supabase/ssr": "^0.6.1",
+    "@supabase/supabase-js": "^2.47.0",
+    "cheerio": "^1.2.0",
+    "clsx": "^2.1.1",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "lucide-react": "^0.378.0",
+    "next": "^15.0.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@types/react": "^18.3.10",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "eslint": "^9.15.0",
+    "eslint-config-next": "^15.0.0",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "supabase": "^2.49.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CHALK26 Production Launch Packet</title>
+  <style>
+    body {
+      font-family: Arial, Helvetica, sans-serif;
+      color: #111;
+      margin: 28px;
+      line-height: 1.35;
+      font-size: 12px;
+    }
+    h1, h2, h3 { margin: 0 0 8px 0; }
+    h1 { font-size: 22px; }
+    h2 { font-size: 16px; margin-top: 18px; border-bottom: 1px solid #ddd; padding-bottom: 4px; }
+    h3 { font-size: 13px; margin-top: 12px; }
+    p { margin: 6px 0; }
+    ul { margin: 4px 0 10px 18px; }
+    li { margin: 2px 0; }
+    .meta {
+      background: #f7f7f7;
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin: 10px 0 14px 0;
+    }
+    .checklist li::marker { content: "☐ "; }
+    .code {
+      white-space: pre-wrap;
+      font-family: Consolas, "Courier New", monospace;
+      background: #f8f8f8;
+      border: 1px solid #ddd;
+      padding: 10px;
+      font-size: 11px;
+    }
+    .small { font-size: 11px; color: #444; }
+    table { border-collapse: collapse; width: 100%; margin: 8px 0; }
+    th, td { border: 1px solid #ddd; padding: 6px; text-align: left; vertical-align: top; }
+    th { background: #f4f4f4; }
+    .page-break { page-break-before: always; }
+  </style>
+</head>
+<body>
+  <h1>Player Pool Production Launch Packet</h1>
+  <p><strong>League:</strong> CHALK26</p>
+  <div class="meta">
+    <p><strong>League UUID:</strong> 142ae951-b6c7-42d2-8401-1c6f01f3b1b7</p>
+    <p><strong>League Code:</strong> CHALK26</p>
+    <p><strong>Season Year:</strong> 2026</p>
+    <p><strong>Primary Goal:</strong> Promote to production using the same league identity and existing draft results (no redraft).</p>
+  </div>
+
+  <h2>1) Launch-Day Checklist (Minute by Minute)</h2>
+  <h3>T-60 to T-30 minutes: Freeze and backup</h3>
+  <ul class="checklist">
+    <li>Announce freeze window: no draft picks and no commissioner bulk actions.</li>
+    <li>Confirm target identifiers: league UUID, league code, and season year.</li>
+    <li>Create Supabase backup/snapshot before cutover.</li>
+    <li>Confirm production env vars are prepared.</li>
+  </ul>
+
+  <h3>T-30 to T-15 minutes: Vercel setup</h3>
+  <ul class="checklist">
+    <li>Import/connect the repository in Vercel.</li>
+    <li>Set required production environment variables.</li>
+    <li>Start production deploy.</li>
+    <li>Attach domain and complete DNS updates.</li>
+  </ul>
+
+  <h3>T-15 to T-5 minutes: Supabase auth URL check</h3>
+  <ul class="checklist">
+    <li>Add redirect URL: https://yourdomain.com/auth/confirm</li>
+    <li>Add redirect URL: https://yourdomain.com/join</li>
+  </ul>
+
+  <h3>T-5 to T+15 minutes: Validation and release</h3>
+  <ul class="checklist">
+    <li>Confirm production loads the same league and draft results.</li>
+    <li>Confirm leaderboard and scores load without errors.</li>
+    <li>Confirm commissioner endpoints reject unauthenticated requests.</li>
+    <li>Confirm invite flow works end-to-end.</li>
+    <li>Check runtime logs for env or auth errors.</li>
+    <li>Lift freeze and announce go-live.</li>
+  </ul>
+
+  <h2>2) Required Production Environment Variables</h2>
+  <ul class="checklist">
+    <li>NEXT_PUBLIC_SUPABASE_URL</li>
+    <li>NEXT_PUBLIC_SUPABASE_ANON_KEY</li>
+    <li>SUPABASE_SERVICE_ROLE_KEY</li>
+    <li>NEXT_PUBLIC_SITE_URL=https://yourdomain.com</li>
+    <li>COMMISSIONER_API_SECRET=&lt;strong-secret&gt;</li>
+    <li>ALLOW_COMMISSIONER_ROUTES_WITHOUT_AUTH=false</li>
+    <li>NEXT_PUBLIC_ALLOW_COMMISSIONER_ROUTES_WITHOUT_AUTH=false</li>
+    <li>NEXT_PUBLIC_APP_NAME=Player Pool</li>
+    <li>NEXT_PUBLIC_DEFAULT_SEASON_YEAR=2026</li>
+  </ul>
+
+  <h2>3) Launch Command Sequence</h2>
+  <div class="code">npm install
+npm run lint
+npm run build
+git status
+git checkout main
+git pull
+git push origin main</div>
+
+  <h2>4) SQL Verification (Run Pre and Post Deploy)</h2>
+  <p class="small">These checks validate that league identity and draft data remain unchanged through deployment.</p>
+  <div class="code">-- League identity
+select id, code, season_year, name, created_at
+from leagues
+where id = '142ae951-b6c7-42d2-8401-1c6f01f3b1b7'
+   or (code = 'CHALK26' and season_year = 2026)
+order by season_year desc;
+
+-- Members and roles
+select league_id, user_id, role, is_autodraft, created_at
+from league_members
+where league_id = '142ae951-b6c7-42d2-8401-1c6f01f3b1b7'
+order by role, created_at;
+
+-- Draft picks count
+select league_id, count(*) as pick_count, min(created_at) first_pick_at, max(created_at) last_pick_at
+from draft_picks
+where league_id = '142ae951-b6c7-42d2-8401-1c6f01f3b1b7'
+group by league_id;
+
+-- Roster occupancy
+select league_id,
+       count(*) as roster_rows,
+       count(*) filter (where player_id is not null) as filled_slots
+from league_rosters
+where league_id = '142ae951-b6c7-42d2-8401-1c6f01f3b1b7'
+group by league_id;
+
+-- Live scoreboard cache freshness
+select league_id, updated_at
+from league_live_scoreboard
+where league_id = '142ae951-b6c7-42d2-8401-1c6f01f3b1b7';
+
+-- Optional latest picks snapshot
+select *
+from draft_picks
+where league_id = '142ae951-b6c7-42d2-8401-1c6f01f3b1b7'
+order by created_at desc
+limit 25;</div>
+
+  <h2>5) Validation Result Log (Fill During Launch)</h2>
+  <table>
+    <thead>
+      <tr><th>Check</th><th>Status (Pass/Fail)</th><th>Notes</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>League opens by UUID/code</td><td></td><td></td></tr>
+      <tr><td>Draft picks match pre-deploy counts</td><td></td><td></td></tr>
+      <tr><td>Roster counts unchanged</td><td></td><td></td></tr>
+      <tr><td>Leaderboard and scores load</td><td></td><td></td></tr>
+      <tr><td>Commissioner auth protection works</td><td></td><td></td></tr>
+      <tr><td>Invite flow to /join works</td><td></td><td></td></tr>
+      <tr><td>No critical runtime errors in logs</td><td></td><td></td></tr>
+    </tbody>
+  </table>
+
+  <h2>6) Future Update Process (Safe Path)</h2>
+  <ul class="checklist">
+    <li>Use feature branch -&gt; PR -&gt; Vercel Preview.</li>
+    <li>Validate preview against this same league in read-only checks first.</li>
+    <li>Merge to main only after lint/build/smoke checks pass.</li>
+    <li>Apply SQL migrations in controlled windows with backup first.</li>
+    <li>After each release, rerun identity + picks + roster SQL checks.</li>
+  </ul>
+
+  <h2>7) Rollback Procedure</h2>
+  <ol>
+    <li>Rollback to the previous Vercel deployment immediately.</li>
+    <li>Keep write freeze enabled if data integrity is uncertain.</li>
+    <li>Validate league load and draft counts after rollback.</li>
+    <li>Restore DB backup only if there was confirmed incorrect write activity.</li>
+  </ol>
+
+  <p class="small">Prepared for league CHALK26. Keep this packet with deployment notes and timestamps for auditability.</p>
+</body>
+</html>

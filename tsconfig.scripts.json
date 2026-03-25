@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "plugins": []
+  },
+  "include": [
+    "scripts/**/*.ts",
+    "lib/espn-mbb-directory.ts",
+    "lib/team-directory-types.ts",
+    "lib/cbb-team-seo.ts"
+  ]
+}

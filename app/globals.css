@@ -1,0 +1,1095 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+/* Theme tokens (RGB triples) used by Tailwind via tailwind.config.ts */
+:root {
+  --theme-background: 5 7 17; /* #050711 */
+  --theme-foreground: 249 250 251; /* #F9FAFB */
+  --theme-muted: 17 24 39; /* #111827 */
+  --theme-accent: 37 99 235; /* #2563EB */
+  --theme-accent-soft: 29 78 216; /* #1D4ED8 */
+  --theme-border: 31 41 55; /* #1F2937 */
+  --theme-danger: 220 38 38; /* #DC2626 */
+  --theme-success: 34 197 94; /* #22C55E */
+  --theme-warning: 249 115 22; /* #F97316 */
+
+  --theme-gradient-top: 31 41 55; /* #1f2937 */
+  --theme-gradient-mid: 2 6 23; /* #020617 */
+  --theme-gradient-bottom: 0 0 0; /* #000000 */
+
+  /*
+   * Databallr.com/stats base chrome (fixed RGB — NOT overridden by theme switcher).
+   * Grey header bands + gold primary columns / owner bar.
+   */
+  --pool-stats-bg-odd: 27 33 44;
+  --pool-stats-bg-even: 34 41 54;
+  --pool-stats-header-bg: 48 55 70;
+  --pool-stats-header-label: 163 171 186;
+  --pool-stats-accent: 255 200 87;
+  --pool-stats-border: 52 60 74;
+  --pool-stats-body-text: 248 250 252;
+}
+
+/*
+ * Color themes: same databallr-style canvas, borders, and table chrome; only accent hues change.
+ */
+html[data-theme="red"] {
+  color-scheme: dark;
+  --theme-background: 27 33 44;
+  --theme-muted: 40 47 60;
+  --theme-border: 52 60 74;
+  --theme-accent: 248 113 113;
+  --theme-accent-soft: 252 165 165;
+  --theme-foreground: 250 250 250;
+  --theme-danger: 251 113 133;
+  --theme-success: 74 222 128;
+  --theme-gradient-top: 36 42 54;
+  --theme-gradient-mid: 27 33 44;
+  --theme-gradient-bottom: 20 24 32;
+  --pool-stats-accent: 248 113 113;
+}
+
+html[data-theme="orange"] {
+  color-scheme: dark;
+  --theme-background: 27 33 44;
+  --theme-muted: 40 47 60;
+  --theme-border: 52 60 74;
+  --theme-accent: 251 146 60;
+  --theme-accent-soft: 253 186 116;
+  --theme-foreground: 250 250 250;
+  --theme-danger: 251 113 133;
+  --theme-success: 74 222 128;
+  --theme-gradient-top: 36 42 54;
+  --theme-gradient-mid: 27 33 44;
+  --theme-gradient-bottom: 20 24 32;
+  --pool-stats-accent: 251 146 60;
+}
+
+html[data-theme="yellow"] {
+  color-scheme: dark;
+  --theme-background: 27 33 44; /* #1b212c */
+  --theme-muted: 40 47 60;
+  --theme-border: 52 60 74;
+  --theme-accent: 255 200 87;
+  --theme-accent-soft: 56 189 248;
+  --theme-foreground: 250 250 250;
+  --theme-danger: 251 113 133;
+  --theme-success: 74 222 128;
+  --theme-gradient-top: 36 42 54;
+  --theme-gradient-mid: 27 33 44;
+  --theme-gradient-bottom: 20 24 32;
+  --pool-stats-accent: 255 200 87;
+}
+
+html[data-theme="green"] {
+  color-scheme: dark;
+  --theme-background: 27 33 44;
+  --theme-muted: 40 47 60;
+  --theme-border: 52 60 74;
+  --theme-accent: 74 222 128;
+  --theme-accent-soft: 134 239 172;
+  --theme-foreground: 250 250 250;
+  --theme-danger: 251 113 133;
+  --theme-success: 74 222 128;
+  --theme-gradient-top: 36 42 54;
+  --theme-gradient-mid: 27 33 44;
+  --theme-gradient-bottom: 20 24 32;
+  --pool-stats-accent: 74 222 128;
+}
+
+html[data-theme="blue"] {
+  color-scheme: dark;
+  --theme-background: 27 33 44;
+  --theme-muted: 40 47 60;
+  --theme-border: 52 60 74;
+  --theme-accent: 96 165 250;
+  --theme-accent-soft: 147 197 253;
+  --theme-foreground: 250 250 250;
+  --theme-danger: 251 113 133;
+  --theme-success: 74 222 128;
+  --theme-gradient-top: 36 42 54;
+  --theme-gradient-mid: 27 33 44;
+  --theme-gradient-bottom: 20 24 32;
+  --pool-stats-accent: 96 165 250;
+}
+
+html[data-theme="purple"] {
+  color-scheme: dark;
+  --theme-background: 27 33 44;
+  --theme-muted: 40 47 60;
+  --theme-border: 52 60 74;
+  --theme-accent: 192 132 252;
+  --theme-accent-soft: 216 180 254;
+  --theme-foreground: 250 250 250;
+  --theme-danger: 251 113 133;
+  --theme-success: 74 222 128;
+  --theme-gradient-top: 36 42 54;
+  --theme-gradient-mid: 27 33 44;
+  --theme-gradient-bottom: 20 24 32;
+  --pool-stats-accent: 192 132 252;
+}
+
+html[data-theme="red"] body,
+html[data-theme="orange"] body,
+html[data-theme="yellow"] body,
+html[data-theme="green"] body,
+html[data-theme="blue"] body,
+html[data-theme="purple"] body {
+  font-family: var(--font-databallr, "DM Sans"), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+html[data-theme="red"] .sleeper-score-font,
+html[data-theme="orange"] .sleeper-score-font,
+html[data-theme="yellow"] .sleeper-score-font,
+html[data-theme="green"] .sleeper-score-font,
+html[data-theme="blue"] .sleeper-score-font,
+html[data-theme="purple"] .sleeper-score-font {
+  font-family: var(--font-databallr, "DM Sans"), system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+body {
+  @apply bg-background text-foreground antialiased;
+  -webkit-tap-highlight-color: transparent;
+  text-size-adjust: 100%;
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+.app-gradient-bg {
+  background: radial-gradient(
+    circle at top,
+    rgb(var(--theme-gradient-top)) 0,
+    rgb(var(--theme-gradient-mid)) 55%,
+    rgb(var(--theme-gradient-bottom)) 100%
+  );
+}
+
+.live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background: #22c55e;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.85);
+}
+
+/*
+ * Stats tables — databallr.com/stats base formatting (theme-independent).
+ * `pool-table-col-primary` = Total / Projection (gold on grey).
+ */
+.pool-card-header {
+  transition: background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease;
+}
+
+/* Owner card title bar: grey field + gold type (databallr “branded” strip) */
+.pool-owner-header {
+  background-color: rgb(var(--pool-stats-header-bg)) !important;
+  color: rgb(var(--pool-stats-accent)) !important;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.72) !important;
+}
+
+.pool-owner-header:hover {
+  background-color: rgb(var(--pool-stats-header-bg) / 0.88) !important;
+  border-color: rgb(var(--pool-stats-accent) / 0.4) !important;
+}
+
+.pool-owner-header .pool-owner-rank {
+  color: rgb(255 255 255);
+}
+
+.pool-owner-header .pool-owner-name {
+  color: rgb(var(--pool-stats-accent));
+}
+
+.pool-owner-header .pool-owner-chevron {
+  color: rgb(var(--pool-stats-accent) / 0.75);
+}
+
+/* StatTracker expanded header — muted stats line on grey owner bar */
+.pool-owner-header .pool-owner-header-stat-meta {
+  color: rgb(255 255 255 / 0.6);
+}
+
+.pool-owner-header .pool-owner-header-stat-meta-sep {
+  color: rgb(255 255 255 / 0.35);
+}
+
+.pool-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.42);
+  border-radius: 0.375rem;
+  overflow: hidden;
+}
+
+/* Embedded in collapsed owner strip — one outer border only */
+.pool-table.pool-table-flush {
+  border: none;
+  border-radius: 0;
+}
+
+/* Collapsed StatTracker summary: squeeze to row width — no horizontal scroll */
+.pool-collapsed-summary-table-wrap {
+  min-width: 0;
+  flex: 1 1 0%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+.pool-table.pool-table-collapsed-summary {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.pool-table.pool-table-collapsed-summary thead th {
+  white-space: nowrap;
+  padding: 0.3rem 0.12rem;
+  font-size: 0.5rem;
+  line-height: 1.12;
+  letter-spacing: 0.04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (min-width: 640px) {
+  .pool-table.pool-table-collapsed-summary thead th {
+    font-size: 0.5625rem;
+    padding: 0.35rem 0.18rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+.pool-table.pool-table-collapsed-summary tbody td {
+  padding: 0.28rem 0.12rem;
+  font-size: 0.5625rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+@media (min-width: 640px) {
+  .pool-table.pool-table-collapsed-summary tbody td {
+    font-size: 0.625rem;
+    padding: 0.32rem 0.18rem;
+  }
+}
+
+/* Match body .pool-table-col-group-end on sortable / plain header cells */
+.pool-table thead th.pool-table-col-group-end {
+  border-right: 1px solid rgb(255 255 255 / 0.32);
+}
+
+.pool-table thead th {
+  background-color: rgb(var(--pool-stats-header-bg));
+  color: rgb(var(--pool-stats-header-label));
+  border-bottom: 1px solid rgb(var(--pool-stats-border) / 0.95);
+  font-weight: 600;
+  font-size: 0.625rem;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.5rem;
+  vertical-align: middle;
+  white-space: nowrap;
+  transition: color 0.3s ease, background-color 0.3s ease;
+}
+
+/* Leaderboard (and similar): merged column-group labels above sortable headers */
+.pool-table thead tr.pool-table-group-header th {
+  border-bottom: 1px solid rgb(var(--pool-stats-border) / 0.65);
+  font-size: 0.5625rem;
+  letter-spacing: 0.08em;
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
+  color: rgb(var(--pool-stats-header-label) / 0.88);
+}
+
+.pool-table thead tr.pool-table-group-header th:hover {
+  color: rgb(var(--pool-stats-header-label) / 0.88);
+}
+
+/* Player Statistics: no merged group header row — keep Owner/Overall vertical rules off thead/tfoot/footer */
+.pool-table.pool-players-stat-table thead th.pool-table-col-group-end,
+.pool-table.pool-players-stat-table tfoot td.pool-table-col-group-end,
+.pool-table.pool-players-stat-table tbody tr.pool-table-footer-row td.pool-table-col-group-end {
+  border-right: none !important;
+}
+
+/* Vertical group separators on body data rows only (not thead, tfoot, or tbody footer band). */
+.pool-table tbody tr:not(.pool-table-footer-row) td.pool-table-col-group-end {
+  border-right: 1px solid rgb(255 255 255 / 0.32);
+}
+
+/* Match plain <th> text: preflight sets button { text-transform: none; font-size: 100% } */
+.pool-table thead th button {
+  font: inherit;
+  color: inherit;
+  text-transform: uppercase;
+}
+
+/* Databallr-style: any column header goes gold on hover */
+.pool-table thead th:hover {
+  color: rgb(var(--pool-stats-accent));
+}
+
+/* After Total → projections: same weight as tbody .pool-table-col-group-end; body data rows only (no thead/tfoot/footer row). */
+.pool-table tbody tr:not(.pool-table-footer-row) td.pool-table-col-total-divider {
+  border-right: 1px solid rgb(255 255 255 / 0.32);
+}
+
+/* Primary aggregate columns — gold label on same grey band */
+.pool-table thead th.pool-table-col-primary {
+  color: rgb(var(--pool-stats-accent));
+  background-color: rgb(var(--pool-stats-header-bg));
+}
+
+/* Already gold: nudge brighter on hover so feedback still reads */
+.pool-table thead th.pool-table-col-primary:hover {
+  color: rgb(255 230 150);
+}
+
+.pool-table tbody td {
+  color: rgb(var(--pool-stats-body-text) / 0.92);
+  padding: 0.45rem 0.5rem;
+  vertical-align: middle;
+  border-bottom: 1px solid rgb(var(--pool-stats-border) / 0.45);
+  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/*
+ * Stat tracker player profile links: no underline — extra-bold for emphasis;
+ * gold (pool accent) on hover. `color: inherit` matches row text / eliminated muting.
+ */
+.pool-table-player-link {
+  color: inherit;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.pool-table-player-link:hover {
+  color: rgb(var(--pool-stats-accent));
+}
+
+.pool-table-player-link:focus-visible {
+  outline: 2px solid rgb(var(--pool-stats-accent) / 0.55);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.pool-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.pool-table tbody tr.pool-table-row:nth-child(odd) td {
+  background-color: rgb(var(--pool-stats-bg-odd) / 0.97) !important;
+}
+
+.pool-table tbody tr.pool-table-row:nth-child(even) td {
+  background-color: rgb(var(--pool-stats-bg-even) / 0.97) !important;
+}
+
+/*
+ * Eliminated player rows: red highlight + grayscale/colorless content.
+ * Use a single horizontal rule between rows (bottom only) so two consecutive eliminated
+ * rows don’t stack top+bottom into a thicker line.
+ */
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated td {
+  background-color: rgb(var(--theme-danger) / 0.11) !important;
+  color: rgb(var(--pool-stats-body-text) / 0.56) !important;
+  border-top: none !important;
+  border-bottom: 1px solid rgb(var(--theme-danger) / 0.3);
+}
+
+/* First eliminated row in tbody (no prior player row): top edge */
+.pool-table tbody > tr.pool-table-row.pool-table-row-eliminated:first-child td {
+  border-top: 1px solid rgb(var(--theme-danger) / 0.3) !important;
+}
+
+/* Transition from active → eliminated: one danger line (previous row’s bottom, not double with next top) */
+.pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):has(+ tr.pool-table-row-eliminated) td {
+  border-bottom: 1px solid rgb(var(--theme-danger) / 0.3);
+}
+
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated td.pool-table-col-primary {
+  background-color: rgb(var(--theme-danger) / 0.16) !important;
+  color: rgb(var(--pool-stats-body-text) / 0.56) !important;
+}
+
+/* Slightly lift primary columns off zebra (databallr-style column read) */
+.pool-table tbody tr.pool-table-row:nth-child(odd) td.pool-table-col-primary {
+  background-color: rgb(var(--pool-stats-header-bg) / 0.42) !important;
+  color: rgb(var(--pool-stats-accent));
+  font-weight: 600;
+}
+
+.pool-table tbody tr.pool-table-row:nth-child(even) td.pool-table-col-primary {
+  background-color: rgb(var(--pool-stats-header-bg) / 0.36) !important;
+  color: rgb(var(--pool-stats-accent));
+  font-weight: 600;
+}
+
+/* Ensure eliminated-row muted tint also applies to primary columns (Total/Proj). */
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated:nth-child(odd) td.pool-table-col-primary,
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated:nth-child(even) td.pool-table-col-primary {
+  background-color: rgb(var(--theme-danger) / 0.16) !important;
+  color: rgb(var(--pool-stats-body-text) / 0.56) !important;
+}
+
+/* Row hover: subtle white wash + full outside white border */
+.pool-table tbody tr.pool-table-row:hover td {
+  background-color: rgb(255 255 255 / 0.06) !important;
+  border-top: 1px solid rgb(255 255 255 / 0.35);
+  border-bottom: 1px solid rgb(255 255 255 / 0.35);
+  box-shadow: none !important;
+}
+
+.pool-table tbody tr.pool-table-row:hover td:first-child {
+  border-left: 1px solid rgb(255 255 255 / 0.35);
+}
+
+.pool-table tbody tr.pool-table-row:hover td:last-child {
+  border-right: 1px solid rgb(255 255 255 / 0.35);
+}
+
+.pool-table tbody tr.pool-table-row:hover td.pool-table-col-primary {
+  background-color: rgb(255 255 255 / 0.08) !important;
+  color: rgb(var(--pool-stats-body-text));
+}
+
+/* Keep hover color uniform on eliminated rows, including primary columns. */
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated:hover td,
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated:hover td.pool-table-col-primary {
+  background-color: rgb(255 255 255 / 0.06) !important;
+  color: rgb(var(--pool-stats-body-text) / 0.62) !important;
+  border-top: none !important;
+  border-bottom: 1px solid rgb(var(--theme-danger) / 0.4);
+}
+
+.pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):has(+ tr.pool-table-row-eliminated:hover) td {
+  border-bottom: 1px solid rgb(var(--theme-danger) / 0.4);
+}
+
+/* Elimination also mutes media + semantic colors to grayscale look. */
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated td img {
+  filter: grayscale(1) saturate(0) opacity(0.72);
+}
+
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated td svg {
+  filter: grayscale(1) saturate(0);
+  opacity: 0.72;
+}
+
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated td .text-success,
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated td .text-danger {
+  color: rgb(var(--pool-stats-body-text) / 0.56) !important;
+}
+
+/* Inline stat ranks on eliminated rows should be white, not gold. */
+.pool-table tbody tr.pool-table-row.pool-table-row-eliminated td .pool-inline-rank {
+  color: rgb(255 255 255 / 0.9) !important;
+}
+
+/* Total / Orig / Live (gold columns): inline rank subtext white, not accent gold. */
+.pool-table tbody td.pool-table-col-primary .pool-inline-rank {
+  color: rgb(255 255 255 / 0.92) !important;
+}
+
+/* StatTracker + Leaderboard: footer band (tbody last row or legacy tfoot). */
+.pool-table tbody tr.pool-table-footer-row td,
+.pool-table tfoot tr.pool-table-footer-row td {
+  background-color: rgb(var(--pool-stats-header-bg) / 0.98) !important;
+  border-top: 2px solid rgb(var(--pool-stats-border));
+  border-bottom: none;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.95) !important;
+}
+
+/* Total + projection columns stay gold */
+.pool-table tbody tr.pool-table-footer-row td.pool-table-col-primary,
+.pool-table tfoot tr.pool-table-footer-row td.pool-table-col-primary {
+  color: rgb(var(--pool-stats-accent)) !important;
+  background-color: rgb(var(--pool-stats-header-bg)) !important;
+}
+
+/* Footer +/- columns: same green/red as player rows */
+.pool-table tbody tr.pool-table-footer-row td.text-success,
+.pool-table tfoot tr.pool-table-footer-row td.text-success {
+  color: rgb(var(--theme-success)) !important;
+}
+
+.pool-table tbody tr.pool-table-footer-row td.text-danger,
+.pool-table tfoot tr.pool-table-footer-row td.text-danger {
+  color: rgb(var(--theme-danger)) !important;
+}
+
+.pool-table tbody tr.pool-table-empty td {
+  background-color: rgb(var(--pool-stats-bg-odd) / 0.65) !important;
+  color: rgb(var(--pool-stats-header-label));
+  border-bottom: none;
+  text-align: center;
+}
+
+/*
+ * Databallr /stats-style layout primitives (shared across all pages).
+ * Uses fixed --pool-stats-* tokens so chrome matches StatTracker tables everywhere.
+ *
+ * Premium minimal frames: light 1px hairlines + tight padding (not heavy “card” chrome).
+ */
+.pool-page-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pool-page-stack-tight {
+  gap: 0.4rem;
+}
+
+.pool-hero {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.4);
+  background: rgb(var(--pool-stats-bg-odd) / 0.16);
+  padding: 0.65rem 0.7rem;
+  box-shadow: none;
+}
+
+/* StatTracker / databallr.com/stats-style page header */
+.pool-hero-databallr {
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.375rem;
+  box-shadow: none;
+}
+
+.stat-tracker-page-title {
+  font-size: clamp(1.2rem, 2.4vw, 1.55rem);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1.12;
+  color: rgb(var(--pool-stats-body-text));
+}
+
+.pool-panel {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.38);
+  background: rgb(var(--pool-stats-bg-odd) / 0.12);
+  padding: 0.45rem 0.55rem;
+}
+
+.pool-panel-compact {
+  padding: 0.3rem 0.4rem;
+  border-radius: 0.375rem;
+}
+
+.pool-filter-toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.35rem 0.45rem;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}
+
+.pool-filter-toolbar > * {
+  flex-shrink: 0;
+}
+
+.pool-card-compact {
+  padding: 0.3rem 0.4rem;
+  border-radius: 0.375rem;
+  box-shadow: none;
+}
+
+.pool-collapsed-table-wrap-compact {
+  margin-top: 0.35rem;
+  padding: 0.3rem 0.35rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.36);
+  background: rgb(var(--pool-stats-bg-even) / 0.08);
+}
+
+/* StatTracker collapsed owner: one continuous bar — owner + summary + chevron */
+.pool-collapsed-owner-strip {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: stretch;
+  border-radius: 0.375rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.42);
+  overflow: hidden;
+  background: rgb(var(--pool-stats-bg-odd) / 0.18);
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.pool-collapsed-owner-strip:hover {
+  background: rgb(var(--pool-stats-bg-even) / 0.24);
+  border-color: rgb(var(--pool-stats-border) / 0.58);
+}
+
+.pool-collapsed-owner-strip:focus-visible {
+  outline: 2px solid rgb(var(--pool-stats-accent) / 0.45);
+  outline-offset: 1px;
+}
+
+.pool-collapsed-owner-strip-owner {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0.5rem;
+  flex-shrink: 0;
+  min-width: 0;
+  overflow: hidden;
+  background-color: rgb(var(--pool-stats-header-bg));
+  border-right: 1px solid rgb(var(--pool-stats-border) / 0.5);
+}
+
+/* Match expanded header: white rank, gold name */
+.pool-collapsed-owner-strip-owner .pool-owner-rank {
+  color: rgb(255 255 255);
+}
+
+.pool-collapsed-owner-strip-owner .pool-owner-name {
+  color: rgb(var(--pool-stats-accent));
+}
+
+.pool-collapsed-owner-strip-chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  flex-shrink: 0;
+  background-color: rgb(var(--pool-stats-header-bg));
+  border-left: 1px solid rgb(var(--pool-stats-border) / 0.5);
+  color: rgb(var(--pool-stats-accent) / 0.88);
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.pool-collapsed-owner-strip:hover .pool-collapsed-owner-strip-chevron {
+  color: rgb(var(--pool-stats-accent));
+}
+
+.pool-subpanel {
+  border-radius: 0.45rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.36);
+  background: rgb(var(--pool-stats-header-bg) / 0.14);
+  padding: 0.45rem 0.55rem;
+}
+
+.pool-card {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.42);
+  background: rgb(var(--pool-stats-bg-odd) / 0.1);
+  box-shadow: none;
+  padding: 0.35rem 0.45rem;
+}
+
+.pool-text-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: rgb(var(--pool-stats-body-text));
+}
+
+.pool-text-muted {
+  font-size: 0.75rem;
+  color: rgb(var(--pool-stats-header-label));
+}
+
+.pool-text-muted-sm {
+  font-size: 0.6875rem;
+  color: rgb(var(--pool-stats-header-label));
+}
+
+.pool-text-faint {
+  font-size: 0.6875rem;
+  color: rgb(var(--pool-stats-header-label) / 0.85);
+}
+
+.pool-text-body {
+  font-size: 0.75rem;
+  color: rgb(var(--pool-stats-body-text) / 0.92);
+  line-height: 1.45;
+}
+
+.pool-link {
+  color: rgb(var(--pool-stats-accent));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 0.2s ease;
+}
+
+.pool-link:hover {
+  color: rgb(255 230 150);
+}
+
+.pool-alert {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.42);
+  background: rgb(var(--pool-stats-bg-even) / 0.18);
+  padding: 0.65rem 0.75rem;
+  font-size: 0.75rem;
+  color: rgb(var(--pool-stats-header-label));
+}
+
+.pool-alert-danger {
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--theme-danger) / 0.4);
+  background: rgb(var(--pool-stats-bg-odd) / 0.22);
+  padding: 0.65rem 0.75rem;
+  font-size: 0.75rem;
+  color: rgb(var(--theme-danger));
+}
+
+/* Must follow .pool-alert / .pool-alert-danger so compact padding wins */
+.pool-alert.pool-alert-compact,
+.pool-alert-danger.pool-alert-compact {
+  padding: 0.4rem 0.55rem;
+  border-radius: 0.375rem;
+  font-size: 0.6875rem;
+  line-height: 1.35;
+}
+
+.pool-field {
+  height: 2.25rem;
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.75);
+  background: rgb(var(--pool-stats-bg-even) / 0.45);
+  padding: 0 0.75rem;
+  font-size: 0.75rem;
+  color: rgb(var(--pool-stats-body-text));
+  outline: none;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pool-field:focus {
+  border-color: rgb(var(--pool-stats-accent) / 0.55);
+  box-shadow: 0 0 0 2px rgb(var(--pool-stats-accent) / 0.15);
+}
+
+.pool-select {
+  height: 2.25rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.75);
+  background: rgb(var(--pool-stats-bg-even) / 0.45);
+  padding: 0 0.5rem;
+  font-size: 0.6875rem;
+  color: rgb(var(--pool-stats-body-text));
+  outline: none;
+}
+
+.pool-select:focus {
+  border-color: rgb(var(--pool-stats-accent) / 0.55);
+  box-shadow: 0 0 0 2px rgb(var(--pool-stats-accent) / 0.12);
+}
+
+.pool-textarea {
+  width: 100%;
+  min-height: 6rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.75);
+  background: rgb(var(--pool-stats-bg-even) / 0.45);
+  padding: 0.5rem;
+  font-size: 0.6875rem;
+  font-family: ui-monospace, monospace;
+  color: rgb(var(--pool-stats-body-text) / 0.95);
+}
+
+.pool-textarea:focus {
+  border-color: rgb(var(--pool-stats-accent) / 0.55);
+  outline: none;
+}
+
+.pool-label {
+  font-size: 0.6875rem;
+  color: rgb(var(--pool-stats-header-label));
+}
+
+.pool-code {
+  font-size: 0.6875rem;
+  color: rgb(var(--pool-stats-header-label));
+  font-family: ui-monospace, monospace;
+}
+
+.pool-player-row {
+  text-align: left;
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.55);
+  background: rgb(var(--pool-stats-bg-even) / 0.28);
+  padding: 0.5rem 0.75rem;
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.pool-player-row:hover:not(:disabled) {
+  background: rgb(var(--pool-stats-accent) / 0.1);
+  border-color: rgb(var(--pool-stats-accent) / 0.35);
+}
+
+.pool-player-row:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.pool-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.45);
+}
+
+.pool-modal-sheet {
+  position: fixed;
+  z-index: 50;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.85);
+  background: rgb(var(--pool-stats-bg-odd) / 0.96);
+  backdrop-filter: blur(12px);
+  padding: 0.5rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.pool-btn-ghost {
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.65);
+  background: rgb(var(--pool-stats-bg-even) / 0.35);
+  color: rgb(var(--pool-stats-body-text));
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.pool-btn-ghost:hover:not(:disabled) {
+  background: rgb(var(--pool-stats-accent) / 0.12);
+  border-color: rgb(var(--pool-stats-accent) / 0.35);
+}
+
+.pool-btn-ghost:disabled {
+  opacity: 0.55;
+}
+
+.pool-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  color: rgb(var(--pool-stats-body-text) / 0.88);
+  border: 1px solid rgb(var(--pool-stats-border) / 0.55);
+  background: rgb(var(--pool-stats-bg-even) / 0.3);
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pool-filter-chip:hover {
+  border-color: rgb(var(--pool-stats-accent) / 0.35);
+}
+
+/*
+ * Owner / Team multi-select on StatTracker (and Player Statistics): outer ring matches
+ * .pool-filter-chip; inner trigger reads like a compact search / combobox field.
+ */
+.pool-filter-select {
+  display: inline-flex;
+  align-items: stretch;
+  font-size: 0.6875rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.55);
+  background: rgb(var(--pool-stats-bg-even) / 0.3);
+  border-radius: 0.375rem;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.pool-filter-select:hover {
+  border-color: rgb(var(--pool-stats-accent) / 0.35);
+}
+
+.pool-filter-select .pool-filter-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.45rem;
+  border-right: 1px solid rgb(var(--pool-stats-border) / 0.45);
+  background: rgb(var(--pool-stats-bg-even) / 0.22);
+  flex-shrink: 0;
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  font-weight: 500;
+  color: rgb(var(--pool-stats-body-text) / 0.88);
+}
+
+.pool-filter-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  min-width: 5.25rem;
+  max-width: 11rem;
+  padding: 0.25rem 0.45rem;
+  font-size: inherit;
+  line-height: 1.25;
+  font-weight: 500;
+  text-align: left;
+  color: rgb(var(--pool-stats-body-text));
+  background: rgb(var(--pool-stats-bg-odd) / 0.5);
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.pool-filter-select-trigger:hover {
+  background: rgb(var(--pool-stats-bg-odd) / 0.72);
+}
+
+.pool-filter-select-trigger:focus {
+  outline: none;
+}
+
+.pool-filter-select-trigger:focus-visible {
+  outline: 2px solid rgb(var(--pool-stats-accent) / 0.45);
+  outline-offset: -1px;
+}
+
+.pool-filter-select-trigger-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* “All selected” should match normal selected state text. */
+.pool-filter-select-trigger--all .pool-filter-select-trigger-text {
+  color: inherit;
+  font-weight: inherit;
+  font-style: normal;
+}
+
+/* StatTracker filter row: same type color/size as .pool-filter-chip text (Owners / Teams, etc.) */
+.pool-filter-toolbar .pool-filter-label {
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  font-weight: 500;
+  color: rgb(var(--pool-stats-body-text) / 0.88);
+}
+
+.pool-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.6875rem;
+  color: rgb(var(--pool-stats-body-text) / 0.82);
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  border-radius: 0.25rem;
+}
+
+.pool-picker-row:hover {
+  background: rgb(var(--pool-stats-accent) / 0.08);
+}
+
+.pool-collapsed-table-wrap {
+  margin-top: 0.45rem;
+  border-radius: 0.375rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.38);
+  background: rgb(var(--pool-stats-bg-even) / 0.1);
+  padding: 0.35rem 0.4rem;
+  overflow-x: auto;
+}
+
+.pool-btn-outline-cta.pool-btn-outline-cta--sm {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.6875rem;
+  border-radius: 0.375rem;
+}
+
+.pool-more-link {
+  display: block;
+  border-radius: 0.375rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.42);
+  background: rgb(var(--pool-stats-bg-even) / 0.12);
+  padding: 0.45rem 0.6rem;
+  font-size: 0.75rem;
+  color: rgb(var(--pool-stats-body-text) / 0.95);
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.pool-more-link:hover {
+  background: rgb(var(--pool-stats-accent) / 0.1);
+  border-color: rgb(var(--pool-stats-accent) / 0.35);
+}
+
+.pool-btn-primary-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  background: rgb(var(--theme-accent));
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgb(255 255 255);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  transition: filter 0.2s ease, transform 0.15s ease;
+}
+
+.pool-btn-primary-cta:hover {
+  filter: brightness(1.06);
+}
+
+/* Commissioner wizard — next action (gold, high contrast on dark UI) */
+.pool-next-cta {
+  background-color: rgb(var(--pool-stats-accent)) !important;
+  color: rgb(24 24 27) !important;
+  border: 1px solid rgb(var(--pool-stats-accent) / 0.85) !important;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.2);
+}
+.pool-next-cta:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.pool-next-cta:disabled {
+  opacity: 0.5;
+}
+
+.pool-step-current {
+  border-color: rgb(var(--pool-stats-accent) / 0.5) !important;
+  box-shadow: 0 0 0 1px rgb(var(--pool-stats-accent) / 0.22);
+}
+
+.pool-btn-outline-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.5rem;
+  border: 1px solid rgb(var(--pool-stats-border) / 0.75);
+  background: rgb(var(--pool-stats-bg-even) / 0.35);
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgb(var(--pool-stats-body-text));
+  transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.pool-btn-outline-cta:hover {
+  background: rgb(var(--pool-stats-accent) / 0.12);
+  border-color: rgb(var(--pool-stats-accent) / 0.4);
+}
+
+.pool-skeleton {
+  border-radius: 0.25rem;
+  background: rgb(var(--pool-stats-header-bg) / 0.65);
+}
+
