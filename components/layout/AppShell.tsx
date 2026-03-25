@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   patchPlayerPoolSessionSeasonYear,
@@ -28,9 +28,8 @@ import { MainScrollContainerRefContext } from "@/components/layout/MainScrollCon
 import { PullToRefreshContainer } from "@/components/layout/PullToRefreshContainer";
 import { PoolSessionRoutes } from "@/components/layout/PoolSessionRoutes";
 
-/** Logical width tables were designed for; mobile zoom = min(1, viewport / this) so tables fit without horizontal scroll. */
-/** Higher = stronger zoom-out on phones so full tables (all columns) fit width. */
-const MOBILE_DESKTOP_FIT_WIDTH_PX = 2800;
+/** Minimum content width used when layout has not measured yet (avoids absurd zoom). */
+const MOBILE_ZOOM_MIN_CONTENT_PX = 320;
 
 /**
  * Icons aligned with databallr.com/stats nav (same Lucide glyphs they ship) where applicable:
@@ -306,10 +305,25 @@ function MobileBottomTabNav({
   );
 }
 
+function measureMobileContentWidthPx(el: HTMLElement): number {
+  const prevZoom = el.style.zoom;
+  el.style.zoom = "1";
+  void el.offsetWidth;
+  let w = el.scrollWidth;
+  for (const t of el.querySelectorAll("table.pool-table")) {
+    w = Math.max(w, (t as HTMLElement).scrollWidth);
+  }
+  if (prevZoom) el.style.zoom = prevZoom;
+  else el.style.removeProperty("zoom");
+  return Math.max(w, MOBILE_ZOOM_MIN_CONTENT_PX);
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const mainScrollRef = useRef<HTMLDivElement>(null);
+  const mobileZoomContentRef = useRef<HTMLDivElement>(null);
+  const mobileZoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [commUnlocked, setCommUnlocked] = useState(() => readCommissionerSecretFromSession().length > 0);
   const [mobileFitZoom, setMobileFitZoom] = useState(1);
@@ -325,27 +339,48 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  useEffect(() => {
-    const mobileMq = window.matchMedia("(max-width: 767px)");
-    const apply = () => {
+  const scheduleMobileZoomMeasure = useCallback(() => {
+    if (mobileZoomDebounceRef.current) clearTimeout(mobileZoomDebounceRef.current);
+    mobileZoomDebounceRef.current = setTimeout(() => {
+      mobileZoomDebounceRef.current = null;
+      const mobileMq = window.matchMedia("(max-width: 767px)");
       if (!mobileMq.matches) {
         setMobileFitZoom(1);
         return;
       }
-      const w = window.visualViewport?.width ?? window.innerWidth;
-      setMobileFitZoom(Math.min(1, w / MOBILE_DESKTOP_FIT_WIDTH_PX));
-    };
-    apply();
-    mobileMq.addEventListener("change", apply);
-    window.addEventListener("resize", apply);
-    const vv = window.visualViewport;
-    vv?.addEventListener("resize", apply);
-    return () => {
-      mobileMq.removeEventListener("change", apply);
-      window.removeEventListener("resize", apply);
-      vv?.removeEventListener("resize", apply);
-    };
+      const outer = mainScrollRef.current;
+      const inner = mobileZoomContentRef.current;
+      if (!outer || !inner) return;
+      const avail = Math.max(160, outer.clientWidth - 4);
+      const needed = measureMobileContentWidthPx(inner);
+      const z = Math.min(1, Math.max(0.07, avail / needed));
+      setMobileFitZoom((cur) => (Math.abs(cur - z) < 0.004 ? cur : z));
+    }, 50);
   }, []);
+
+  useLayoutEffect(() => {
+    scheduleMobileZoomMeasure();
+  }, [pathname, scheduleMobileZoomMeasure]);
+
+  useLayoutEffect(() => {
+    const mobileMq = window.matchMedia("(max-width: 767px)");
+    if (!mobileMq.matches) return;
+    const outer = mainScrollRef.current;
+    const inner = mobileZoomContentRef.current;
+    if (!inner) return;
+    const ro = new ResizeObserver(() => scheduleMobileZoomMeasure());
+    ro.observe(inner);
+    if (outer) ro.observe(outer);
+    window.addEventListener("resize", scheduleMobileZoomMeasure);
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", scheduleMobileZoomMeasure);
+    return () => {
+      ro.disconnect();
+      window.removeEventListener("resize", scheduleMobileZoomMeasure);
+      vv?.removeEventListener("resize", scheduleMobileZoomMeasure);
+      if (mobileZoomDebounceRef.current) clearTimeout(mobileZoomDebounceRef.current);
+    };
+  }, [pathname, scheduleMobileZoomMeasure]);
 
   const navTabsEffective = commUnlocked
     ? navTabs
@@ -404,10 +439,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <AppearancePicker />
               </div>
             ) : null}
-            <div
-              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:min-w-0 md:overflow-visible"
-              style={mobileShellZoomStyle}
-            >
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:min-w-0 md:overflow-visible">
               <Suspense fallback={null}>
                 <PoolSessionRoutes />
                 <LeagueIdentityBar />
@@ -415,9 +447,15 @@ export function AppShell({ children }: { children: ReactNode }) {
               <MainScrollContainerRefContext.Provider value={mainScrollRef}>
                 <PullToRefreshContainer
                   scrollRef={mainScrollRef}
-                  className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden md:min-h-0 md:overflow-visible"
+                  className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto md:min-h-0 md:overflow-x-visible md:overflow-visible"
                 >
-                  {children}
+                  <div
+                    ref={mobileZoomContentRef}
+                    className="flex min-h-0 min-w-0 flex-1 flex-col max-md:w-max max-md:self-start md:min-w-0 md:w-full md:self-stretch"
+                    style={mobileShellZoomStyle}
+                  >
+                    {children}
+                  </div>
                 </PullToRefreshContainer>
               </MainScrollContainerRefContext.Provider>
             </div>
