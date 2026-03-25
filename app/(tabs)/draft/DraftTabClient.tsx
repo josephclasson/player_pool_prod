@@ -674,10 +674,13 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
 
       if (!didMerge) return json;
       mergedPicks.sort((a, b) => a.pickOverall - b.pickOverall);
+      const pickedPlayerIds = new Set<number>(mergedPicks.map((p) => p.player.id));
 
       return {
         ...json,
-        picks: mergedPicks
+        picks: mergedPicks,
+        // Also merge optimistic availability so the bottom filter updates immediately.
+        availablePlayers: (json.availablePlayers ?? []).filter((p) => !pickedPlayerIds.has(p.id))
       };
     });
   }
@@ -799,6 +802,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
 
         return {
           ...prev,
+          // Remove from the available pool immediately so the bottom filter updates instantly.
+          availablePlayers: prev.availablePlayers.filter((p) => p.id !== playerId),
           picks: [...prev.picks, picked].sort((a, b) => a.pickOverall - b.pickOverall),
           draftRoom: {
             ...prev.draftRoom,
