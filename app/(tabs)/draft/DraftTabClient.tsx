@@ -1300,11 +1300,11 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                       return (
                         <td
                           key={idx}
-                          className="align-top px-1 py-1.5 text-left leading-snug text-foreground/90"
+                          className="align-top px-1 py-1.5 text-left leading-snug text-foreground/90 overflow-visible"
                         >
                           {pick ?
                             <>
-                              <div className="font-semibold text-foreground line-clamp-2">
+                              <div className="font-semibold text-foreground break-words whitespace-normal">
                                 <DraftPlayerNameLink
                                   playerName={pick.player.name}
                                   espnAthleteId={pick.player.espnAthleteId}
@@ -1315,7 +1315,10 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                   </span>
                                 ) : null}
                               </div>
-                              <div className="mt-0.5 line-clamp-2 text-foreground/55" title={college || undefined}>
+                              <div
+                                className="mt-0.5 break-words whitespace-normal text-foreground/55"
+                                title={college || undefined}
+                              >
                                 {college || "—"} · {displayRegionName(pick.player.team?.region)}
                               </div>
                             </>
@@ -1336,7 +1339,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                     submitDraftCellPickFromInput();
                                   }}
                                   placeholder="Type name..."
-                                  className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap rounded-sm border border-border/40 bg-background/50 px-1 py-0.5 text-[11px] outline-none focus:border-[#b89a3a]/70 focus:ring-0"
+                                  className="w-auto min-w-[3rem] max-w-none rounded-sm border border-border/40 bg-background/50 px-1 py-0.5 text-[11px] outline-none focus:border-[#b89a3a]/70 focus:ring-0"
+                                  style={{ width: `${Math.max(10, draftCellInput.trim().length)}ch` }}
                                   aria-label={`Draft board cell for round ${roundNumber}`}
                                 />
                                 <button
