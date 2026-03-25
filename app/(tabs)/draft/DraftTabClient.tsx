@@ -1336,7 +1336,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                     submitDraftCellPickFromInput();
                                   }}
                                   placeholder="Type name..."
-                                  className="w-full min-w-0 rounded-sm border border-border/40 bg-background/50 px-1 py-0.5 text-[11px] outline-none focus:border-[#b89a3a]/70 focus:ring-0"
+                                  className="flex-1 min-w-0 overflow-x-auto whitespace-nowrap rounded-sm border border-border/40 bg-background/50 px-1 py-0.5 text-[11px] outline-none focus:border-[#b89a3a]/70 focus:ring-0"
                                   aria-label={`Draft board cell for round ${roundNumber}`}
                                 />
                                 <button
@@ -1349,6 +1349,14 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                   Pick
                                 </button>
                               </div>
+                              {draftCellInput.trim() ? (
+                                <div
+                                  className="mt-0.5 text-[10px] leading-tight text-foreground/55 break-words"
+                                  title={draftCellInput}
+                                >
+                                  {draftCellInput}
+                                </div>
+                              ) : null}
                               {showSuggestions && (
                                 <div
                                   className={
@@ -1382,7 +1390,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                             if (!el) return;
                                             el.focus();
                                             el.setSelectionRange(0, String(p.name ?? "").length);
-                                            el.scrollLeft = 0;
+                                            // Scroll to end so the selection isn't clipped.
+                                            el.scrollLeft = el.scrollWidth;
                                           });
                                         }}
                                       >
