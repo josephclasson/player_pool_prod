@@ -861,6 +861,9 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     setUndoLastPickBusy(true);
     setError(null);
     try {
+      // Block the auto-refresh interval from consuming the optimistic-merge skip flag
+      // while undo is in flight.
+      pickInFlightRef.current = true;
       // Next loadState call should trust the server snapshot; otherwise
       // optimistic merge may re-add the undone pick until a manual refresh.
       skipOptimisticMergeNextRef.current = true;
@@ -879,6 +882,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
       setError(e?.message ?? "Undo pick failed");
     } finally {
       setUndoLastPickBusy(false);
+      pickInFlightRef.current = false;
     }
   }
 
