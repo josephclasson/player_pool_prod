@@ -12,6 +12,7 @@ import {
   writeStoredActiveLeagueId,
   writeStoredSnapshot
 } from "@/lib/player-pool-storage";
+import { PoolResponsiveOwnerNameText } from "@/components/stats/PoolResponsiveDisplayNames";
 import { PoolTablePlayerPhotoCell, PoolTableTeamLogoCell } from "@/components/stats/PoolTableMediaCells";
 import { HeatBadgeLegend } from "@/components/stats/HeatBadgeLegend";
 import { PlayerHeatBadge } from "@/components/stats/PlayerHeatBadge";
@@ -20,6 +21,7 @@ import { resolveEspnTeamLogoForPoolRow } from "@/lib/espn-ncaam-assets";
 import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-directory";
 import { displayCollegeTeamNameForUi } from "@/lib/college-team-display";
 import { resolvePlayerHeadshotUrlCandidates } from "@/lib/player-media";
+import { abbreviatePlayerNameForMobile } from "@/lib/pool-mobile-display-names";
 
 type TeamInfo = {
   id: number;
@@ -537,12 +539,19 @@ function PlayersPoolPlayerNameLink({
         target="_blank"
         rel="noopener noreferrer"
         className="pool-table-player-link"
+        title={playerName}
       >
-        {playerName}
+        <span className="hidden md:inline">{playerName}</span>
+        <span className="md:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
       </a>
     );
   }
-  return <span className="font-semibold">{playerName}</span>;
+  return (
+    <span className="font-semibold" title={playerName}>
+      <span className="hidden md:inline">{playerName}</span>
+      <span className="md:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
+    </span>
+  );
 }
 
 /** Gold sub-rank under value; ranks computed from full pool load (`rows`), unchanged by filters. */
@@ -1018,13 +1027,18 @@ export function PlayersPoolClient({
               }
             >
               <span className="pool-filter-select-trigger-text">
-                {selectedOwnerNames.length === 0
-                  ? "None"
-                  : allOwnersSelected
-                    ? "All"
-                    : selectedOwnerNames.length === 1
-                      ? selectedOwnerNames[0]
-                      : `${selectedOwnerNames.length} selected`}
+                {selectedOwnerNames.length === 0 ? (
+                  "None"
+                ) : allOwnersSelected ? (
+                  "All"
+                ) : selectedOwnerNames.length === 1 ? (
+                  (() => {
+                    const nm = selectedOwnerNames[0];
+                    return nm ? <PoolResponsiveOwnerNameText full={nm} /> : "1 selected";
+                  })()
+                ) : (
+                  `${selectedOwnerNames.length} selected`
+                )}
               </span>
               <ChevronDown className="size-3 shrink-0 opacity-45" strokeWidth={2.25} aria-hidden />
             </button>
@@ -1147,7 +1161,9 @@ export function PlayersPoolClient({
                             )
                           }
                         />
-                        <span className="truncate">{name}</span>
+                        <span className="truncate">
+                          <PoolResponsiveOwnerNameText full={name} />
+                        </span>
                       </label>
                     );
                   })}
@@ -1400,7 +1416,7 @@ export function PlayersPoolClient({
                       </div>
                     </td>
                     <td className="px-1 py-2 text-left text-foreground/85 transition-colors align-top pool-table-col-group-end">
-                      {ownerLabel(p)}
+                      <PoolResponsiveOwnerNameText full={ownerLabel(p)} />
                     </td>
                     <td className="px-1 py-2 text-center transition-colors">{seedDisplay}</td>
                     <td className="px-1 py-2 text-center transition-colors pool-table-col-group-end">

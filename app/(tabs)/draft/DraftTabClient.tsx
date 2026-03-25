@@ -10,9 +10,11 @@ import {
   readPlayerPoolSession,
   type PlayerPoolSession
 } from "@/lib/player-pool-session";
+import { PoolResponsiveOwnerNameText } from "@/components/stats/PoolResponsiveDisplayNames";
 import { PoolTablePlayerPhotoCell, PoolTableTeamLogoCell } from "@/components/stats/PoolTableMediaCells";
 import { resolveEspnTeamLogoForPoolRow } from "@/lib/espn-ncaam-assets";
 import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-directory";
+import { abbreviatePlayerNameForMobile } from "@/lib/pool-mobile-display-names";
 import { displayCollegeTeamNameForUi } from "@/lib/college-team-display";
 
 type DraftStateResponse = {
@@ -168,12 +170,19 @@ function DraftPlayerNameLink({
         target="_blank"
         rel="noopener noreferrer"
         className="pool-table-player-link"
+        title={playerName}
       >
-        {playerName}
+        <span className="hidden md:inline">{playerName}</span>
+        <span className="md:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
       </a>
     );
   }
-  return <span className="font-semibold">{playerName}</span>;
+  return (
+    <span className="font-semibold" title={playerName}>
+      <span className="hidden md:inline">{playerName}</span>
+      <span className="md:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
+    </span>
+  );
 }
 
 type DraftSortColumn = "name" | "team" | "position" | "seed" | "region" | "ppg" | "projection";
@@ -1310,7 +1319,9 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                       className="sticky left-0 z-[1] w-24 min-w-[5.5rem] max-w-[6rem] bg-[rgb(var(--pool-stats-bg-even)/0.92)] px-1 py-1.5 text-left text-[10px] font-medium leading-tight text-foreground backdrop-blur-sm align-top sm:text-[11px]"
                       title={row.ownerName}
                     >
-                      <span className="line-clamp-2 leading-snug">{row.ownerName}</span>
+                      <span className="line-clamp-2 leading-snug">
+                        <PoolResponsiveOwnerNameText full={row.ownerName} />
+                      </span>
                     </th>
                     {row.roundPicks.map((pick, idx) => {
                       const roundNumber = idx + 1;
@@ -1456,16 +1467,23 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
               {state.draftRoom.currentPickOverall}
             </span>
             <span>
-              Clock: <span className="font-semibold text-foreground">{onClockOwnerName}</span>
+              Clock:{" "}
+              <span className="font-semibold text-foreground">
+                <PoolResponsiveOwnerNameText full={onClockOwnerName} />
+              </span>
             </span>
             <span>Timer {timerRemaining === null ? "—" : formatSeconds(timerRemaining)}</span>
             <span className="font-medium">
               {yourTurn ?
                 <span className="text-accent">Your turn</span>
               : commissionerProxyMode && state.viewerCanCommissionerPick ?
-                <span className="text-accent">Proxy: {onClockOwnerName}</span>
+                <span className="text-accent">
+                  Proxy: <PoolResponsiveOwnerNameText full={onClockOwnerName} />
+                </span>
               : state.currentTurn.leagueTeamId ?
-                `Wait · ${onClockOwnerName}`
+                <span>
+                  Wait · <PoolResponsiveOwnerNameText full={onClockOwnerName} />
+                </span>
               : !activeLeagueId ?
                 "Set league in header"
               : "—"}
@@ -1835,7 +1853,9 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                               {displayCollegeTeam(p.player.team)} · {displayRegionName(p.player.team?.region)}
                             </div>
                           </td>
-                          <td className="pool-text-faint">{p.ownerName}</td>
+                          <td className="pool-text-faint">
+                            <PoolResponsiveOwnerNameText full={p.ownerName} />
+                          </td>
                         </tr>
                       ))}
                       {(!state || state.picks.length === 0) && (
@@ -1882,13 +1902,20 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                       aria-label="Filter draft results by owner"
                     >
                       <span className="pool-filter-select-trigger-text">
-                        {selectedResultOwnerIds.length === 0
-                          ? "None"
-                          : allResultOwnersSelected
-                            ? "All"
-                            : selectedResultOwnerIds.length === 1
-                              ? resultOwnerOptions.find((o) => o.leagueTeamId === selectedResultOwnerIds[0])?.ownerName ?? "1 selected"
-                              : `${selectedResultOwnerIds.length} selected`}
+                        {selectedResultOwnerIds.length === 0 ? (
+                          "None"
+                        ) : allResultOwnersSelected ? (
+                          "All"
+                        ) : selectedResultOwnerIds.length === 1 ? (
+                          (() => {
+                            const nm = resultOwnerOptions.find(
+                              (o) => o.leagueTeamId === selectedResultOwnerIds[0]
+                            )?.ownerName;
+                            return nm ? <PoolResponsiveOwnerNameText full={nm} /> : "1 selected";
+                          })()
+                        ) : (
+                          `${selectedResultOwnerIds.length} selected`
+                        )}
                       </span>
                       <ChevronDown className="size-3 shrink-0 opacity-45" strokeWidth={2.25} aria-hidden />
                     </button>
@@ -1942,7 +1969,9 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                       );
                                     }}
                                   />
-                                  <span className="truncate text-[11px]">{o.ownerName}</span>
+                                  <span className="truncate text-[11px]">
+                                    <PoolResponsiveOwnerNameText full={o.ownerName} />
+                                  </span>
                                 </label>
                               );
                             })}
@@ -1988,7 +2017,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                         className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md pool-card-header pool-owner-header"
                       >
                         <div className="text-sm font-semibold pool-owner-name min-w-0 truncate max-w-[min(100%,14rem)] sm:max-w-[18rem]">
-                          {bucket.ownerName}
+                          <PoolResponsiveOwnerNameText full={bucket.ownerName} />
                         </div>
                         <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
                           <span>Report Card: {rc.grade}</span>

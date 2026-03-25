@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { IceBoxBadge } from "@/components/stats/IceBoxBadge";
 import { InMoneyBadge } from "@/components/stats/InMoneyBadge";
 import { LeaderboardOwnerBadgesLegend } from "@/components/stats/LeaderboardOwnerBadgesLegend";
+import { PoolResponsiveOwnerNameText } from "@/components/stats/PoolResponsiveDisplayNames";
 import { ChevronDown, ChevronUp, Trophy } from "lucide-react";
 import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
 import {
@@ -900,14 +901,22 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                   }
                 >
                   <span className="pool-filter-select-trigger-text">
-                    {selectedLeagueTeamIds.length === 0
-                      ? toBookTitleCase("none")
-                      : selectedLeagueTeamIds.length === teamsSorted.length
-                        ? toBookTitleCase("all")
-                        : selectedLeagueTeamIds.length === 1
-                          ? teamsSorted.find((t) => t.leagueTeamId === selectedLeagueTeamIds[0])
-                              ?.ownerName ?? `1 ${toBookTitleCase("selected")}`
-                          : `${selectedLeagueTeamIds.length} ${toBookTitleCase("selected")}`}
+                    {selectedLeagueTeamIds.length === 0 ? (
+                      toBookTitleCase("none")
+                    ) : selectedLeagueTeamIds.length === teamsSorted.length ? (
+                      toBookTitleCase("all")
+                    ) : selectedLeagueTeamIds.length === 1 ? (
+                      (() => {
+                        const nm = teamsSorted.find((t) => t.leagueTeamId === selectedLeagueTeamIds[0])?.ownerName;
+                        return nm ? (
+                          <PoolResponsiveOwnerNameText full={nm} />
+                        ) : (
+                          `1 ${toBookTitleCase("selected")}`
+                        );
+                      })()
+                    ) : (
+                      `${selectedLeagueTeamIds.length} ${toBookTitleCase("selected")}`
+                    )}
                   </span>
                   <ChevronDown className="size-3 shrink-0 opacity-45" strokeWidth={2.25} aria-hidden />
                 </button>
@@ -955,7 +964,9 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                                 )
                               }
                             />
-                            <span className="truncate">{t.ownerName}</span>
+                            <span className="truncate">
+                              <PoolResponsiveOwnerNameText full={t.ownerName} />
+                            </span>
                           </label>
                         );
                       })}
@@ -1305,7 +1316,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           <td className="px-1 py-2 font-semibold text-left align-middle min-w-0 max-w-[9rem] pool-table-col-group-end">
                             <span className="inline-flex items-baseline gap-1 min-w-0 max-w-full">
                               <span className="truncate min-w-0" title={team.ownerName}>
-                                {team.ownerName}
+                                <PoolResponsiveOwnerNameText full={team.ownerName} />
                               </span>
                               {inTheMoney ? (
                                 <InMoneyBadge

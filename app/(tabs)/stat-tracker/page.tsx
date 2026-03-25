@@ -16,6 +16,7 @@ import {
 import type { StatTrackerApiResponse } from "@/lib/stat-tracker/build-stat-tracker-response";
 import { readJsonResponse } from "@/lib/read-json-response";
 import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-directory";
+import { PoolResponsiveOwnerNameText } from "@/components/stats/PoolResponsiveDisplayNames";
 import { PoolTablePlayerPhotoCell, PoolTableTeamLogoCell } from "@/components/stats/PoolTableMediaCells";
 import { HeatBadgeLegend } from "@/components/stats/HeatBadgeLegend";
 import { PlayerHeatBadge } from "@/components/stats/PlayerHeatBadge";
@@ -25,6 +26,7 @@ import {
   readPlayerPoolSession,
   PLAYER_POOL_IDENTITY_CHANGE_EVENT
 } from "@/lib/player-pool-session";
+import { abbreviateOwnerNameForMobile, abbreviatePlayerNameForMobile } from "@/lib/pool-mobile-display-names";
 import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
 
 type RoundScores = Record<number, number | null | undefined>;
@@ -80,12 +82,19 @@ function StatTrackerPlayerNameLink({
         target="_blank"
         rel="noopener noreferrer"
         className="pool-table-player-link"
+        title={playerName}
       >
-        {playerName}
+        <span className="hidden md:inline">{playerName}</span>
+        <span className="md:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
       </a>
     );
   }
-  return <span className="font-semibold">{playerName}</span>;
+  return (
+    <span className="font-semibold" title={playerName}>
+      <span className="hidden md:inline">{playerName}</span>
+      <span className="md:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
+    </span>
+  );
 }
 
 function displayRegionName(region: string): string {
@@ -1305,10 +1314,12 @@ function StatTrackerTabPageInner() {
     /** Match expanded header name cap (~14rem); same full name for every strip. */
     const MAX_OWNER_STRIP_PX = 224;
     let max = 0;
+    const mobile =
+      typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
     for (const o of selectedOwners) {
       const r = rankByOwnerId.get(o.ownerId) ?? 0;
       rankSlot.textContent = ordinalRankLabel(r);
-      nameSlot.textContent = o.ownerName;
+      nameSlot.textContent = mobile ? abbreviateOwnerNameForMobile(o.ownerName) : o.ownerName;
       max = Math.max(max, wrap.offsetWidth);
     }
     setCollapsedOwnerStripWidthPx(Math.min(Math.ceil(max), MAX_OWNER_STRIP_PX));
@@ -1557,14 +1568,18 @@ function StatTrackerTabPageInner() {
               }
             >
               <span className="pool-filter-select-trigger-text">
-                {selectedOwnerIds.length === 0
-                  ? toBookTitleCase("none")
-                  : selectedOwnerIds.length === ownersSorted.length
-                    ? toBookTitleCase("all")
-                    : selectedOwnerIds.length === 1
-                      ? ownersSorted.find((o) => o.ownerId === selectedOwnerIds[0])?.ownerName ??
-                        `1 ${toBookTitleCase("selected")}`
-                      : `${selectedOwnerIds.length} ${toBookTitleCase("selected")}`}
+                {selectedOwnerIds.length === 0 ? (
+                  toBookTitleCase("none")
+                ) : selectedOwnerIds.length === ownersSorted.length ? (
+                  toBookTitleCase("all")
+                ) : selectedOwnerIds.length === 1 ? (
+                  (() => {
+                    const nm = ownersSorted.find((o) => o.ownerId === selectedOwnerIds[0])?.ownerName;
+                    return nm ? <PoolResponsiveOwnerNameText full={nm} /> : `1 ${toBookTitleCase("selected")}`;
+                  })()
+                ) : (
+                  `${selectedOwnerIds.length} ${toBookTitleCase("selected")}`
+                )}
               </span>
               <ChevronDown className="size-3 shrink-0 opacity-45" strokeWidth={2.25} aria-hidden />
             </button>
@@ -1687,7 +1702,9 @@ function StatTrackerTabPageInner() {
                             )
                           }
                         />
-                        <span className="truncate">{o.ownerName}</span>
+                        <span className="truncate">
+                          <PoolResponsiveOwnerNameText full={o.ownerName} />
+                        </span>
                       </label>
                     );
                   })}
@@ -1980,7 +1997,7 @@ function StatTrackerTabPageInner() {
                       className="text-sm font-semibold pool-owner-name min-w-0 truncate max-w-[min(100%,14rem)] sm:max-w-[18rem]"
                       title={owner.ownerName}
                     >
-                      {owner.ownerName}
+                      <PoolResponsiveOwnerNameText full={owner.ownerName} />
                     </div>
                   </div>
                   <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
@@ -2461,7 +2478,7 @@ function StatTrackerTabPageInner() {
                     className="pool-owner-name min-w-0 flex-1 truncate text-left text-sm font-semibold max-w-[min(100%,14rem)] sm:max-w-[18rem]"
                     title={owner.ownerName}
                   >
-                    {owner.ownerName}
+                    <PoolResponsiveOwnerNameText full={owner.ownerName} />
                   </span>
                 </div>
                 {collapsedSummaryTable}

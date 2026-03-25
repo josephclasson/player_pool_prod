@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { PoolResponsiveOwnerNameText } from "@/components/stats/PoolResponsiveDisplayNames";
 import { PoolTablePlayerPhotoCell, PoolTableTeamLogoCell } from "@/components/stats/PoolTableMediaCells";
 import { PlayerHeatBadge } from "@/components/stats/PlayerHeatBadge";
 import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-directory";
@@ -15,6 +16,7 @@ import {
 } from "@/lib/all-tournament-team";
 import { computeHeatBadgeInfo } from "@/lib/player-heat-badge";
 import type { LeaderboardRosterPlayerApi } from "@/lib/scoring/persist-league-scoreboard";
+import { abbreviatePlayerNameForMobile } from "@/lib/pool-mobile-display-names";
 
 type RoundScores = Record<number, number | null | undefined>;
 
@@ -660,7 +662,7 @@ function LeaderboardPlayersHighlightTable({
                   </td>
                   <td className="px-1 py-2 text-left text-foreground/85 transition-colors align-top pool-table-col-group-end min-w-0 max-w-[9rem]">
                     <span className="truncate block" title={p.ownerName}>
-                      {p.ownerName}
+                      <PoolResponsiveOwnerNameText full={p.ownerName} />
                     </span>
                   </td>
                   <td
