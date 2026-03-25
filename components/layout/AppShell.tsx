@@ -435,8 +435,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div
             className={
               pathname === "/"
-                ? "flex min-h-0 flex-1 flex-col px-1.5 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-2 max-w-6xl mx-auto w-full md:px-6 md:pb-4"
-                : "flex min-h-0 flex-1 flex-col px-1.5 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-1 max-w-6xl mx-auto w-full md:px-5 md:py-2 md:pb-2"
+                ? "flex min-h-0 flex-1 flex-col px-0 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-2 max-w-6xl mx-auto w-full md:px-6 md:pb-4"
+                : "flex min-h-0 flex-1 flex-col px-0 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-1 max-w-6xl mx-auto w-full md:px-5 md:py-2 md:pb-2"
             }
           >
             {pathname === "/" ? (
