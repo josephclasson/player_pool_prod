@@ -712,7 +712,11 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
         throw new Error(`Pick failed: ${res.status} ${t}`);
       }
 
-      await loadState();
+      // Don't block the UI on a full draft-state reload.
+      // `loadState()` is relatively expensive and was making picks feel delayed.
+      void loadState().catch(() => {
+        /* ignore background refresh failures; draft will recover on next interval */
+      });
     } catch (e: any) {
       setError(e?.message ?? "Pick failed");
     } finally {
