@@ -316,8 +316,8 @@ export async function loadSeasonProjectionBundle(
     gameTeamByGameId.set(g.id, { a: g.team_a_id, b: g.team_b_id });
   }
 
-  /** Team played in display round (final/live) → show 0 fantasy pts when no box-score row for that player. */
-  const participatedDisplayRoundsByTeamId = new Map<number, Set<number>>();
+  /** Team played in display round (final/live) keyed by canonical team slug to survive team-id drift. */
+  const participatedDisplayRoundsByCanonical = new Map<string, Set<number>>();
   for (const g of dbGameRows) {
     const status = String((g as { status?: unknown }).status ?? "");
     if (!isFinalStatus(status) && !isLiveStatus(status)) continue;
@@ -327,8 +327,12 @@ export async function loadSeasonProjectionBundle(
     const b = safeNum((g as { team_b_id?: unknown }).team_b_id);
     for (const tid of [a, b]) {
       if (tid <= 0) continue;
-      if (!participatedDisplayRoundsByTeamId.has(tid)) participatedDisplayRoundsByTeamId.set(tid, new Set());
-      participatedDisplayRoundsByTeamId.get(tid)!.add(r);
+      const canon = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
+      if (!canon) continue;
+      if (!participatedDisplayRoundsByCanonical.has(canon)) {
+        participatedDisplayRoundsByCanonical.set(canon, new Set());
+      }
+      participatedDisplayRoundsByCanonical.get(canon)!.add(r);
     }
   }
 
@@ -374,9 +378,16 @@ export async function loadSeasonProjectionBundle(
 
     /** `${team_id}:${henrygdBoxscorePlayerId}` → canonical pool `players.id` */
     const henrygdKeyToPoolId = new Map<string, number>();
+    /** `${canonicalSlug}:${normalizedName}` → canonical pool `players.id` */
+    const canonicalNameToPoolId = new Map<string, number>();
     for (const pp of poolRows) {
       const tid = safeNum(pp.team_id);
       const pid = safeNum(pp.id);
+      const nk = normalizePlayerNameForMatch(String(pp.name ?? ""));
+      if (tid > 0 && pid > 0 && nk) {
+        const canon = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
+        if (canon) canonicalNameToPoolId.set(`${canon}:${nk}`, pid);
+      }
       const hid =
         pp.henrygd_boxscore_player_id?.trim() ||
         parseHenrygdBoxscorePlayerIdFromExternal(pp.external_player_id ?? null);
@@ -424,6 +435,14 @@ export async function loadSeasonProjectionBundle(
       }
       const nk = normalizePlayerNameForMatch(String(sp.name ?? ""));
       if (!nk) continue;
+      const canonSlug = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
+      if (canonSlug) {
+        const canonPid = canonicalNameToPoolId.get(`${canonSlug}:${nk}`);
+        if (canonPid != null && canonPid > 0) {
+          statPlayerToPoolId.set(sid, canonPid);
+          continue;
+        }
+      }
       const match = poolRows.find(
         (pp) => safeNum(pp.team_id) === tid && normalizePlayerNameForMatch(String(pp.name ?? "")) === nk
       );
@@ -485,7 +504,8 @@ export async function loadSeasonProjectionBundle(
       const poolPid = safeNum(pp.id);
       const tid = safeNum(pp.team_id);
       if (poolPid <= 0 || tid <= 0) continue;
-      const part = participatedDisplayRoundsByTeamId.get(tid);
+      const canon = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
+      const part = canon ? participatedDisplayRoundsByCanonical.get(canon) : undefined;
       if (!part || part.size === 0) continue;
       let byR = pointsByDisplayRoundByPlayer.get(poolPid);
       if (!byR) {

@@ -45,6 +45,10 @@ Commissioner POST routes require one of:
 
 Use the **Commissioner Tools** auth fields to store token/secret in `sessionStorage`.
 
+**Create league** (`POST /api/commissioner/leagues/create`): `profiles.id` references `auth.users`. With a valid commissioner password (or local dev bypass), the API **creates or reuses** a dedicated Auth user automatically — you do **not** need any users in the project first. Production uses **`pool-league-owner@player-pool.internal`** by default (override with **`COMMISSIONER_LEAGUE_OWNER_EMAIL`**). To record **your** account as `owner_id` instead, set **`COMMISSIONER_LEAGUE_OWNER_USER_ID`** to that user’s UUID. Local dev bypass uses **`dev-league-actor@player-pool.local`** when the UUID env var is unset.
+
+**`profiles_id_fkey` / create league:** apply migration **`0013_profiles_drop_auth_users_fkey.sql`** (included in `supabase db push`). It removes the foreign key from `public.profiles.id` to `auth.users` so commissioner flows can upsert a profile row without Postgres blocking on Auth visibility. Keep using real Auth user ids for owners so sign-in still lines up.
+
 ### Auth routes (Supabase + PKCE)
 
 - **`/auth/confirm`** is a **server route** (`@supabase/ssr`): exchanges magic-link `?code=` or runs **`verifyOtp`** using **cookies** (PKCE verifier is stored via `createBrowserClient`, not only `localStorage`). Commissioner “Email link” uses `?next=/commissioner`. Add **`/auth/confirm`** to Supabase **Redirect URLs**.

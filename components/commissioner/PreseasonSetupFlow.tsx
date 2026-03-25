@@ -534,7 +534,9 @@ export function PreseasonSetupFlow({
           <div className="font-semibold text-foreground">League — choose your path</div>
           {!sessionReady && (
             <p className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-100/90">
-              Sign in first (email link or password) — then you can continue.
+              Enter the <strong>commissioner password</strong> in the site header (League Identity bar → Commissioner)
+              to unlock this wizard. You do <strong>not</strong> need pool owners yet — step 2 runs{" "}
+              <em>after</em> you create or attach a league here. Optional: sign in with email if you use that path.
             </p>
           )}
 
@@ -591,7 +593,8 @@ export function PreseasonSetupFlow({
             <>
               <p className="pool-text-muted-sm text-sm">
                 New league: enter display name, short code, and season. Your league <strong>UUID</strong> appears in
-                the league field at the top of this section after you create.
+                the league field at the top of this section after you create. The server creates one technical Auth
+                user for the league record if needed — that is separate from your roster owners in step 2.
               </p>
               <div className="grid gap-2 sm:grid-cols-2">
                 <label className="flex flex-col gap-1">

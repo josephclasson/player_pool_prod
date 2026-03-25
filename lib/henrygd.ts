@@ -1,10 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  externalTeamIdToSeo,
   getEspnMbbTeamIndex,
   normalizePlayerNameForMatch,
   resolveEspnTeamLogoFromIndex
 } from "@/lib/espn-mbb-directory";
 import { resolveEspnTeamLogoForPoolRow } from "@/lib/espn-ncaam-assets";
+import {
+  fetchHenrygdBracketGames,
+  upsertTournamentTeamsFromBracketGames
+} from "@/lib/henrygd-bracket-seeds";
 
 type PlayerRosterRow = {
   id: number;
@@ -172,12 +177,49 @@ function isPower5ConferenceSeo(conferenceSeo: string | null | undefined) {
   ) || s.includes("big-12") || s.includes("big12") || s.includes("pac-12");
 }
 
+function seoBase(slug: string): string {
+  const s = slug.trim().toLowerCase();
+  if (!s) return s;
+  const parts = s.split("-").filter(Boolean);
+  if (parts.length <= 1) return s;
+  return parts.slice(0, -1).join("-");
+}
+
+function resolveTeamInternalIdFromSeo(
+  seoname: string,
+  seasonYear: number,
+  teamIdByExternal: ReadonlyMap<string, number>,
+  teamIdBySeo: ReadonlyMap<string, number>
+): number | null {
+  const seo = seoname.trim().toLowerCase();
+  if (!seo) return null;
+  const direct = teamIdByExternal.get(`${seo}-${seasonYear}`);
+  if (direct != null && direct > 0) return direct;
+  const bySeo = teamIdBySeo.get(seo);
+  if (bySeo != null && bySeo > 0) return bySeo;
+  const byBase = teamIdBySeo.get(seoBase(seo));
+  if (byBase != null && byBase > 0) return byBase;
+  return null;
+}
+
 export type HenrygdSyncResult = {
   teamsUpserted: number;
   gamesUpserted: number;
   teamGameStatsUpserted: number;
   playersUpserted: number;
   playerGameStatsUpserted: number;
+  /** Increment when changing bracket/game filtering logic, to confirm deployed backend version. */
+  henrygdSyncLogicVersion: number;
+  /** Optional debug when using the Henrygd bracket endpoint as a source of truth for `games` round bucketing. */
+  bracketDebug?: {
+    bracketAllCount: number;
+    bracketPlayedCount: number;
+    bracketExternalTeamIdsCount: number;
+    bracketGamesUpserted: number;
+    bracketTeamsUpserted: number;
+  };
+  /** Set when bracket sync was attempted but failed; legacy scoreboard sync may still run. */
+  bracketError?: string | null;
 };
 
 /**
@@ -199,6 +241,182 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
 }): Promise<HenrygdSyncResult> {
   const { supabase, seasonYear, date, syncPlayerBoxscores = true } = opts;
   const excludeFirstFour = opts.excludeFirstFour !== false;
+  let bracketError: string | null = null;
+  let bracketDebug: NonNullable<HenrygdSyncResult["bracketDebug"]> = {
+    bracketAllCount: 0,
+    bracketPlayedCount: 0,
+    bracketExternalTeamIdsCount: 0,
+    bracketGamesUpserted: 0,
+    bracketTeamsUpserted: 0
+  };
+  const henrygdSyncLogicVersion = 2;
+
+  // Henrygd’s daily scoreboard endpoint does not reliably include bracket metadata
+  // (e.g. `championshipGame.round.roundNumber`). When that happens, our previous
+  // filter results in zero bracket games → zero `public.games` rows for R1–R6.
+  //
+  // The bracket endpoint is the correct source of truth for:
+  // - `contestId` (used by `/game/{id}/boxscore`)
+  // - `startTimeEpoch`
+  // - team `seoname`
+  // - and gameState (final/live).
+  try {
+    const bracketAll = await fetchHenrygdBracketGames(seasonYear);
+    const dateMs = date.getTime();
+    const bracketPlayed = (bracketAll as any[]).filter((g) => {
+      const epochSec = safeNum(g?.startTimeEpoch);
+      if (epochSec == null) return false;
+      const startMs = epochSec * 1000;
+      const stateRaw = String(g?.gameState ?? "");
+      const state = stateRaw.trim().toUpperCase();
+      // Henrygd uses inconsistent gameState labels depending on endpoint/version.
+      return state === "F" || state === "L" || state === "FINAL" || state === "LIVE";
+    });
+
+    // Default bracket debug values are already set; if we have no played games, keep zeros but still
+    // report how many were fetched from the endpoint.
+    if (bracketPlayed.length === 0) {
+      bracketDebug.bracketAllCount = Array.isArray(bracketAll) ? bracketAll.length : 0;
+    }
+
+    if (bracketPlayed.length > 0) {
+      // Ensure teams exist for all seonames that appear in the played games.
+      const teamsUpserted = await upsertTournamentTeamsFromBracketGames(
+        supabase,
+        seasonYear,
+        bracketPlayed as any
+      );
+
+      const externalTeamIds = new Set<string>();
+      for (const g of bracketPlayed) {
+        const teams = (g?.teams ?? []) as any[];
+        const home = teams.find((t) => t?.isHome === true);
+        const away = teams.find((t) => t?.isHome === false);
+        const homeSeo = home?.seoname;
+        const awaySeo = away?.seoname;
+        if (typeof homeSeo === "string" && homeSeo.trim()) externalTeamIds.add(`${homeSeo}-${seasonYear}`);
+        if (typeof awaySeo === "string" && awaySeo.trim()) externalTeamIds.add(`${awaySeo}-${seasonYear}`);
+      }
+
+      const { data: teamRows } = externalTeamIds.size
+        ? await supabase
+            .from("teams")
+            .select("id, external_team_id")
+            .in("external_team_id", Array.from(externalTeamIds))
+        : { data: [] as any[] };
+
+      const teamIdByExternal = new Map<string, number>(
+        (teamRows ?? []).map((t: any) => [String(t.external_team_id ?? ""), safeNum(t.id) ?? 0])
+      );
+
+      const nowIso = new Date().toISOString();
+      const gameUpserts: any[] = [];
+
+      for (const g of bracketPlayed) {
+        const bracketPositionId = safeNum(g?.bracketPositionId);
+        if (bracketPositionId == null || bracketPositionId <= 0) continue;
+
+        // bracketPositionId: 101 first four, 201 round of 64, ..., 701 championship
+        const mappedRound = Math.floor(bracketPositionId / 100) - 1; // -> 0..6
+        if (excludeFirstFour && mappedRound === 0) continue;
+        if (mappedRound < 0 || mappedRound > 6) continue;
+
+        const contestId = g?.contestId != null ? String(g.contestId) : String(g?.url ?? "").split("/").pop();
+        if (!contestId) continue;
+
+        const epochSec = safeNum(g?.startTimeEpoch);
+        if (epochSec == null) continue;
+        const startTime = new Date(epochSec * 1000).toISOString();
+
+        const teams = (g?.teams ?? []) as any[];
+        const home = teams.find((t) => t?.isHome === true) ?? null;
+        const away = teams.find((t) => t?.isHome === false) ?? null;
+        if (!home || !away) continue;
+
+        const homeSeo = typeof home.seoname === "string" ? home.seoname : null;
+        const awaySeo = typeof away.seoname === "string" ? away.seoname : null;
+        if (!homeSeo || !awaySeo) continue;
+
+        const homeExternal = `${homeSeo}-${seasonYear}`;
+        const awayExternal = `${awaySeo}-${seasonYear}`;
+        const teamB = teamIdByExternal.get(homeExternal);
+        const teamA = teamIdByExternal.get(awayExternal);
+        if (!teamA || !teamB) continue;
+
+        const homeScore = safeNum(home?.score) ?? 0;
+        const awayScore = safeNum(away?.score) ?? 0;
+
+        const stateRaw = String(g?.gameState ?? "");
+        const state = stateRaw.trim().toUpperCase();
+        const status = state === "L" || state === "LIVE" ? "live" : "final";
+
+        gameUpserts.push({
+          external_game_id: contestId,
+          round: mappedRound,
+          start_time: startTime,
+          team_a_id: teamA,
+          team_b_id: teamB,
+          team_a_score: awayScore,
+          team_b_score: homeScore,
+          status,
+          last_synced_at: nowIso
+        });
+      }
+
+      if (gameUpserts.length > 0) {
+        await supabase.from("games").upsert(gameUpserts, { onConflict: "external_game_id" });
+        const { data: upsertedGames } = await supabase
+          .from("games")
+          .select("id, external_game_id")
+          .in("external_game_id", gameUpserts.map((u) => u.external_game_id));
+
+        const gameIdByExternal = new Map<string, number>(
+          (upsertedGames ?? []).map((row: any) => [String(row.external_game_id ?? ""), safeNum(row.id) ?? 0])
+        );
+
+        const teamStatsUpserts: any[] = [];
+        for (const u of gameUpserts) {
+          const gid = gameIdByExternal.get(String(u.external_game_id ?? ""));
+          if (!gid) continue;
+          if (safeNum(u.team_a_id) && safeNum(u.team_a_id) > 0) {
+            teamStatsUpserts.push({ game_id: gid, team_id: u.team_a_id, points: u.team_a_score ?? 0 });
+          }
+          if (safeNum(u.team_b_id) && safeNum(u.team_b_id) > 0) {
+            teamStatsUpserts.push({ game_id: gid, team_id: u.team_b_id, points: u.team_b_score ?? 0 });
+          }
+        }
+        if (teamStatsUpserts.length > 0) {
+          await supabase
+            .from("team_game_stats")
+            .upsert(teamStatsUpserts, { onConflict: "game_id,team_id" });
+        }
+      }
+
+      // Player box scores are intentionally handled by the explicit “Fill player box scores” step.
+      // (Per-day boxscore syncing is extremely rate-limited and expensive.)
+      bracketDebug = {
+        bracketAllCount: Array.isArray(bracketAll) ? bracketAll.length : 0,
+        bracketPlayedCount: bracketPlayed.length,
+        bracketExternalTeamIdsCount: externalTeamIds.size,
+        bracketGamesUpserted: gameUpserts.length,
+        bracketTeamsUpserted: teamsUpserted
+      };
+      return {
+        teamsUpserted: teamsUpserted,
+        gamesUpserted: gameUpserts.length,
+        teamGameStatsUpserted: 0,
+        playersUpserted: 0,
+        playerGameStatsUpserted: 0,
+        bracketDebug,
+        bracketError,
+        henrygdSyncLogicVersion
+      };
+    }
+  } catch (e) {
+    // Important: don't silently swallow bracket failures; they cause 0-team/0-game sync.
+    bracketError = e instanceof Error ? e.message : String(e);
+    console.error("[henrygd] bracket sync failed", bracketError);
+  }
 
   const y = date.getUTCFullYear();
   const m = date.getUTCMonth() + 1;
@@ -215,10 +433,21 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
   const json = await resp.json();
   const games = (json?.games ?? []) as any[];
 
-  // We only want games that have bracketRound and championshipGame.roundNumber (tournament bracket games).
+  // We only want tournament-bracket games.
+  // Henrygd is inconsistent: some responses omit `championshipGame.round.roundNumber` but still
+  // provide `bracketRound`, so use whichever is available to decide eligibility + mapping.
   const bracketGames = games
     .map((entry) => entry?.game)
-    .filter((g) => g?.bracketRound !== undefined && g?.championshipGame?.round?.roundNumber);
+    .filter((g) => {
+      if (!g?.gameID) return false;
+      const roundNumberRaw = g?.championshipGame?.round?.roundNumber;
+      const hasRoundNumber = roundNumberRaw != null && String(roundNumberRaw).trim() !== "";
+      const bracketRoundRaw = g?.bracketRound;
+      const hasBracketRound =
+        bracketRoundRaw != null &&
+        !(typeof bracketRoundRaw === "string" && bracketRoundRaw.trim() === "");
+      return hasRoundNumber || hasBracketRound;
+    });
 
   let espnTeamIndex: Awaited<ReturnType<typeof getEspnMbbTeamIndex>> | null = null;
   try {
@@ -231,6 +460,7 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
   // We use external_team_id = `${seo}-${seasonYear}` to avoid collisions across seasons.
   type TeamKey = string; // external_team_id
   const teamIdByExternal = new Map<TeamKey, number>();
+  const teamIdBySeo = new Map<string, number>();
 
   // Helper: ensure team upsert and return internal id.
   const upsertTeams = async (teamPayloads: any[]) => {
@@ -277,6 +507,12 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
 
     for (const row of createdTeams ?? []) {
       teamIdByExternal.set(row.external_team_id, row.id);
+      const seo = externalTeamIdToSeo(String(row.external_team_id ?? ""), seasonYear);
+      if (seo) {
+        if (!teamIdBySeo.has(seo)) teamIdBySeo.set(seo, row.id);
+        const base = seoBase(seo);
+        if (base && !teamIdBySeo.has(base)) teamIdBySeo.set(base, row.id);
+      }
     }
 
     return upserts.length;
@@ -328,19 +564,52 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
   for (const g of bracketGames) {
     const gameId = g?.gameID;
     const roundNumber = parseIntOrNull(g?.championshipGame?.round?.roundNumber);
-    if (roundNumber === null) continue;
-    if (excludeFirstFour && roundNumber === 1) continue;
+    // Map henrygd `bracketRound` to our `games.round` buckets (0..6 where 0 is First Four).
+    //
+    // The feed sometimes provides `bracketRound` already bucketed (0..6),
+    // but in other henrygd endpoints it can be a "position id" style number (e.g. 100..600),
+    // so we normalize by /100 when needed.
+    const bracketRoundInput = g?.bracketRound;
+    const bracketRoundRaw =
+      typeof bracketRoundInput === "string" && bracketRoundInput.trim() === ""
+        ? null
+        : safeNum(bracketRoundInput);
+    let mappedRound: number | null = null;
+    if (bracketRoundRaw != null) {
+      if (bracketRoundRaw >= 0 && bracketRoundRaw <= 6) {
+        mappedRound = bracketRoundRaw;
+      } else {
+        const bucket = Math.floor(bracketRoundRaw / 100);
+        if (bucket >= 0 && bucket <= 6) mappedRound = bucket;
+        // Some feeds use a 100/200/.. style position id where 100..700 maps to 0..6.
+        else if (bucket - 1 >= 0 && bucket - 1 <= 6) mappedRound = bucket - 1;
+      }
+    }
 
-    // Map henrygd roundNumber to our `games.round`:
-    // - roundNumber 1 => First Four => store as 0
-    // - roundNumber 2 => Round of 64 => store as 1 (R1)
-    // - ...
-    const mappedRound = roundNumber === 1 ? 0 : roundNumber - 1;
+    if (mappedRound == null) {
+      // Fallback: Map henrygd roundNumber to our `games.round`:
+      // - roundNumber 1 => First Four => store as 0
+      // - roundNumber 2 => Round of 64 => store as 1 (R1)
+      // - Some henrygd shapes can send position ids (e.g. 100..600); bucket those.
+      if (roundNumber != null) {
+        if (roundNumber >= 100) {
+          mappedRound = Math.floor(roundNumber / 100);
+        } else {
+          mappedRound = roundNumber === 1 ? 0 : roundNumber - 1;
+        }
+      }
+    }
+
+    if (mappedRound == null) continue;
+    if (excludeFirstFour && mappedRound === 0) continue;
+    if (mappedRound < 0 || mappedRound > 6) continue;
 
     const awaySeo = g?.away?.names?.seo;
     const homeSeo = g?.home?.names?.seo;
-    const awayTeamInternal = awaySeo ? teamIdByExternal.get(`${awaySeo}-${seasonYear}`) : undefined;
-    const homeTeamInternal = homeSeo ? teamIdByExternal.get(`${homeSeo}-${seasonYear}`) : undefined;
+    const awayTeamInternal =
+      awaySeo ? resolveTeamInternalIdFromSeo(awaySeo, seasonYear, teamIdByExternal, teamIdBySeo) : undefined;
+    const homeTeamInternal =
+      homeSeo ? resolveTeamInternalIdFromSeo(homeSeo, seasonYear, teamIdByExternal, teamIdBySeo) : undefined;
     if (!awayTeamInternal || !homeTeamInternal) continue;
 
     const statusRaw = String(g?.gameState ?? "");
@@ -463,8 +732,7 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
             const teamIdNum = safeNum(tb.teamId);
             const seoname = teamIdToSeoname.get(teamIdNum ?? 0) ?? "";
             if (!seoname) continue;
-            const teamExternalKey = `${seoname}-${seasonYear}`;
-            const tid = teamIdByExternal.get(teamExternalKey);
+            const tid = resolveTeamInternalIdFromSeo(seoname, seasonYear, teamIdByExternal, teamIdBySeo);
             if (tid != null && tid > 0) teamInternalIds.add(tid);
           }
 
@@ -499,8 +767,12 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
             const seoname = teamIdToSeoname.get(teamIdNum ?? 0) ?? "";
             if (!seoname) continue;
 
-            const teamExternalKey = `${seoname}-${seasonYear}`;
-            const teamInternalId = teamIdByExternal.get(teamExternalKey);
+            const teamInternalId = resolveTeamInternalIdFromSeo(
+              seoname,
+              seasonYear,
+              teamIdByExternal,
+              teamIdBySeo
+            );
             if (teamInternalId == null || teamInternalId <= 0) continue;
 
             const roster = rosterByTeam.get(teamInternalId) ?? [];
@@ -649,7 +921,10 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
       gamesUpserted,
       teamGameStatsUpserted: statsUpsertsFinal.length,
       playersUpserted,
-      playerGameStatsUpserted
+      playerGameStatsUpserted,
+      bracketError,
+      bracketDebug,
+      henrygdSyncLogicVersion
     };
   }
 
@@ -658,7 +933,10 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
     gamesUpserted: 0,
     teamGameStatsUpserted: 0,
     playersUpserted: 0,
-    playerGameStatsUpserted: 0
+    playerGameStatsUpserted: 0,
+    bracketError,
+    bracketDebug,
+    henrygdSyncLogicVersion
   };
 }
 

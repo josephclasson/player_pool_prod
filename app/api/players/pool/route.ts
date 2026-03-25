@@ -75,7 +75,27 @@ export async function GET(req: Request) {
     typeof (latestGame as { last_synced_at?: unknown } | null)?.last_synced_at === "string"
       ? String((latestGame as { last_synced_at: string }).last_synced_at)
       : null;
-  const etag = buildEtag(["players-pool", seasonYear, q?.trim() ?? "", take, leagueId ?? "", lastSyncedAt ?? ""]);
+  const { data: latestPlayerStatsRow } = await supabase
+    .from("player_game_stats")
+    .select("updated_at, games!inner(start_time)")
+    .gte("games.start_time", seasonStartIso)
+    .lt("games.start_time", seasonEndIso)
+    .order("updated_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const playerStatsUpdatedAt =
+    typeof (latestPlayerStatsRow as { updated_at?: unknown } | null)?.updated_at === "string"
+      ? String((latestPlayerStatsRow as { updated_at: string }).updated_at)
+      : null;
+  const etag = buildEtag([
+    "players-pool",
+    seasonYear,
+    q?.trim() ?? "",
+    take,
+    leagueId ?? "",
+    lastSyncedAt ?? "",
+    playerStatsUpdatedAt ?? ""
+  ]);
   if (ifNoneMatch && ifNoneMatch === etag) {
     return new NextResponse(null, {
       status: 304,

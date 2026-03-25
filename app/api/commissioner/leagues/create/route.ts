@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createSupabaseAdminClientSafe } from "@/lib/supabase/admin";
+import { ensureProfileForAuthUser } from "@/lib/commissioner/ensure-profile-for-auth-user";
 import { resolveCreateLeagueActor } from "@/lib/commissioner/resolve-create-league-actor";
 
 const bodySchema = z.object({
@@ -38,20 +39,33 @@ export async function POST(req: Request) {
   const { name, code, seasonYear, defaultPasscode, guestPasscode } = parsed.data;
   const codeNorm = code.trim();
 
-  const displayName =
-    actor.email?.split("@")[0]?.trim().slice(0, 80) || "Commissioner";
-  const { error: profileErr } = await supabase.from("profiles").upsert(
-    {
-      id: actor.profileId,
-      display_name: displayName
-    },
-    { onConflict: "id" }
-  );
-  if (profileErr) {
+  const ownerParsed = z.string().uuid().safeParse(String(actor.profileId).trim());
+  if (!ownerParsed.success) {
     return NextResponse.json(
-      { error: `Could not ensure profile row: ${profileErr.message}` },
+      { error: "Invalid league owner user id from auth — cannot create league." },
       { status: 500 }
     );
+  }
+  const ownerUserId = ownerParsed.data;
+
+  const { data: authActor, error: authActorErr } = await supabase.auth.admin.getUserById(ownerUserId);
+  if (authActorErr || !authActor?.user?.id) {
+    return NextResponse.json(
+      {
+        error:
+          "Create league needs a Supabase Auth user for the league owner. If you used a Bearer token, it must be from this project. Prefer the commissioner password in the site header, or set COMMISSIONER_LEAGUE_OWNER_USER_ID to a user UUID from Dashboard → Authentication."
+      },
+      { status: 500 }
+    );
+  }
+
+  const emailForDisplay =
+    actor.email?.trim() || authActor.user.email?.trim() || "";
+  const displayName = emailForDisplay.split("@")[0]?.trim().slice(0, 80) || "Commissioner";
+
+  const profileOk = await ensureProfileForAuthUser(supabase, ownerUserId, displayName);
+  if (!profileOk.ok) {
+    return NextResponse.json({ error: profileOk.error }, { status: 500 });
   }
 
   const { data: created, error } = await supabase
@@ -60,7 +74,7 @@ export async function POST(req: Request) {
       name: name.trim(),
       season_year: seasonYear,
       code: codeNorm,
-      owner_id: actor.profileId,
+      owner_id: ownerUserId,
       default_passcode: defaultPasscode ?? null,
       guest_passcode: guestPasscode ?? "guest"
     })
@@ -84,7 +98,7 @@ export async function POST(req: Request) {
   await supabase.from("league_members").upsert(
     {
       league_id: row.id,
-      user_id: actor.profileId,
+      user_id: ownerUserId,
       role: "commissioner",
       is_autodraft: false
     },

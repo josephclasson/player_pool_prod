@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normalizePlayerNameForMatch } from "@/lib/espn-mbb-directory";
+import { externalTeamIdToSeo, normalizePlayerNameForMatch } from "@/lib/espn-mbb-directory";
 import { claimHenrygdBoxscorePlayerForCanonicalRow } from "@/lib/henrygd";
 
 type PlayerRosterRow = {
@@ -33,6 +33,23 @@ function resolveCanonicalPlayerForBoxscore(opts: {
 function safeNum(x: unknown): number | null {
   const n = typeof x === "number" ? x : Number(x);
   return Number.isFinite(n) ? n : null;
+}
+
+function normalizeGamesRoundForR1ToR6(roundValue: unknown): number | null {
+  const r = safeNum(roundValue);
+  if (r == null) return null;
+
+  // Expected schema: 0..6 where 0=First Four, 1..6 = R1..R6.
+  if (r >= 0 && r <= 6) return r;
+
+  // If some prod data accidentally stored bracketPositionId-like values (e.g. 101, 201, ...),
+  // convert back: floor(pos/100) - 1 => 0..6.
+  if (r >= 100 && r <= 800) {
+    const bucket = Math.floor(r / 100) - 1;
+    if (bucket >= 0 && bucket <= 6) return bucket;
+  }
+
+  return null;
 }
 
 function parseIntOrNull(x: unknown) {
@@ -73,6 +90,31 @@ export type PlayerBoxscoreBackfillResult = {
   errors: string[];
 };
 
+function seoBase(slug: string): string {
+  const s = slug.trim().toLowerCase();
+  if (!s) return s;
+  const parts = s.split("-").filter(Boolean);
+  if (parts.length <= 1) return s;
+  return parts.slice(0, -1).join("-");
+}
+
+function resolveTeamInternalIdFromSeo(
+  seoname: string,
+  seasonYear: number,
+  teamIdByExternal: ReadonlyMap<string, number>,
+  teamIdBySeo: ReadonlyMap<string, number>
+): number | null {
+  const seo = seoname.trim().toLowerCase();
+  if (!seo) return null;
+  const direct = teamIdByExternal.get(`${seo}-${seasonYear}`);
+  if (direct != null && direct > 0) return direct;
+  const bySeo = teamIdBySeo.get(seo);
+  if (bySeo != null && bySeo > 0) return bySeo;
+  const byBase = teamIdBySeo.get(seoBase(seo));
+  if (byBase != null && byBase > 0) return byBase;
+  return null;
+}
+
 /**
  * Fetches henrygd box scores for every R1–R6 row already in `games` and upserts `player_game_stats`.
  * Use when daily scoreboard sync created `games` but never filled per-player stats (empty table).
@@ -89,10 +131,19 @@ export async function syncPlayerBoxscoresForSeasonGamesInDb(opts: {
     .ilike("external_team_id", `%-${seasonYear}`);
 
   const teamIdByExternal = new Map<string, number>();
+  const teamIdBySeo = new Map<string, number>();
   for (const t of teamRows ?? []) {
     const ext = String(t.external_team_id ?? "");
     const id = safeNum(t.id);
-    if (ext && id != null && id > 0) teamIdByExternal.set(ext, id);
+    if (ext && id != null && id > 0) {
+      teamIdByExternal.set(ext, id);
+      const seo = externalTeamIdToSeo(ext, seasonYear);
+      if (seo) {
+        if (!teamIdBySeo.has(seo)) teamIdBySeo.set(seo, id);
+        const base = seoBase(seo);
+        if (base && !teamIdBySeo.has(base)) teamIdBySeo.set(base, id);
+      }
+    }
   }
 
   const gameRows: { id: number; external_game_id: string }[] = [];
@@ -100,8 +151,8 @@ export async function syncPlayerBoxscoresForSeasonGamesInDb(opts: {
   for (let from = 0; ; from += pageSize) {
     const { data: chunk, error } = await supabase
       .from("games")
-      .select("id, external_game_id")
-      .in("round", [1, 2, 3, 4, 5, 6])
+      .select("id, external_game_id, round")
+      .not("external_game_id", "is", null)
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
     if (error) break;
@@ -109,6 +160,9 @@ export async function syncPlayerBoxscoresForSeasonGamesInDb(opts: {
     for (const g of rows) {
       const id = safeNum((g as { id: unknown }).id);
       const ext = String((g as { external_game_id: unknown }).external_game_id ?? "");
+      const bucket = normalizeGamesRoundForR1ToR6((g as { round?: unknown }).round);
+      if (bucket == null) continue;
+      if (bucket < 1 || bucket > 6) continue;
       if (id != null && id > 0 && ext) gameRows.push({ id, external_game_id: ext });
     }
     if (rows.length < pageSize) break;
@@ -126,7 +180,8 @@ export async function syncPlayerBoxscoresForSeasonGamesInDb(opts: {
       seasonYear,
       gameInternalId: g.id,
       externalGameId: g.external_game_id,
-      teamIdByExternal
+      teamIdByExternal,
+      teamIdBySeo
     });
     playersTouched += one.playersTouched;
     playerGameStatsRowsUpserted += one.playerGameStatsRowsUpserted;
@@ -151,12 +206,13 @@ async function ingestHenrygdBoxscoreForOneGame(opts: {
   gameInternalId: number;
   externalGameId: string;
   teamIdByExternal: Map<string, number>;
+  teamIdBySeo: Map<string, number>;
 }): Promise<{
   playersTouched: number;
   playerGameStatsRowsUpserted: number;
   error?: string;
 }> {
-  const { supabase, seasonYear, gameInternalId, externalGameId, teamIdByExternal } = opts;
+  const { supabase, seasonYear, gameInternalId, externalGameId, teamIdByExternal, teamIdBySeo } = opts;
   let playersTouched = 0;
 
   const boxUrl = `https://ncaa-api.henrygd.me/game/${encodeURIComponent(externalGameId)}/boxscore`;
@@ -185,8 +241,7 @@ async function ingestHenrygdBoxscoreForOneGame(opts: {
       const teamIdNum = safeNum(tb.teamId);
       const seoname = teamIdToSeoname.get(teamIdNum ?? 0) ?? "";
       if (!seoname) continue;
-      const teamExternalKey = `${seoname}-${seasonYear}`;
-      const tid = teamIdByExternal.get(teamExternalKey);
+      const tid = resolveTeamInternalIdFromSeo(seoname, seasonYear, teamIdByExternal, teamIdBySeo);
       if (tid != null && tid > 0) teamInternalIds.add(tid);
     }
 
@@ -221,8 +276,7 @@ async function ingestHenrygdBoxscoreForOneGame(opts: {
       const seoname = teamIdToSeoname.get(teamIdNum ?? 0) ?? "";
       if (!seoname) continue;
 
-      const teamExternalKey = `${seoname}-${seasonYear}`;
-      const teamInternalId = teamIdByExternal.get(teamExternalKey);
+      const teamInternalId = resolveTeamInternalIdFromSeo(seoname, seasonYear, teamIdByExternal, teamIdBySeo);
       if (teamInternalId == null || teamInternalId <= 0) continue;
 
       const roster = rosterByTeam.get(teamInternalId) ?? [];

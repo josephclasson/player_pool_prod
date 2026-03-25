@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ensureProfileForAuthUser } from "@/lib/commissioner/ensure-profile-for-auth-user";
 import { normalizeEmailFragment } from "@/lib/demo/league";
 
 function demoPassword(pass: string | undefined) {
@@ -38,16 +39,15 @@ export async function ensureDemoAuthProfileForLeague(opts: {
       user_metadata: { display_name: displayName }
     });
     if (createErr) throw createErr;
-    const userId = created.user.id;
-    await supabase.from("profiles").upsert({ id: userId, display_name: displayName }, { onConflict: "id" });
+    const userId = created.user!.id;
+    const prof = await ensureProfileForAuthUser(supabase, userId, displayName);
+    if (!prof.ok) throw new Error(prof.error);
     return { userId };
   }
 
   const userId = (existing as { id: string }).id;
-  const { data: prof } = await supabase.from("profiles").select("id").eq("id", userId).maybeSingle();
-  if (!prof) {
-    await supabase.from("profiles").insert({ id: userId, display_name: displayName });
-  }
+  const prof = await ensureProfileForAuthUser(supabase, userId, displayName);
+  if (!prof.ok) throw new Error(prof.error);
   return { userId };
 }
 

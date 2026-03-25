@@ -97,7 +97,7 @@ Next steps (production, project player_pool_prod):
   1. Set the same variables in your host (e.g. Vercel → Environment Variables), using keys from player_pool_prod — never commit .env.production.local
   2. NEXT_PUBLIC_SITE_URL must be your public origin (no trailing slash)
   3. Do NOT set ALLOW_COMMISSIONER_ROUTES_WITHOUT_AUTH=true or NEXT_PUBLIC_ALLOW_* in production
-  4. Set COMMISSIONER_API_SECRET and use Commissioner Tools with the password / header
+  4. Set COMMISSIONER_API_SECRET (create-league auto-provisions an Auth user if COMMISSIONER_LEAGUE_OWNER_USER_ID is unset)
   5. Add https://your-domain.com/auth/confirm and https://your-domain.com/join to Supabase Redirect URLs
   6. npm run build && npm run start  (or deploy via your platform)
 

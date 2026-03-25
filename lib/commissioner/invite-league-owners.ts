@@ -1,4 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { ensureProfileForAuthUser } from "@/lib/commissioner/ensure-profile-for-auth-user";
+import { adminFindUserIdByEmail } from "@/lib/supabase/admin-find-user-by-email";
 
 const USERNAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{1,23}$/;
 
@@ -43,25 +45,6 @@ function normalizeOwners(rows: OwnerInviteRow[]): OwnerInviteRow[] {
   return out;
 }
 
-async function findUserIdByEmail(
-  supabase: SupabaseClient,
-  email: string
-): Promise<string | null> {
-  const target = email.toLowerCase();
-  let page = 1;
-  const perPage = 200;
-  for (let i = 0; i < 20; i++) {
-    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage });
-    if (error) throw error;
-    const users = (data as { users?: { id: string; email?: string }[] })?.users ?? [];
-    const found = users.find((u) => String(u.email ?? "").toLowerCase() === target);
-    if (found) return found.id;
-    if (users.length < perPage) break;
-    page += 1;
-  }
-  return null;
-}
-
 async function upsertLeagueMembership(opts: {
   supabase: SupabaseClient;
   leagueId: string;
@@ -75,10 +58,8 @@ async function upsertLeagueMembership(opts: {
 
   const role = leagueOwnerId && userId === leagueOwnerId ? "commissioner" : "member";
 
-  await supabase.from("profiles").upsert(
-    { id: userId, display_name: fullName },
-    { onConflict: "id" }
-  );
+  const prof = await ensureProfileForAuthUser(supabase, userId, fullName);
+  if (!prof.ok) throw new Error(prof.error);
 
   await supabase.from("league_members").upsert(
     {
@@ -171,7 +152,7 @@ export async function inviteLeagueOwners(opts: {
       continue;
     }
 
-    const existingId = await findUserIdByEmail(supabase, row.email);
+    const existingId = await adminFindUserIdByEmail(supabase, row.email);
 
     if (existingId) {
       await upsertLeagueMembership({
@@ -208,7 +189,7 @@ export async function inviteLeagueOwners(opts: {
     if (invErr || !invited?.user?.id) {
       const msg = invErr?.message ?? "invite failed";
       if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("registered")) {
-        const retryId = await findUserIdByEmail(supabase, row.email);
+        const retryId = await adminFindUserIdByEmail(supabase, row.email);
         if (retryId) {
           await upsertLeagueMembership({
             supabase,

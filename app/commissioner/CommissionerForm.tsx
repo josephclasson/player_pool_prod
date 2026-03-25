@@ -288,8 +288,27 @@ export function CommissionerForm() {
       });
       const json = await readJsonResponse(res);
       if (!res.ok) throw new Error(formatApiError(json, `Sync failed: ${res.status}`));
-      const j = json as { sync?: { teamsUpserted?: number } };
-      setMessage(`Synced games. Teams: ${j.sync?.teamsUpserted ?? "?"}`);
+      const j = json as {
+        sync?: {
+          teamsUpserted?: number;
+          bracketDebug?: {
+            bracketAllCount: number;
+            bracketPlayedCount: number;
+            bracketExternalTeamIdsCount: number;
+            bracketGamesUpserted: number;
+            bracketTeamsUpserted: number;
+          };
+          bracketError?: string | null;
+        };
+      };
+      const bd = j.sync?.bracketDebug;
+      setMessage(
+        `Synced games. Teams: ${j.sync?.teamsUpserted ?? "?"}` +
+          (bd
+            ? ` (Bracket: ${bd.bracketPlayedCount}/${bd.bracketAllCount} games, external teams ${bd.bracketExternalTeamIdsCount}, upserted teams ${bd.bracketTeamsUpserted}, games ${bd.bracketGamesUpserted})`
+            : "") +
+          (j.sync?.bracketError ? ` [Bracket error: ${j.sync.bracketError}]` : "")
+      );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Sync failed");
     } finally {
@@ -341,9 +360,9 @@ export function CommissionerForm() {
       }
 
       setMessage(
-        `Done — synced ${daysSynced} calendar day(s) through ${today}. Championship game in database: ${
-          sawChampionshipComplete ? "yes" : "not yet"
-        }.`
+        `Done — synced ${daysSynced} calendar day(s) through ${today}. Championship: ${
+          sawChampionshipComplete ? "final is in DB" : "not final in DB yet"
+        }. If player round columns are still empty, run the next button — Fill player box scores (all R1–R6 games in DB) — then Recompute projections. Daily sync often writes games but skips per-player lines when henrygd box scores fail or names do not match the player pool.`
       );
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Tournament sync failed");
@@ -927,9 +946,10 @@ export function CommissionerForm() {
               <p className="pool-text-muted-sm text-sm">
                 After step 1, run this once (or again after more days have been played). We sync each calendar day
                 from the <strong>First Round Thursday</strong> through today so early rounds are not missed. That
-                updates team scores and should write per-player rows to <code className="pool-code">player_game_stats</code>
-                ; if that table stays empty, use <strong>Fill player box scores</strong> below (reads every R1–R6 game
-                already in <code className="pool-code">games</code> and pulls henrygd box scores).
+                updates team scores and <em>tries</em> per-player rows in{" "}
+                <code className="pool-code">player_game_stats</code>. That step is fragile (network, rate limits, name
+                match vs your ESPN pool). <strong>Always run Fill player box scores below after this</strong> if Stat
+                Tracker / Players tab round points are missing — then <strong>Recompute projections</strong>.
               </p>
               <label className="flex flex-col gap-1">
                 <span className="pool-label">First Round Thursday (YYYY-MM-DD)</span>
