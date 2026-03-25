@@ -31,7 +31,8 @@ export function PoolSessionRoutes() {
     next.set("leagueId", session.leagueId);
     const s = next.toString();
     router.replace(s ? `${pathname}?${s}` : `${pathname}?leagueId=${encodeURIComponent(session.leagueId)}`);
-  }, [pathname, router, searchParams]);
+    // `searchParams` identity can churn between renders; the query string is the real dependency.
+  }, [pathname, router, searchParams.toString()]);
 
   return null;
 }
