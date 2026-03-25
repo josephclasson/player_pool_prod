@@ -571,6 +571,13 @@ body {
   box-shadow: none;
 }
 
+/* Very small phones: tighter table numerals without hiding columns */
+@media (max-width: 374px) {
+  .pool-table {
+    font-size: 0.625rem;
+  }
+}
+
 .stat-tracker-page-title {
   font-size: clamp(1.2rem, 2.4vw, 1.55rem);
   font-weight: 800;
@@ -881,6 +888,8 @@ body {
 @media (max-width: 768px) {
   .safe-area-wrapper {
     padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
     /* Bottom inset is handled by the fixed mobile tab bar + main content padding. */
     padding-bottom: 0;
   }

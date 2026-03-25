@@ -16,6 +16,7 @@ import {
   utcDateISOsFromStart,
   utcTodayISO
 } from "@/lib/ncaa-tournament-calendar";
+import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
 
 function formatApiError(json: unknown, fallback: string): string {
   const err = (json as { error?: unknown })?.error;
@@ -830,9 +831,9 @@ export function CommissionerForm() {
         <div className="flex items-start justify-between gap-3">
           <div>
             <div className="pool-text-title">Commissioner</div>
-            <div className="pool-text-muted mt-1">Commissioner tools status and setup controls</div>
-            <div className="mt-1.5 pt-2 border-t border-border/25 pool-text-muted">
-              Guided setup, owner/team management, draft controls, score sync, and player-data administration.
+            <div className="pool-text-muted mt-1 hidden md:block">Commissioner tools status and setup controls</div>
+            <div className="mt-1.5 pt-2 border-t border-border/25 pool-text-muted hidden md:block">
+              Owner/team management, draft controls, score sync, and player administration.
             </div>
           </div>
           {leagueIdFromQuery && (

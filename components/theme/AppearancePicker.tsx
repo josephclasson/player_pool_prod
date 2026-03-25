@@ -45,7 +45,7 @@ function applyTheme(theme: ThemeKey) {
 }
 
 /** Top-bar control: paint bucket opens theme list. */
-export function AppearancePicker() {
+export function AppearancePicker({ triggerClassName }: { triggerClassName?: string } = {}) {
   const [open, setOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeKey>("yellow");
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -84,7 +84,12 @@ export function AppearancePicker() {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center justify-center gap-1 rounded-md border border-border/55 bg-background/45 px-2 py-1 text-[10px] font-semibold text-foreground/85 transition hover:bg-muted/50"
+        className={[
+          "inline-flex items-center justify-center gap-1 rounded-md border border-border/55 bg-background/45 px-2 py-1 text-[10px] font-semibold text-foreground/85 transition hover:bg-muted/50",
+          triggerClassName
+        ]
+          .filter(Boolean)
+          .join(" ")}
         title="Appearance — color theme"
         aria-label="Appearance — choose color theme"
         aria-expanded={open}

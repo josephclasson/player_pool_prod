@@ -3,6 +3,8 @@
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, GraduationCap } from "lucide-react";
+import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
+import { PoolTableSkeleton } from "@/components/ui/PoolTableSkeleton";
 import { readStoredActiveLeagueId, writeStoredActiveLeagueId } from "@/lib/player-pool-storage";
 import {
   PLAYER_POOL_IDENTITY_CHANGE_EVENT,
@@ -703,6 +705,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     }
   }
 
+  useSubscribePullRefresh(() => void onManualRefresh(), Boolean(activeLeagueId));
+
   useEffect(() => {
     let cancelled = false;
     if (!activeLeagueId) return;
@@ -1237,10 +1241,11 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
             </div>
             <div className="min-w-0">
               <h1 className="stat-tracker-page-title">Draft</h1>
-              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5">{draftStatusLine}</div>
+              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block">{draftStatusLine}</div>
+              <div className="md:hidden mt-0.5 text-[9px] text-foreground/40">Pull down to refresh</div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <div className="hidden md:flex flex-wrap items-center gap-1.5 shrink-0">
             <button
               type="button"
               className="pool-btn-outline-cta pool-btn-outline-cta--sm"
@@ -1251,7 +1256,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
             </button>
           </div>
         </div>
-        <div className="mt-1.5 pt-2 border-t border-border/25 text-[10px] text-foreground/45">
+        <div className="mt-1.5 pt-2 border-t border-border/25 text-[10px] text-foreground/45 hidden md:block">
           Live draft board, available player pool, and recent picks by round.
         </div>
 

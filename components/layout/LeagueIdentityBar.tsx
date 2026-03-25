@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { Briefcase, Pause, Play, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BossModeOverlay } from "@/components/layout/BossModeOverlay";
+import { useMainScrollContainerRef } from "@/components/layout/MainScrollContainerContext";
 import { AppearancePicker } from "@/components/theme/AppearancePicker";
 import { clearStoredActiveLeagueId } from "@/lib/player-pool-storage";
 import {
@@ -154,28 +155,61 @@ export function LeagueIdentityBar() {
     return null;
   }
 
+  const mainScrollRef = useMainScrollContainerRef();
+  const [barCompact, setBarCompact] = useState(false);
+  const lastScrollY = useRef(0);
+  const scrollAccum = useRef(0);
+
+  useEffect(() => {
+    const el = mainScrollRef?.current;
+    if (!el) return;
+    const onScroll = () => {
+      if (window.matchMedia("(min-width: 768px)").matches) {
+        setBarCompact(false);
+        scrollAccum.current = 0;
+        return;
+      }
+      const y = el.scrollTop;
+      const delta = y - lastScrollY.current;
+      lastScrollY.current = y;
+      if (y < 20) {
+        setBarCompact(false);
+        scrollAccum.current = 0;
+        return;
+      }
+      scrollAccum.current += delta;
+      if (scrollAccum.current > 16) setBarCompact(true);
+      if (scrollAccum.current < -12) setBarCompact(false);
+      if (Math.abs(scrollAccum.current) > 48) {
+        scrollAccum.current = scrollAccum.current > 0 ? 24 : -24;
+      }
+    };
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [mainScrollRef]);
+
   const barText = "text-[10px] sm:text-[11px]";
-  const labelCls = "text-foreground/50 shrink-0";
+  const labelCls = "text-foreground/50 shrink-0 hidden md:inline";
   const sepCls = "text-foreground/30 select-none shrink-0";
 
   return (
     <>
       <BossModeOverlay open={bossOpen} onClose={() => setBossOpen(false)} />
-      <div className="mb-1.5 rounded-md border border-border/35 bg-muted/[0.07] px-2 py-1.5 text-xs">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+      <div className="mb-1 md:mb-1.5 rounded-md border border-border/35 bg-muted/[0.07] px-2 py-1 md:py-1.5 text-xs transition-[padding] duration-200 max-md:data-[compact=true]:py-0.5" data-compact={barCompact || undefined}>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 md:gap-y-1.5">
           {session ? (
             <div
-              className={`min-w-0 flex-1 flex flex-nowrap items-center gap-x-1.5 overflow-x-auto leading-snug ${barText}`}
+              className={`min-w-0 flex-1 flex flex-nowrap items-center gap-x-1 sm:gap-x-1.5 overflow-x-auto leading-snug ${barText}`}
             >
-              <span className={labelCls}>Current League:</span>
-              <span className="min-w-0 max-w-[28%] sm:max-w-[11rem] truncate font-semibold text-foreground">
+              <span className={`${labelCls}`}>Current League:</span>
+              <span className="min-w-0 max-w-[42vw] md:max-w-[11rem] truncate font-semibold text-foreground">
                 {leagueMetaLoading ? "Loading…" : resolvedLeagueName ?? "—"}
               </span>
               <span className={sepCls} aria-hidden>
                 ·
               </span>
               <span className={labelCls}>User:</span>
-              <span className="min-w-0 max-w-[22%] sm:max-w-[9rem] truncate font-medium text-foreground">
+              <span className="min-w-0 max-w-[38vw] md:max-w-[9rem] truncate font-medium text-foreground">
                 {session.teamName}
               </span>
               <span className={sepCls} aria-hidden>
@@ -183,16 +217,17 @@ export function LeagueIdentityBar() {
               </span>
               <span className={labelCls}>League ID:</span>
               <code
-                className="min-w-0 max-w-[26%] sm:max-w-[10rem] truncate font-mono text-[9px] sm:text-[10px] text-foreground/90"
+                className="hidden md:inline min-w-0 max-w-[10rem] truncate font-mono text-[9px] sm:text-[10px] text-foreground/90"
                 title={session.leagueId}
               >
                 {session.leagueId}
               </code>
-              <span className={sepCls} aria-hidden>
+              <span className="hidden md:inline sepCls" aria-hidden>
                 ·
               </span>
               <button type="button" className="pool-link shrink-0 font-medium whitespace-nowrap" onClick={switchPool}>
-                Switch pool or user…
+                <span className="md:hidden">Switch…</span>
+                <span className="hidden md:inline">Switch pool or user…</span>
               </button>
             </div>
           ) : (
@@ -204,7 +239,7 @@ export function LeagueIdentityBar() {
             </div>
           )}
 
-          <div className="flex shrink-0 flex-wrap items-center gap-1.5">
+          <div className="hidden md:flex shrink-0 flex-wrap items-center gap-1.5">
             <div className="relative shrink-0">
               <button
                 type="button"
@@ -269,8 +304,16 @@ export function LeagueIdentityBar() {
             </button>
           </div>
 
-          <div className="flex w-full shrink-0 flex-nowrap items-center justify-end gap-2 sm:ml-auto sm:w-auto">
-            <AppearancePicker />
+          {/* Theme + commissioner: hide on mobile when scrolled down to maximize roster space */}
+          <div
+            className={[
+              "flex w-full shrink-0 flex-nowrap items-center justify-end gap-1.5 sm:gap-2 sm:ml-auto sm:w-auto max-md:min-w-0",
+              barCompact ? "max-md:hidden" : ""
+            ]
+              .filter(Boolean)
+              .join(" ")}
+          >
+            <AppearancePicker triggerClassName="max-md:!h-7 max-md:!w-7 max-md:!min-w-[1.75rem] max-md:!p-0 max-md:shrink-0" />
             <div className="relative hidden shrink-0 md:block">
               <button
                 type="button"
@@ -303,51 +346,53 @@ export function LeagueIdentityBar() {
                 </div>
               ) : null}
             </div>
-            <div className="min-w-0 flex-1 rounded-md border border-border/35 bg-background/35 px-1.5 py-1 sm:flex-initial sm:max-w-[260px]">
+            <div className="min-w-0 flex-1 rounded-md border border-border/35 bg-background/35 px-1 py-0.5 sm:px-1.5 sm:py-1 sm:flex-initial sm:max-w-[260px]">
             <button
               type="button"
               onClick={() => setCommOpen((o) => !o)}
-              className="flex w-full min-w-0 items-center gap-1.5 flex-nowrap text-left text-[11px] font-semibold text-foreground/75"
+              className="flex w-full min-w-0 items-center gap-1 flex-nowrap text-left text-[10px] font-semibold text-foreground/75 sm:gap-1.5 sm:text-[11px]"
             >
               <span className="min-w-0 flex-1 truncate">Commissioner</span>
-              <span className="text-foreground/40 shrink-0">{commOpen ? "▾" : "▸"}</span>
+              <span className="text-foreground/40 shrink-0 text-[10px]">{commOpen ? "▾" : "▸"}</span>
               {commUnlocked ? (
-                <span className="shrink-0 text-[10px] font-medium text-emerald-600/90 dark:text-emerald-400/90">
+                <span className="shrink-0 text-[9px] font-medium text-emerald-600/90 dark:text-emerald-400/90 sm:text-[10px]">
                   Unlocked.
                 </span>
               ) : null}
             </button>
             {commOpen && (
-              <div className="mt-1.5 space-y-1.5 border-t border-border/30 pt-1.5">
+              <div className="mt-1 space-y-1 border-t border-border/30 pt-1 sm:mt-1.5 sm:space-y-1.5 sm:pt-1.5">
                 {commUnlocked && (
-                  <p className="text-[11px] pool-text-muted-sm leading-snug">
+                  <p className="hidden sm:block text-[11px] pool-text-muted-sm leading-snug">
                     Same value as server env <code className="pool-code">COMMISSIONER_API_SECRET</code>. Unlocks commissioner
                     APIs, tools, and proxy draft picks.
                   </p>
                 )}
                 {commUnlocked && (
-                  <div className="flex flex-wrap gap-1.5">
-                    <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2" onClick={openCommissionerTools}>
+                  <div className="flex flex-wrap gap-1 sm:gap-1.5">
+                    <Button type="button" size="sm" variant="outline" className="h-6 text-[10px] px-1.5 sm:h-7 sm:text-xs sm:px-2" onClick={openCommissionerTools}>
                       Open tools
                     </Button>
                   </div>
                 )}
                 {!commUnlocked && (
-                  <p className="text-[10px] text-foreground/50 leading-snug">Enter the commissioner password for this browser.</p>
+                  <p className="text-[9px] text-foreground/50 leading-tight sm:text-[10px] sm:leading-snug">
+                    Commissioner password for this browser.
+                  </p>
                 )}
                 <input
-                  className="pool-field font-mono text-[10px] !h-8"
+                  className="pool-field font-mono text-[10px] !h-7 sm:!h-8"
                   type="password"
                   autoComplete="off"
                   value={commPw}
                   onChange={(e) => setCommPw(e.target.value)}
                   placeholder="Password"
                 />
-                <div className="flex flex-wrap gap-1.5">
-                  <Button type="button" size="sm" className="h-7 text-xs px-2" onClick={saveCommissionerPassword}>
+                <div className="flex flex-wrap gap-1 sm:gap-1.5">
+                  <Button type="button" size="sm" className="h-6 text-[10px] px-1.5 sm:h-7 sm:text-xs sm:px-2" onClick={saveCommissionerPassword}>
                     Save
                   </Button>
-                  <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2" onClick={clearCommissionerPassword}>
+                  <Button type="button" size="sm" variant="outline" className="h-6 text-[10px] px-1.5 sm:h-7 sm:text-xs sm:px-2" onClick={clearCommissionerPassword}>
                     Clear
                   </Button>
                 </div>

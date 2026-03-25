@@ -6,6 +6,8 @@ import { IceBoxBadge } from "@/components/stats/IceBoxBadge";
 import { InMoneyBadge } from "@/components/stats/InMoneyBadge";
 import { LeaderboardOwnerBadgesLegend } from "@/components/stats/LeaderboardOwnerBadgesLegend";
 import { ChevronDown, ChevronUp, Trophy } from "lucide-react";
+import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
+import { PoolTableSkeleton } from "@/components/ui/PoolTableSkeleton";
 import {
   leaderboardSnapshotKey,
   readStoredSnapshot,
@@ -572,6 +574,19 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
     }
   }
 
+  useSubscribePullRefresh(() => void onManualRefresh(), Boolean(leagueId));
+
+  const [heroPulse, setHeroPulse] = useState(false);
+  const lastLbSyncRef = useRef<string | null>(null);
+  useEffect(() => {
+    const at = data?.lastSyncedAt ?? null;
+    if (!at || at === lastLbSyncRef.current) return;
+    lastLbSyncRef.current = at;
+    setHeroPulse(true);
+    const t = window.setTimeout(() => setHeroPulse(false), 700);
+    return () => window.clearTimeout(t);
+  }, [data?.lastSyncedAt]);
+
   const teamsSorted = useMemo(() => {
     const list = data?.teams ?? [];
     return [...list].sort((a, b) => {
@@ -765,18 +780,35 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
             <div className="min-w-0">
               <h1 className="stat-tracker-page-title">Leaderboard</h1>
               {data?.lastSyncedAt ? (
-                <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5">
-                  Synced {new Date(data.lastSyncedAt).toLocaleString()}
-                  {data.anyLiveGames ? (
-                    <span className="ml-1.5 text-emerald-500 font-semibold">· Live ×{data.liveGamesCount}</span>
-                  ) : null}
-                </div>
+                <>
+                  <div className={`text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block ${heroPulse ? "motion-safe:animate-pulse" : ""}`}>
+                    Synced {new Date(data.lastSyncedAt).toLocaleString()}
+                    {data.anyLiveGames ? (
+                      <span className="ml-1.5 text-emerald-500 font-semibold">· Live ×{data.liveGamesCount}</span>
+                    ) : null}
+                  </div>
+                  <div
+                    className={`md:hidden mt-0.5 flex items-center gap-1 text-[9px] font-semibold text-emerald-500/90 ${heroPulse ? "motion-safe:animate-pulse" : ""}`}
+                  >
+                    {data.anyLiveGames ? (
+                      <>
+                        <span className="relative flex h-2 w-2">
+                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40" />
+                          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                        </span>
+                        <span>Live</span>
+                      </>
+                    ) : (
+                      <span className="text-foreground/40 font-normal">Pull down to refresh</span>
+                    )}
+                  </div>
+                </>
               ) : (
-                <div className="text-[10px] text-foreground/45 mt-0.5">Live leaderboard status</div>
+                <div className="text-[10px] text-foreground/45 mt-0.5 hidden md:block">Live leaderboard status</div>
               )}
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <div className="hidden md:flex flex-wrap items-center gap-1.5 shrink-0">
             <button
               type="button"
               className="pool-btn-outline-cta pool-btn-outline-cta--sm"
@@ -787,7 +819,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
             </button>
           </div>
         </div>
-        <div className="mt-1.5 pt-2 border-t border-border/25 text-[10px] text-foreground/45">
+        <div className="mt-1.5 pt-2 border-t border-border/25 text-[10px] text-foreground/45 hidden md:block">
           Owner standings, round-by-round scoring, projections, and win/money probabilities.
           {roundLiveLabel != null ? (
             <span className="ml-1.5 tabular-nums">· Round live R{roundLiveLabel}</span>
@@ -797,8 +829,14 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
 
       {data?.partialDataWarning && (
         <div className="rounded-md border border-warning/45 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning leading-snug">
-          <strong>Stale sync</strong> — scores may be behind while games are live. Ask your commissioner to run{" "}
-          <strong>Sync games now</strong> (or use Refresh Data).
+          <strong>Stale sync</strong>{" "}
+          <span className="md:hidden">
+            — scores may lag during live games. Pull down to refresh or ask your commissioner to run <strong>Sync games now</strong>.
+          </span>
+          <span className="hidden md:inline">
+            — scores may be behind while games are live. Ask your commissioner to run <strong>Sync games now</strong> (or use Refresh
+            Data).
+          </span>
         </div>
       )}
 
@@ -810,9 +848,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
 
       {leagueId && error && <div className="pool-alert-danger pool-alert-compact">{error}</div>}
 
-      {loading && !data && leagueId && (
-        <div className="pool-text-muted text-[11px] py-0.5">Loading…</div>
-      )}
+      {loading && !data && leagueId && <PoolTableSkeleton />}
 
       {leagueId && data && !loading && teamsSorted.length === 0 && (
         <div className="pool-alert pool-alert-compact">
@@ -948,7 +984,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
               <div className="flex min-w-0 items-center gap-1 shrink-0">
                 <span className="text-sm font-semibold pool-owner-name">Leaderboard</span>
               </div>
-              <div className="pool-owner-header-stat-meta flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
+              <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
                 <span>
                   {visibleTeams.length} of {teamsSorted.length}{" "}
                   {teamsSorted.length === 1 ? "team" : "teams"}

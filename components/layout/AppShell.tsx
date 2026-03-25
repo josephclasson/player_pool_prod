@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   patchPlayerPoolSessionSeasonYear,
@@ -24,6 +24,8 @@ import {
 import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { LeagueIdentityBar } from "@/components/layout/LeagueIdentityBar";
+import { MainScrollContainerRefContext } from "@/components/layout/MainScrollContainerContext";
+import { PullToRefreshContainer } from "@/components/layout/PullToRefreshContainer";
 import { PoolSessionRoutes } from "@/components/layout/PoolSessionRoutes";
 
 /**
@@ -375,9 +377,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               <PoolSessionRoutes />
               <LeagueIdentityBar />
             </Suspense>
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden md:min-h-0 md:overflow-visible">
-              {children}
-            </div>
+            <MainScrollContainerRefContext.Provider value={mainScrollRef}>
+              <PullToRefreshContainer
+                scrollRef={mainScrollRef}
+                className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden md:min-h-0 md:overflow-visible"
+              >
+                {children}
+              </PullToRefreshContainer>
+            </MainScrollContainerRefContext.Provider>
           </div>
         </main>
       </div>

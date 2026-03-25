@@ -4,6 +4,8 @@ import type { ReactNode } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, UsersRound } from "lucide-react";
+import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
+import { PoolTableSkeleton } from "@/components/ui/PoolTableSkeleton";
 import {
   playerStatsSnapshotKey,
   readStoredActiveLeagueId,
@@ -740,6 +742,8 @@ export function PlayersPoolClient({
     }
   }, [seasonYear, qDeferred, effectiveLeagueId, rows.length, meta, snapshotKey]);
 
+  useSubscribePullRefresh(() => void load({ manual: true, force: true }), true);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -938,7 +942,7 @@ export function PlayersPoolClient({
             </div>
             <div className="min-w-0">
               <h1 className="stat-tracker-page-title">Player Statistics</h1>
-              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5">
+              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block">
                 {meta ? (
                   <>
                     {meta.lastSyncedAt ? `Synced ${new Date(meta.lastSyncedAt).toLocaleString()}` : "Synced —"}
@@ -954,9 +958,10 @@ export function PlayersPoolClient({
                   <span className="text-foreground/45">Live player stats status</span>
                 )}
               </div>
+              <div className="md:hidden mt-0.5 text-[9px] text-foreground/40">Pull down to refresh</div>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          <div className="hidden md:flex flex-wrap items-center gap-1.5 shrink-0">
             <button
               type="button"
               className="pool-btn-outline-cta pool-btn-outline-cta--sm"
@@ -967,7 +972,7 @@ export function PlayersPoolClient({
             </button>
           </div>
         </div>
-        <div className="mt-1.5 pt-2 border-t border-border/25 text-[10px] text-foreground/45">
+        <div className="mt-1.5 pt-2 border-t border-border/25 text-[10px] text-foreground/45 hidden md:block">
           Player-level pool stats, R1-R6 scoring splits, ownership filters, and draft projection trends.
         </div>
       </div>
@@ -1156,7 +1161,7 @@ export function PlayersPoolClient({
           <HeatBadgeLegend className="ml-auto" />
         </div>
 
-        <div className="pool-text-muted-sm mb-2">
+        <div className="pool-text-muted-sm mb-2 hidden md:block">
           {meta ? (
             <span>
               Showing {displayedRows.length}
@@ -1173,6 +1178,9 @@ export function PlayersPoolClient({
         </div>
         {error && <div className="pool-alert-danger pool-alert-compact text-sm mb-2">{error}</div>}
 
+        {busy && rows.length === 0 ? (
+          <PoolTableSkeleton rows={8} />
+        ) : (
         <div className="pool-card pool-card-compact min-w-0">
           <div className="overflow-x-auto min-w-0">
             <table className="pool-table pool-players-stat-table w-full text-xs min-w-[1040px]">
@@ -1498,6 +1506,7 @@ export function PlayersPoolClient({
           </table>
           </div>
         </div>
+        )}
       </div>
     </div>
   );

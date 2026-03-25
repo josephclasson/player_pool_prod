@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { clearStoredActiveLeagueId, writeStoredActiveLeagueId } from "@/lib/player-pool-storage";
+import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
 import {
   clearPlayerPoolSession,
   PLAYER_POOL_IDENTITY_CHANGE_EVENT,
@@ -17,6 +18,7 @@ type TeamRow = { id: string; teamName: string };
 
 export function WelcomeFlow() {
   const router = useRouter();
+  useSubscribePullRefresh(() => void router.refresh(), true);
   const sp = useSearchParams();
   const prefillLeague = useMemo(() => sp.get("league")?.trim() ?? sp.get("code")?.trim() ?? "", [sp]);
 
@@ -127,7 +129,7 @@ export function WelcomeFlow() {
       <div className="pool-page-stack max-w-lg mx-auto">
         <div className="pool-hero">
           <div className="pool-text-title">Welcome back</div>
-          <p className="pool-text-muted mt-2">
+          <p className="pool-text-muted mt-2 hidden md:block">
             You are <span className="font-semibold text-foreground">{existing.teamName}</span> in this browser
             session.
           </p>
@@ -177,7 +179,7 @@ export function WelcomeFlow() {
     <div className="pool-page-stack max-w-lg mx-auto">
       <div className="pool-hero">
         <div className="pool-text-title">March Madness Draft</div>
-        <p className="pool-text-muted mt-2">
+        <p className="pool-text-muted mt-2 hidden md:block">
           Enter your pool once per browser session. You will not be asked again until you close this tab or clear
           session storage.
         </p>

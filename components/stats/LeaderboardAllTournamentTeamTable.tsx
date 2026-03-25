@@ -546,7 +546,7 @@ function LeaderboardPlayersHighlightTable({
         <div className="flex min-w-0 items-center gap-1 shrink-0">
           <span className="text-sm font-semibold pool-owner-name">{title}</span>
         </div>
-        <div className="pool-owner-header-stat-meta flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
+        <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
           {subtitle}
         </div>
         <div className="text-xs flex items-center gap-2 pool-owner-chevron shrink-0">
