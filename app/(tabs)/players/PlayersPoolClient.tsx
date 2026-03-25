@@ -1192,7 +1192,7 @@ export function PlayersPoolClient({
         {error && <div className="pool-alert-danger pool-alert-compact text-sm mb-2">{error}</div>}
 
         <div className="pool-card pool-card-compact min-w-0">
-          <div className="min-w-0 overflow-x-hidden md:overflow-x-auto">
+          <div className="min-w-0 overflow-x-auto md:overflow-x-auto">
             <table className="pool-table pool-players-stat-table w-full text-xs min-w-[1040px]">
               <thead>
                 <tr>

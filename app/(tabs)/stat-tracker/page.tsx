@@ -2029,7 +2029,7 @@ function StatTrackerTabPageInner() {
                   </div>
                 </button>
 
-                <div className="mt-1.5 overflow-x-hidden md:overflow-x-auto">
+                <div className="mt-1.5 overflow-x-auto md:overflow-x-auto">
                 <table className="pool-table w-full text-xs">
                   <thead>
                     <tr>

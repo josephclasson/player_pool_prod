@@ -1294,7 +1294,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
               </div>
             </button>
             {draftBoardOpen ? (
-            <div className="mt-1 shrink-0 overflow-x-hidden md:overflow-x-auto">
+            <div className="mt-1 shrink-0 overflow-x-auto md:overflow-x-auto">
               <table
                 className="pool-table w-full min-w-[520px] text-[10px] sm:text-[11px]"
                 aria-label="Draft board by round"
@@ -1631,7 +1631,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                   </div>
                 </div>
                 <div className="min-h-[min(640px,calc(100dvh-9.5rem))] flex-1 overflow-auto pr-1">
-                  <div className="min-w-0 overflow-x-hidden md:overflow-x-auto">
+                  <div className="min-w-0 overflow-x-auto md:overflow-x-auto">
                     <table className="pool-table w-full text-xs min-w-[720px]">
                       <thead>
                         <tr>
@@ -2047,7 +2047,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                       <div className="mt-1 px-2 text-[11px] text-foreground/80">{rc.blurb}</div>
                       {(resultsOpenByOwnerId[bucket.leagueTeamId] ?? true) ? (
                         <>
-                      <div className="mt-2 overflow-x-hidden md:overflow-x-auto">
+                      <div className="mt-2 overflow-x-auto md:overflow-x-auto">
                         <table className="pool-table w-full text-xs">
                           <thead>
                             <tr>

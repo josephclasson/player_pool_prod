@@ -1029,22 +1029,38 @@ body {
     padding: 0.25rem 0.25rem !important;
   }
 
-  /* iOS optimized viewing: force tables to a fixed layout that shrinks columns to fit. */
+  /* ESPN-like mobile table behavior (condensed, fixed width canvas, sticky header). */
   .pool-table {
     table-layout: fixed !important;
     width: 100% !important;
     min-width: 0 !important;
   }
 
+  .pool-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    background-color: rgb(var(--pool-stats-header-bg));
+  }
+
   .pool-table thead th,
-  .pool-table tbody td,
-  .pool-table tfoot td,
-  .pool-table tfoot th,
   .pool-table thead th button {
     min-width: 0 !important;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+
+  /* Allow data cells to wrap instead of truncating so mobile looks like ESPN boxscore. */
+  .pool-table tbody td,
+  .pool-table tfoot td,
+  .pool-table tfoot th {
+    min-width: 0 !important;
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 }
 
