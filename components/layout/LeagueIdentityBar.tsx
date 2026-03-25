@@ -151,16 +151,13 @@ export function LeagueIdentityBar() {
     [router]
   );
 
-  if (pathname === "/") {
-    return null;
-  }
-
   const mainScrollRef = useMainScrollContainerRef();
   const [barCompact, setBarCompact] = useState(false);
   const lastScrollY = useRef(0);
   const scrollAccum = useRef(0);
 
   useEffect(() => {
+    if (pathname === "/") return;
     const el = mainScrollRef?.current;
     if (!el) return;
     const onScroll = () => {
@@ -186,7 +183,11 @@ export function LeagueIdentityBar() {
     };
     el.addEventListener("scroll", onScroll, { passive: true });
     return () => el.removeEventListener("scroll", onScroll);
-  }, [mainScrollRef]);
+  }, [mainScrollRef, pathname]);
+
+  if (pathname === "/") {
+    return null;
+  }
 
   const barText = "text-[10px] sm:text-[11px]";
   const labelCls = "text-foreground/50 shrink-0 hidden md:inline";
