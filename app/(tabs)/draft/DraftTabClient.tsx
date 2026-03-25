@@ -428,6 +428,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   const [busyPick, setBusyPick] = useState<number | null>(null);
   /** Prevent the 8s auto-refresh from overwriting optimistic pick UI mid-request. */
   const pickInFlightRef = useRef(false);
+  /** Used to prevent optimistic merge from re-adding picks during undo. */
+  const skipOptimisticMergeNextRef = useRef(false);
   const [undoLastPickBusy, setUndoLastPickBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** Name typed into the commissioner-editable draft-board cell. */
@@ -655,6 +657,12 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     const json = (await res.json()) as DraftStateResponse;
     // Merge optimistic picks (client-side) into the server snapshot so the draft board
     // doesn't "flicker" when Supabase state is still catching up.
+    if (skipOptimisticMergeNextRef.current) {
+      skipOptimisticMergeNextRef.current = false;
+      setState(json);
+      return;
+    }
+
     setState((prev) => {
       if (!prev) return json;
 
@@ -853,6 +861,10 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     setUndoLastPickBusy(true);
     setError(null);
     try {
+      // Next loadState call should trust the server snapshot; otherwise
+      // optimistic merge may re-add the undone pick until a manual refresh.
+      skipOptimisticMergeNextRef.current = true;
+
       const res = await fetch(`/api/commissioner/${encodeURIComponent(activeLeagueId)}/draft/undo-last-pick`, {
         method: "POST",
         headers: draftInitHeaders(true)
