@@ -378,11 +378,13 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
         for (const u of gameUpserts) {
           const gid = gameIdByExternal.get(String(u.external_game_id ?? ""));
           if (!gid) continue;
-          if (safeNum(u.team_a_id) && safeNum(u.team_a_id) > 0) {
-            teamStatsUpserts.push({ game_id: gid, team_id: u.team_a_id, points: u.team_a_score ?? 0 });
+          const teamAId = safeNum(u.team_a_id);
+          if (teamAId != null && teamAId > 0) {
+            teamStatsUpserts.push({ game_id: gid, team_id: teamAId, points: u.team_a_score ?? 0 });
           }
-          if (safeNum(u.team_b_id) && safeNum(u.team_b_id) > 0) {
-            teamStatsUpserts.push({ game_id: gid, team_id: u.team_b_id, points: u.team_b_score ?? 0 });
+          const teamBId = safeNum(u.team_b_id);
+          if (teamBId != null && teamBId > 0) {
+            teamStatsUpserts.push({ game_id: gid, team_id: teamBId, points: u.team_b_score ?? 0 });
           }
         }
         if (teamStatsUpserts.length > 0) {
