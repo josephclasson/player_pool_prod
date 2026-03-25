@@ -114,8 +114,41 @@ function displayCollegeTeam(t: TeamInfo): string {
   );
 }
 
+function eliminatedRoundForPlayer(p: PoolPlayer): number | null {
+  const chalkRem = p.chalkGamesRemaining;
+  const completed = p.completedTournamentGames;
+
+  const chalkRemN = chalkRem == null ? null : Number(chalkRem);
+  const completedN = completed == null ? null : Number(completed);
+
+  // Backend convention: `chalkGamesRemaining = 0` means eliminated.
+  if (chalkRemN == null || !Number.isFinite(chalkRemN) || chalkRemN !== 0) return null;
+
+  if (completedN != null && Number.isFinite(completedN)) {
+    const er = Math.trunc(completedN);
+    if (er >= 1 && er <= 6) return er;
+  }
+
+  // Fallback: infer last round that has any aggregated points row.
+  const tr = p.tournamentRoundPoints as Record<string, number | undefined> | undefined;
+  if (!tr) return null;
+
+  for (let r = 6; r >= 1; r--) {
+    const sk = String(r);
+    const hasKey =
+      Object.prototype.hasOwnProperty.call(tr, sk) || Object.prototype.hasOwnProperty.call(tr, r);
+    if (!hasKey) continue;
+    return r;
+  }
+
+  return null;
+}
+
 /** Show em dash only when that round has no aggregated row; real 0 fantasy points show as "0". */
 function tournamentRoundPointsCell(p: PoolPlayer, displayRound: number): string {
+  const er = eliminatedRoundForPlayer(p);
+  if (er != null && displayRound > er) return "E";
+
   const tr = p.tournamentRoundPoints;
   if (!tr) return "—";
   const raw = tr as Record<string, number | undefined>;
@@ -1330,7 +1363,12 @@ export function PlayersPoolClient({
                 const roundRanks = [ps.r1, ps.r2, ps.r3, ps.r4, ps.r5, ps.r6] as const;
 
                 return (
-                  <tr key={p.id} className="cursor-pointer group pool-table-row">
+                  <tr
+                    key={p.id}
+                    className={`cursor-pointer group pool-table-row ${
+                      eliminatedRoundForPlayer(p) != null ? "pool-table-row-eliminated" : ""
+                    }`}
+                  >
                     <PoolTableTeamLogoCell url={teamLogoUrl} teamName={teamLabel} />
                     <PoolTablePlayerPhotoCell urls={headshotUrls} playerName={p.name} />
                     <td className="px-1 py-2 transition-colors text-left align-top">
