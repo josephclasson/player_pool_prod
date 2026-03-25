@@ -13,6 +13,7 @@ export function PoolSessionRoutes() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const router = useRouter();
+  const searchKey = searchParams.toString();
 
   useEffect(() => {
     if (poolRouteIsPublic(pathname)) return;
@@ -24,15 +25,14 @@ export function PoolSessionRoutes() {
       return;
     }
 
-    const q = searchParams.get("leagueId")?.trim();
+    const q = new URLSearchParams(searchKey).get("leagueId")?.trim();
     if (q) return;
 
-    const next = new URLSearchParams(searchParams.toString());
+    const next = new URLSearchParams(searchKey);
     next.set("leagueId", session.leagueId);
     const s = next.toString();
     router.replace(s ? `${pathname}?${s}` : `${pathname}?leagueId=${encodeURIComponent(session.leagueId)}`);
-    // `searchParams` identity can churn between renders; the query string is the real dependency.
-  }, [pathname, router, searchParams.toString()]);
+  }, [pathname, router, searchKey]);
 
   return null;
 }

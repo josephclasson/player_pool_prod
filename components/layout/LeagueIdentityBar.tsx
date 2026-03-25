@@ -327,7 +327,7 @@ export function LeagueIdentityBar() {
                 )}
                 {commUnlocked && (
                   <div className="flex flex-wrap gap-1.5">
-                    <Button type="button" size="sm" variant="secondary" className="h-7 text-xs px-2" onClick={openCommissionerTools}>
+                    <Button type="button" size="sm" variant="outline" className="h-7 text-xs px-2" onClick={openCommissionerTools}>
                       Open tools
                     </Button>
                   </div>
