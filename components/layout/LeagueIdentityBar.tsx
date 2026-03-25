@@ -199,10 +199,10 @@ export function LeagueIdentityBar() {
   return (
     <>
       <BossModeOverlay open={bossOpen} onClose={() => setBossOpen(false)} />
-      <div className="relative mb-1 md:mb-1.5 rounded-md border border-border/35 bg-muted/[0.07] px-1 py-0.5 text-[8px] leading-tight md:px-2 md:py-1.5 md:text-xs md:leading-normal">
+      <div className="relative mb-0 md:mb-1.5 rounded-md border border-border/35 bg-muted/[0.07] px-0 py-0 text-[8px] leading-tight md:px-2 md:py-1.5 md:text-xs md:leading-normal">
         <div className="flex flex-nowrap items-center gap-x-1 md:flex-wrap md:gap-x-2 md:gap-y-1.5">
           {session ? (
-            <div className="min-w-0 flex-1 flex flex-nowrap items-center gap-x-0.5 overflow-hidden md:gap-x-1.5 md:overflow-x-auto md:leading-snug">
+            <div className="hidden md:flex min-w-0 flex-1 flex flex-nowrap items-center gap-x-0.5 overflow-hidden md:gap-x-1.5 md:overflow-x-auto md:leading-snug">
               <span className={`${labelCls}`}>Current League:</span>
               <span className="min-w-0 max-w-[28vw] sm:max-w-[32vw] md:max-w-[11rem] truncate font-semibold text-foreground">
                 {leagueMetaLoading ? "…" : resolvedLeagueName ?? "—"}
@@ -237,7 +237,7 @@ export function LeagueIdentityBar() {
               </button>
             </div>
           ) : (
-            <div className="min-w-0 flex-1 text-[8px] text-foreground/65 sm:text-[10px] md:text-[11px]">
+            <div className="hidden md:block min-w-0 flex-1 text-[8px] text-foreground/65 sm:text-[10px] md:text-[11px]">
               No pool —{" "}
               <button type="button" className="pool-link font-medium" onClick={() => router.push("/")}>
                 Home
@@ -310,7 +310,7 @@ export function LeagueIdentityBar() {
             </button>
           </div>
 
-          <div className="flex shrink-0 flex-nowrap items-center gap-0.5 md:ml-auto md:gap-2">
+          <div className="hidden md:flex shrink-0 flex-nowrap items-center gap-0.5 md:ml-auto md:gap-2">
             <AppearancePicker triggerClassName="max-md:!h-[1.35rem] max-md:!w-[1.35rem] max-md:!min-w-[1.35rem] max-md:!p-0 max-md:[&_svg]:!h-2.5 max-md:[&_svg]:!w-2.5 shrink-0" />
             <div className="relative hidden shrink-0 md:block">
               <button

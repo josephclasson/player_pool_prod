@@ -1019,6 +1019,15 @@ body {
     font-size: 16px !important;
     border-radius: 12px;
   }
+
+  /* Mobile table density: smaller cell padding so more columns fit. */
+  .pool-table thead th {
+    padding: 0.2rem 0.25rem !important;
+  }
+
+  .pool-table tbody td {
+    padding: 0.25rem 0.25rem !important;
+  }
 }
 
 .pool-btn-ghost:disabled {

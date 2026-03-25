@@ -1196,7 +1196,7 @@ export function PlayersPoolClient({
             <table className="pool-table pool-players-stat-table w-full text-xs min-w-[1040px]">
               <thead>
                 <tr>
-                  <th className="w-10 max-md:hidden p-1 text-center" scope="col">
+                  <th className="w-10 p-1 text-center" scope="col">
                     <span className="sr-only">Team logo</span>
                   </th>
                   <th className="w-10 p-1 text-center" scope="col">

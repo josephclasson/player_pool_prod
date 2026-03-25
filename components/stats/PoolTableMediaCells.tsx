@@ -112,7 +112,7 @@ export function PoolTableTeamLogoCell({
       label={teamName}
       alt={`${teamName} logo`}
       fit="contain"
-      cellClassName={["max-md:hidden", cellClassName].filter(Boolean).join(" ")}
+      cellClassName={cellClassName}
     />
   );
 }

@@ -357,7 +357,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       const avail = Math.max(160, outer.clientWidth);
       const needed = measureMobileContentWidthPx(inner);
       /* Slightly aggressive so full desktop-width tables fit without horizontal pan; pinch-zoom reads detail. */
-      const z = Math.min(1, Math.max(0.05, (avail * 0.96) / needed));
+      // Slightly more aggressive on mobile so more table columns remain visible.
+      const z = Math.min(1, Math.max(0.05, (avail * 0.92) / needed));
       setMobileFitZoom((cur) => (Math.abs(cur - z) < 0.004 ? cur : z));
     }, 50);
   }, []);
@@ -434,12 +435,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div
             className={
               pathname === "/"
-                ? "flex min-h-0 flex-1 flex-col px-3 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-4 max-w-6xl mx-auto w-full md:px-6 md:pb-4"
-                : "flex min-h-0 flex-1 flex-col px-3 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-1.5 max-w-6xl mx-auto w-full md:px-5 md:py-2 md:pb-2"
+                ? "flex min-h-0 flex-1 flex-col px-1.5 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-2 max-w-6xl mx-auto w-full md:px-6 md:pb-4"
+                : "flex min-h-0 flex-1 flex-col px-1.5 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-1 max-w-6xl mx-auto w-full md:px-5 md:py-2 md:pb-2"
             }
           >
             {pathname === "/" ? (
-              <div className="flex justify-end items-center gap-2 mb-1 min-h-[2.25rem] shrink-0">
+              <div className="hidden md:flex justify-end items-center gap-2 mb-1 min-h-[2.25rem] shrink-0">
                 <AppearancePicker />
               </div>
             ) : null}

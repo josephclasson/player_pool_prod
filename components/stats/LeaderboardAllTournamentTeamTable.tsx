@@ -561,7 +561,7 @@ function LeaderboardPlayersHighlightTable({
         <table className="pool-table w-full text-xs">
           <thead>
             <tr>
-              <th className="w-10 max-md:hidden p-1 text-center" scope="col">
+              <th className="w-10 p-1 text-center" scope="col">
                 <span className="sr-only">Team logo</span>
               </th>
               <th className="w-10 p-1 text-center" scope="col">
