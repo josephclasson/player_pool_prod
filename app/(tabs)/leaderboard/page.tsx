@@ -16,15 +16,7 @@ function LeaderboardWithQuery() {
 
 export default function LeaderboardTabPage() {
   return (
-    <Suspense
-      fallback={
-        <div className="pool-page-stack pool-page-stack-tight">
-          <div className="pool-hero pool-hero-databallr">
-            <div className="pool-text-muted text-[11px] py-0.5">Loading…</div>
-          </div>
-        </div>
-      }
-    >
+    <Suspense fallback={null}>
       <LeaderboardWithQuery />
     </Suspense>
   );

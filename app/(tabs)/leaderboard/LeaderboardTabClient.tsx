@@ -7,7 +7,6 @@ import { InMoneyBadge } from "@/components/stats/InMoneyBadge";
 import { LeaderboardOwnerBadgesLegend } from "@/components/stats/LeaderboardOwnerBadgesLegend";
 import { ChevronDown, ChevronUp, Trophy } from "lucide-react";
 import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
-import { PoolTableSkeleton } from "@/components/ui/PoolTableSkeleton";
 import {
   leaderboardSnapshotKey,
   readStoredSnapshot,
@@ -45,7 +44,7 @@ const LeaderboardAllTournamentTeamTable = dynamic(
     import("@/components/stats/LeaderboardAllTournamentTeamTable").then(
       (m) => m.LeaderboardAllTournamentTeamTable
     ),
-  { ssr: false, loading: () => <div className="pool-text-muted text-[11px] py-1">Loading team table…</div> }
+  { ssr: false, loading: () => null }
 );
 
 const LeaderboardBestSelectionByRoundTable = dynamic(
@@ -53,7 +52,7 @@ const LeaderboardBestSelectionByRoundTable = dynamic(
     import("@/components/stats/LeaderboardAllTournamentTeamTable").then(
       (m) => m.LeaderboardBestSelectionByRoundTable
     ),
-  { ssr: false, loading: () => <div className="pool-text-muted text-[11px] py-1">Loading best picks…</div> }
+  { ssr: false, loading: () => null }
 );
 
 const LeaderboardWorstSelectionByRoundTable = dynamic(
@@ -61,7 +60,7 @@ const LeaderboardWorstSelectionByRoundTable = dynamic(
     import("@/components/stats/LeaderboardAllTournamentTeamTable").then(
       (m) => m.LeaderboardWorstSelectionByRoundTable
     ),
-  { ssr: false, loading: () => <div className="pool-text-muted text-[11px] py-1">Loading worst picks…</div> }
+  { ssr: false, loading: () => null }
 );
 
 /** Chicago-style title case (matches StatTracker toolbar labels). */
@@ -375,7 +374,6 @@ function StatCellWithOwnerRank({
 
 export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
   const [data, setData] = useState<LeaderboardApiPayload | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [sortKey, setSortKey] = useState<LeaderboardSortKey>("standingsRank");
@@ -498,8 +496,6 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
     const controller = new AbortController();
     loadControllerRef.current = controller;
     inFlightRef.current = true;
-    const showLoading = data == null && !opts?.silent;
-    if (showLoading) setLoading(true);
     if (opts?.manual) setError(null);
     try {
       const params = new URLSearchParams();
@@ -533,9 +529,8 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
       setError(e instanceof Error ? e.message : "Load failed");
     } finally {
       inFlightRef.current = false;
-      if (showLoading) setLoading(false);
     }
-  }, [leagueId, data, cacheKey]);
+  }, [leagueId, cacheKey]);
 
   useEffect(() => {
     if (!leagueId) return;
@@ -812,7 +807,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
             <button
               type="button"
               className="pool-btn-outline-cta pool-btn-outline-cta--sm"
-              disabled={!leagueId || refreshBusy || loading}
+              disabled={!leagueId || refreshBusy}
               onClick={() => void onManualRefresh()}
             >
               {refreshBusy ? "…" : "Refresh Data"}
@@ -848,9 +843,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
 
       {leagueId && error && <div className="pool-alert-danger pool-alert-compact">{error}</div>}
 
-      {loading && !data && leagueId && <PoolTableSkeleton />}
-
-      {leagueId && data && !loading && teamsSorted.length === 0 && (
+      {leagueId && data && teamsSorted.length === 0 && (
         <div className="pool-alert pool-alert-compact">
           No scoring data yet. Sync games from Commissioner Tools when the tournament starts.
         </div>

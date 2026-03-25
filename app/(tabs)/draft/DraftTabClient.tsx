@@ -4,7 +4,6 @@ import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronUp, GraduationCap } from "lucide-react";
 import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
-import { PoolTableSkeleton } from "@/components/ui/PoolTableSkeleton";
 import { readStoredActiveLeagueId, writeStoredActiveLeagueId } from "@/lib/player-pool-storage";
 import {
   PLAYER_POOL_IDENTITY_CHANGE_EVENT,
@@ -1514,10 +1513,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
         <div className="mt-3 flex min-h-0 min-w-0 flex-1 flex-col gap-3">
           {!isFinal ? (
             activeLeagueId && !state?.draftRoom && !draftLoadError ? (
-              <div className="pool-subpanel flex min-h-[12rem] min-w-0 flex-1 flex-col justify-center py-8 px-3">
-                <p className="text-center text-[11px] text-muted-foreground mb-4">Loading draft room…</p>
-                <PoolTableSkeleton rows={12} />
-              </div>
+              <p className="text-center text-[11px] text-muted-foreground py-6 px-2">Loading draft room…</p>
             ) : (
             <>
               <div className="pool-subpanel flex min-h-0 min-w-0 flex-1 flex-col py-2">

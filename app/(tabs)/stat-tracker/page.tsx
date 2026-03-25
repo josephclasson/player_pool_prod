@@ -26,7 +26,6 @@ import {
   PLAYER_POOL_IDENTITY_CHANGE_EVENT
 } from "@/lib/player-pool-session";
 import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
-import { PoolTableSkeleton } from "@/components/ui/PoolTableSkeleton";
 
 type RoundScores = Record<number, number | null | undefined>;
 
@@ -942,15 +941,12 @@ function StatTrackerTabPageInner() {
   }, [leagueId]);
 
   const [api, setApi] = useState<StatTrackerApiResponse | null>(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [authHint, setAuthHint] = useState<string | null>(null);
 
-  const loadData = useCallback(async (opts?: { background?: boolean }) => {
+  const loadData = useCallback(async () => {
     if (!leagueId) return;
-    const showLoading = !opts?.background;
-    if (showLoading) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/stat-tracker/${encodeURIComponent(leagueId)}`, {
@@ -962,8 +958,6 @@ function StatTrackerTabPageInner() {
       setApi(json);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Load failed");
-    } finally {
-      if (showLoading) setLoading(false);
     }
   }, [leagueId]);
 
@@ -991,9 +985,9 @@ function StatTrackerTabPageInner() {
     if (!leagueId) return;
     try {
       const pulled = await pullLiveIfAuthed();
-      if (!pulled) await loadData({ background: true });
+      if (!pulled) await loadData();
     } catch {
-      await loadData({ background: true });
+      await loadData();
     }
   }, [leagueId, loadData, pullLiveIfAuthed]);
 
@@ -1015,7 +1009,7 @@ function StatTrackerTabPageInner() {
           table: "league_live_scoreboard",
           filter: `league_id=eq.${leagueId}`
         },
-        () => void loadData({ background: true })
+        () => void loadData()
       )
       .subscribe();
     return () => {
@@ -1361,11 +1355,11 @@ function StatTrackerTabPageInner() {
       const pulled = await pullLiveIfAuthed();
       if (!pulled) {
         setAuthHint("Sign in to pull live NCAA scores. Showing cached pool data.");
-        await loadData({ background: true });
+        await loadData();
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Refresh failed");
-      await loadData({ background: true });
+      await loadData();
     } finally {
       setRefreshBusy(false);
     }
@@ -1496,9 +1490,7 @@ function StatTrackerTabPageInner() {
         </div>
       )}
 
-      {loading && !api && leagueId && <PoolTableSkeleton />}
-
-      {leagueId && api && !loading && owners.length === 0 && (
+      {leagueId && api && owners.length === 0 && (
         <div className="pool-alert pool-alert-compact">
           No roster yet.{" "}
           <Link href={`/draft?leagueId=${encodeURIComponent(leagueId)}`} className="pool-link">
@@ -2020,7 +2012,7 @@ function StatTrackerTabPageInner() {
                   </div>
                 </button>
 
-                <div className="mt-1.5 max-md:overflow-x-visible md:overflow-x-auto">
+                <div className="mt-1.5 overflow-x-hidden md:overflow-x-auto">
                 <table className="pool-table w-full text-xs">
                   <thead>
                     <tr>
@@ -2488,7 +2480,7 @@ function StatTrackerTabPageInner() {
 
 export default function StatTrackerTabPage() {
   return (
-    <Suspense fallback={<div className="pool-text-muted text-[11px] py-2 px-2">Loading…</div>}>
+    <Suspense fallback={null}>
       <StatTrackerTabPageInner />
     </Suspense>
   );

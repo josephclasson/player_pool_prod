@@ -16,13 +16,7 @@ export default async function PlayersPage({ searchParams }: PageProps) {
   const seasonYear = Number.isFinite(syRaw) ? syRaw : 2026;
   const q = typeof sp.q === "string" ? sp.q : "";
   return (
-    <Suspense
-      fallback={
-        <div className="rounded-lg border border-border/35 bg-muted/[0.06] px-3 py-2 pool-text-muted-sm text-sm">
-          Loading…
-        </div>
-      }
-    >
+    <Suspense fallback={null}>
       <PlayersPoolClient initialSeasonYear={seasonYear} initialQ={q} />
     </Suspense>
   );

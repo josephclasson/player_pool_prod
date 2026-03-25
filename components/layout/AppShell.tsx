@@ -351,9 +351,10 @@ export function AppShell({ children }: { children: ReactNode }) {
       const outer = mainScrollRef.current;
       const inner = mobileZoomContentRef.current;
       if (!outer || !inner) return;
-      const avail = Math.max(160, outer.clientWidth - 4);
+      const avail = Math.max(160, outer.clientWidth);
       const needed = measureMobileContentWidthPx(inner);
-      const z = Math.min(1, Math.max(0.07, avail / needed));
+      /* Slightly aggressive so full desktop-width tables fit without horizontal pan; pinch-zoom reads detail. */
+      const z = Math.min(1, Math.max(0.05, (avail * 0.96) / needed));
       setMobileFitZoom((cur) => (Math.abs(cur - z) < 0.004 ? cur : z));
     }, 50);
   }, []);
@@ -447,7 +448,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               <MainScrollContainerRefContext.Provider value={mainScrollRef}>
                 <PullToRefreshContainer
                   scrollRef={mainScrollRef}
-                  className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-auto md:min-h-0 md:overflow-x-visible md:overflow-visible"
+                  className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden md:min-h-0 md:overflow-x-visible md:overflow-visible"
                 >
                   <div
                     ref={mobileZoomContentRef}

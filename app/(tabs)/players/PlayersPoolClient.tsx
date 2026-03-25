@@ -5,7 +5,6 @@ import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } f
 import { useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, UsersRound } from "lucide-react";
 import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
-import { PoolTableSkeleton } from "@/components/ui/PoolTableSkeleton";
 import {
   playerStatsSnapshotKey,
   readStoredActiveLeagueId,
@@ -734,8 +733,6 @@ export function PlayersPoolClient({
     } catch (e: unknown) {
       if ((e as Error)?.name === "AbortError") return;
       setError(e instanceof Error ? e.message : "Load failed");
-      setRows([]);
-      setMeta(null);
     } finally {
       inFlightRef.current = false;
       if (showBusy) setBusy(false);
@@ -1178,9 +1175,6 @@ export function PlayersPoolClient({
         </div>
         {error && <div className="pool-alert-danger pool-alert-compact text-sm mb-2">{error}</div>}
 
-        {busy && rows.length === 0 ? (
-          <PoolTableSkeleton rows={8} />
-        ) : (
         <div className="pool-card pool-card-compact min-w-0">
           <div className="min-w-0 overflow-x-hidden md:overflow-x-auto">
             <table className="pool-table pool-players-stat-table w-full text-xs min-w-[1040px]">
@@ -1506,7 +1500,6 @@ export function PlayersPoolClient({
           </table>
           </div>
         </div>
-        )}
       </div>
     </div>
   );
