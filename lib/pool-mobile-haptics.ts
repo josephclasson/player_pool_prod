@@ -4,7 +4,8 @@ export function poolHapticsLight(): void {
   const v = navigator.vibrate;
   if (typeof v === "function") {
     try {
-      v.call(navigator, 12);
+      // lib.dom types use `Iterable<number>` / pattern form; single-ms overload is not always present.
+      v.call(navigator, [12]);
     } catch {
       /* unsupported or blocked */
     }
