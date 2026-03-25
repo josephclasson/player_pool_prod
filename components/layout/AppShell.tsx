@@ -305,6 +305,7 @@ function MobileBottomTabNav({
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const mainScrollRef = useRef<HTMLDivElement>(null);
 
   const [commUnlocked, setCommUnlocked] = useState(() => readCommissionerSecretFromSession().length > 0);
 
