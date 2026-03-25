@@ -498,7 +498,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
     const controller = new AbortController();
     loadControllerRef.current = controller;
     inFlightRef.current = true;
-    const showLoading = Boolean(opts?.manual) || (data == null && !opts?.silent);
+    const showLoading = data == null && !opts?.silent;
     if (showLoading) setLoading(true);
     if (opts?.manual) setError(null);
     try {

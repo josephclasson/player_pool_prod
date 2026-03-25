@@ -559,7 +559,7 @@ function LeaderboardPlayersHighlightTable({
         <table className="pool-table w-full text-xs">
           <thead>
             <tr>
-              <th className="w-10 p-1 text-center" scope="col">
+              <th className="w-10 max-md:hidden p-1 text-center" scope="col">
                 <span className="sr-only">Team logo</span>
               </th>
               <th className="w-10 p-1 text-center" scope="col">
@@ -642,7 +642,7 @@ function LeaderboardPlayersHighlightTable({
                     <span className="inline-flex items-baseline gap-1 flex-wrap min-w-0">
                       <StatTrackerPlayerNameLink playerName={p.playerName} espnAthleteId={p.espnAthleteId} />
                       {p.position ? (
-                        <span className="text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0">
+                        <span className="hidden text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0 md:inline">
                           {p.position}
                         </span>
                       ) : null}

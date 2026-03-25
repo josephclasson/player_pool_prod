@@ -110,12 +110,6 @@ function displayRegionName(region: string): string {
   }
 }
 
-/** Collapsed owner strip label: first word only (full name in `title` / aria). */
-function abbreviateOwnerStripName(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  return parts[0] ?? "";
-}
-
 /** e.g. 1 → "1st", 2 → "2nd", 11 → "11th" (standings rank label). */
 function ordinalRankLabel(n: number): string {
   if (!Number.isFinite(n) || n <= 0) return "—";
@@ -953,9 +947,10 @@ function StatTrackerTabPageInner() {
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [authHint, setAuthHint] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (opts?: { background?: boolean }) => {
     if (!leagueId) return;
-    setLoading(true);
+    const showLoading = !opts?.background;
+    if (showLoading) setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/stat-tracker/${encodeURIComponent(leagueId)}`, {
@@ -968,7 +963,7 @@ function StatTrackerTabPageInner() {
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Load failed");
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, [leagueId]);
 
@@ -996,9 +991,9 @@ function StatTrackerTabPageInner() {
     if (!leagueId) return;
     try {
       const pulled = await pullLiveIfAuthed();
-      if (!pulled) await loadData();
+      if (!pulled) await loadData({ background: true });
     } catch {
-      await loadData();
+      await loadData({ background: true });
     }
   }, [leagueId, loadData, pullLiveIfAuthed]);
 
@@ -1020,7 +1015,7 @@ function StatTrackerTabPageInner() {
           table: "league_live_scoreboard",
           filter: `league_id=eq.${leagueId}`
         },
-        () => void loadData()
+        () => void loadData({ background: true })
       )
       .subscribe();
     return () => {
@@ -1313,13 +1308,13 @@ function StatTrackerTabPageInner() {
     const rankSlot = wrap.querySelector("[data-measure-rank]");
     const nameSlot = wrap.querySelector("[data-measure-name]");
     if (!rankSlot || !nameSlot) return;
-    /** Same width for every strip; cap keeps the owner column compact. */
-    const MAX_OWNER_STRIP_PX = 158;
+    /** Match expanded header name cap (~14rem); same full name for every strip. */
+    const MAX_OWNER_STRIP_PX = 224;
     let max = 0;
     for (const o of selectedOwners) {
       const r = rankByOwnerId.get(o.ownerId) ?? 0;
       rankSlot.textContent = ordinalRankLabel(r);
-      nameSlot.textContent = abbreviateOwnerStripName(o.ownerName);
+      nameSlot.textContent = o.ownerName;
       max = Math.max(max, wrap.offsetWidth);
     }
     setCollapsedOwnerStripWidthPx(Math.min(Math.ceil(max), MAX_OWNER_STRIP_PX));
@@ -1366,11 +1361,11 @@ function StatTrackerTabPageInner() {
       const pulled = await pullLiveIfAuthed();
       if (!pulled) {
         setAuthHint("Sign in to pull live NCAA scores. Showing cached pool data.");
-        await loadData();
+        await loadData({ background: true });
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Refresh failed");
-      await loadData();
+      await loadData({ background: true });
     } finally {
       setRefreshBusy(false);
     }
@@ -2029,7 +2024,7 @@ function StatTrackerTabPageInner() {
                 <table className="pool-table w-full text-xs">
                   <thead>
                     <tr>
-                      <th className="w-10 p-1 text-center" scope="col">
+                      <th className="w-10 max-md:hidden p-1 text-center" scope="col">
                         <span className="sr-only">Team logo</span>
                       </th>
                       <th className="w-10 p-1 text-center" scope="col">
@@ -2122,7 +2117,7 @@ function StatTrackerTabPageInner() {
                                 espnAthleteId={p.espnAthleteId}
                               />
                               {p.position ? (
-                                <span className="text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0">
+                                <span className="hidden text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0 md:inline">
                                   {p.position}
                                 </span>
                               ) : null}
@@ -2471,10 +2466,10 @@ function StatTrackerTabPageInner() {
                     {ordinalRankLabel(rank)}
                   </span>
                   <span
-                    className="pool-owner-name min-w-0 flex-1 truncate text-left text-sm font-semibold"
+                    className="pool-owner-name min-w-0 flex-1 truncate text-left text-sm font-semibold max-w-[min(100%,14rem)] sm:max-w-[18rem]"
                     title={owner.ownerName}
                   >
-                    {abbreviateOwnerStripName(owner.ownerName)}
+                    {owner.ownerName}
                   </span>
                 </div>
                 {collapsedSummaryTable}

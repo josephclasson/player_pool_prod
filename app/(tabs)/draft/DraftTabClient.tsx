@@ -1624,7 +1624,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                           <th className="w-6 p-0.5 text-center" scope="col">
                             <span className="sr-only">Draft player</span>
                           </th>
-                          <th className="w-10 p-1 text-center" scope="col">
+                          <th className="w-10 max-md:hidden p-1 text-center" scope="col">
                             <span className="sr-only">Team logo</span>
                           </th>
                           <th className="w-10 p-1 text-center" scope="col">
@@ -2026,7 +2026,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                         <table className="pool-table w-full text-xs">
                           <thead>
                             <tr>
-                              <th className="w-10 p-1 text-center">
+                              <th className="w-10 max-md:hidden p-1 text-center">
                                 <span className="sr-only">Team logo</span>
                               </th>
                               <th className="w-10 p-1 text-center">

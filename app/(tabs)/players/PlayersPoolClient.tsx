@@ -686,7 +686,7 @@ export function PlayersPoolClient({
     const controller = new AbortController();
     loadControllerRef.current = controller;
     inFlightRef.current = true;
-    const showBusy = Boolean(opts?.manual) || (rows.length === 0 && meta == null && !opts?.silent);
+    const showBusy = rows.length === 0 && meta == null && !opts?.silent;
     if (showBusy) setBusy(true);
     if (opts?.manual) setError(null);
     try {
@@ -1186,7 +1186,7 @@ export function PlayersPoolClient({
             <table className="pool-table pool-players-stat-table w-full text-xs min-w-[1040px]">
               <thead>
                 <tr>
-                  <th className="w-10 p-1 text-center" scope="col">
+                  <th className="w-10 max-md:hidden p-1 text-center" scope="col">
                     <span className="sr-only">Team logo</span>
                   </th>
                   <th className="w-10 p-1 text-center" scope="col">
@@ -1389,7 +1389,7 @@ export function PlayersPoolClient({
                       <span className="inline-flex items-baseline gap-1 flex-wrap min-w-0">
                         <PlayersPoolPlayerNameLink playerName={p.name} espnAthleteId={p.espn_athlete_id} />
                         {posTrim ? (
-                          <span className="text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0">
+                          <span className="hidden text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0 md:inline">
                             {posTrim}
                           </span>
                         ) : null}

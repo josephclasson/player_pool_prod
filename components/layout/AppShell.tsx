@@ -29,7 +29,8 @@ import { PullToRefreshContainer } from "@/components/layout/PullToRefreshContain
 import { PoolSessionRoutes } from "@/components/layout/PoolSessionRoutes";
 
 /** Logical width tables were designed for; mobile zoom = min(1, viewport / this) so tables fit without horizontal scroll. */
-const MOBILE_DESKTOP_FIT_WIDTH_PX = 1320;
+/** Higher = stronger zoom-out on phones so full tables (all columns) fit width. */
+const MOBILE_DESKTOP_FIT_WIDTH_PX = 2800;
 
 /**
  * Icons aligned with databallr.com/stats nav (same Lucide glyphs they ship) where applicable:
