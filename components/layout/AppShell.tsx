@@ -31,6 +31,9 @@ import { PoolSessionRoutes } from "@/components/layout/PoolSessionRoutes";
 /** Minimum content width used when layout has not measured yet (avoids absurd zoom). */
 const MOBILE_ZOOM_MIN_CONTENT_PX = 320;
 
+/** Match `max-w-6xl` (72rem) so mobile lays out like desktop, then shell zoom fits the canvas to the viewport. */
+const MOBILE_DESKTOP_CANVAS_MIN_PX = 1152;
+
 /**
  * Icons aligned with databallr.com/stats nav (same Lucide glyphs they ship) where applicable:
  * Live → Radio, NBA Draft → GraduationCap, WOWY Lineups → UsersRound; Leaderboard → Trophy (pool standings).
@@ -452,7 +455,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                 >
                   <div
                     ref={mobileZoomContentRef}
-                    className="flex min-h-0 min-w-0 flex-1 flex-col max-md:w-max max-md:self-start md:min-w-0 md:w-full md:self-stretch"
+                    className={[
+                      "flex min-h-0 flex-col",
+                      /* Mobile: full desktop-width layout plane (not shrink-to-fit to viewport — `self-start` caused that). */
+                      "max-md:min-w-[72rem] max-md:w-max max-md:flex-none max-md:shrink-0",
+                      "md:min-h-0 md:min-w-0 md:flex-1 md:w-full"
+                    ].join(" ")}
                     style={mobileShellZoomStyle}
                   >
                     {children}
