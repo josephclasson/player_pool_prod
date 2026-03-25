@@ -653,7 +653,33 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     }
     setDraftLoadError(null);
     const json = (await res.json()) as DraftStateResponse;
-    setState(json);
+    // Merge optimistic picks (client-side) into the server snapshot so the draft board
+    // doesn't "flicker" when Supabase state is still catching up.
+    setState((prev) => {
+      if (!prev) return json;
+
+      const serverPickKeys = new Set(
+        (json.picks ?? []).map((p) => `${p.pickOverall}:${p.player.id}`)
+      );
+
+      const mergedPicks = [...(json.picks ?? [])];
+      let didMerge = false;
+
+      for (const p of prev.picks ?? []) {
+        const key = `${p.pickOverall}:${p.player.id}`;
+        if (serverPickKeys.has(key)) continue;
+        mergedPicks.push(p);
+        didMerge = true;
+      }
+
+      if (!didMerge) return json;
+      mergedPicks.sort((a, b) => a.pickOverall - b.pickOverall);
+
+      return {
+        ...json,
+        picks: mergedPicks
+      };
+    });
   }
 
   async function onManualRefresh() {
@@ -1299,6 +1325,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                 <input
                                   ref={draftCellInputRef}
                                   value={draftCellInput}
+                                  title={draftCellInput.trim() ? draftCellInput : undefined}
                                   onChange={(e) => {
                                     setDraftCellInput(e.target.value);
                                     if (error) setError(null);
@@ -1349,6 +1376,14 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                         onClick={() => {
                                           setDraftCellInput(p.name);
                                           setError(null);
+                                          // Improve visibility for long names in narrow cells.
+                                          requestAnimationFrame(() => {
+                                            const el = draftCellInputRef.current;
+                                            if (!el) return;
+                                            el.focus();
+                                            el.setSelectionRange(0, String(p.name ?? "").length);
+                                            el.scrollLeft = 0;
+                                          });
                                         }}
                                       >
                                         {label}
