@@ -1444,10 +1444,10 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
           </div>
         )}
 
-        {Boolean(state?.draftRoom) && !isFinal && (
+        {state != null && state.draftRoom != null && !isFinal && (
           <div
             className={`mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] ${
-              yourTurn || (commissionerProxyMode && state?.viewerCanCommissionerPick)
+              yourTurn || (commissionerProxyMode && state.viewerCanCommissionerPick)
                 ? "text-foreground"
                 : "text-muted-foreground"
             }`}
@@ -1463,9 +1463,9 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
             <span className="font-medium">
               {yourTurn ?
                 <span className="text-accent">Your turn</span>
-              : commissionerProxyMode && state?.viewerCanCommissionerPick ?
+              : commissionerProxyMode && state.viewerCanCommissionerPick ?
                 <span className="text-accent">Proxy: {onClockOwnerName}</span>
-              : state?.currentTurn.leagueTeamId ?
+              : state.currentTurn.leagueTeamId ?
                 `Wait · ${onClockOwnerName}`
               : !activeLeagueId ?
                 "Set league in header"
