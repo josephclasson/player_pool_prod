@@ -1,15 +1,16 @@
 "use client";
 
-import type { ReactNode, RefObject } from "react";
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { dispatchPlayerPoolPullRefresh } from "@/lib/player-pool-pull-refresh";
+import type { MainScrollContainerRef } from "@/lib/main-scroll-ref";
 import { poolHapticsLight } from "@/lib/pool-mobile-haptics";
 
 const PULL_THRESHOLD_PX = 56;
 const MAX_PULL_PX = 96;
 
 type Props = {
-  scrollRef: RefObject<HTMLDivElement | null>;
+  scrollRef: MainScrollContainerRef;
   children: ReactNode;
   className?: string;
 };
