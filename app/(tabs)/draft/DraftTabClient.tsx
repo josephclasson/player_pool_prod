@@ -702,18 +702,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
         ? { playerId, commissionerOverride: true }
         : { leagueTeamId: state.yourLeagueTeamId!, playerId };
 
-      const res = await fetch(`/api/draft/${activeLeagueId}/pick`, {
-        method: "POST",
-        headers: draftInitHeaders(true),
-        body: JSON.stringify(body)
-      });
-      if (!res.ok) {
-        const t = await res.text();
-        throw new Error(`Pick failed: ${res.status} ${t}`);
-      }
-
-      // Optimistically update the board immediately so it doesn't wait for
-      // the full `/api/draft/.../state` reload to finish.
+      // Optimistically update the board immediately so it doesn't wait for the
+      // potentially-slow `/api/draft/.../pick` request to return.
       setState((prev) => {
         if (!prev) return prev;
         const useLeagueTeamId = useProxy ? prev.currentTurn.leagueTeamId : prev.yourLeagueTeamId;
@@ -794,6 +784,16 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
           }
         };
       });
+
+      const res = await fetch(`/api/draft/${activeLeagueId}/pick`, {
+        method: "POST",
+        headers: draftInitHeaders(true),
+        body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(`Pick failed: ${res.status} ${t}`);
+      }
 
       // Don't block the UI on a full draft-state reload.
       // `loadState()` is relatively expensive and was making picks feel delayed.
