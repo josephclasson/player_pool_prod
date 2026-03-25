@@ -1000,7 +1000,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
             </button>
 
             {leaderboardTableOpen ? (
-            <div className="mt-1.5 overflow-x-auto min-w-0">
+            <div className="mt-1.5 min-w-0 overflow-x-hidden md:overflow-x-auto">
               <table className="pool-table w-full text-xs min-w-[58rem]">
                 <thead>
                   <tr>

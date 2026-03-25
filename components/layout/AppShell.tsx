@@ -21,12 +21,15 @@ import {
   Trophy,
   UsersRound
 } from "lucide-react";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Suspense } from "react";
 import { LeagueIdentityBar } from "@/components/layout/LeagueIdentityBar";
 import { MainScrollContainerRefContext } from "@/components/layout/MainScrollContainerContext";
 import { PullToRefreshContainer } from "@/components/layout/PullToRefreshContainer";
 import { PoolSessionRoutes } from "@/components/layout/PoolSessionRoutes";
+
+/** Logical width tables were designed for; mobile zoom = min(1, viewport / this) so tables fit without horizontal scroll. */
+const MOBILE_DESKTOP_FIT_WIDTH_PX = 1320;
 
 /**
  * Icons aligned with databallr.com/stats nav (same Lucide glyphs they ship) where applicable:
@@ -308,6 +311,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const mainScrollRef = useRef<HTMLDivElement>(null);
 
   const [commUnlocked, setCommUnlocked] = useState(() => readCommissionerSecretFromSession().length > 0);
+  const [mobileFitZoom, setMobileFitZoom] = useState(1);
 
   useEffect(() => {
     const sync = () => setCommUnlocked(readCommissionerSecretFromSession().length > 0);
@@ -317,6 +321,28 @@ export function AppShell({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener(PLAYER_POOL_IDENTITY_CHANGE_EVENT, sync);
       window.removeEventListener("focus", sync);
+    };
+  }, []);
+
+  useEffect(() => {
+    const mobileMq = window.matchMedia("(max-width: 767px)");
+    const apply = () => {
+      if (!mobileMq.matches) {
+        setMobileFitZoom(1);
+        return;
+      }
+      const w = window.visualViewport?.width ?? window.innerWidth;
+      setMobileFitZoom(Math.min(1, w / MOBILE_DESKTOP_FIT_WIDTH_PX));
+    };
+    apply();
+    mobileMq.addEventListener("change", apply);
+    window.addEventListener("resize", apply);
+    const vv = window.visualViewport;
+    vv?.addEventListener("resize", apply);
+    return () => {
+      mobileMq.removeEventListener("change", apply);
+      window.removeEventListener("resize", apply);
+      vv?.removeEventListener("resize", apply);
     };
   }, []);
 
@@ -351,6 +377,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   };
 
+  const mobileShellZoomStyle: CSSProperties | undefined =
+    mobileFitZoom < 0.999 ? { zoom: mobileFitZoom } : undefined;
+
   return (
     <div className="safe-area-wrapper flex min-h-dvh w-full flex-col text-foreground md:min-h-screen">
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
@@ -374,18 +403,23 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <AppearancePicker />
               </div>
             ) : null}
-            <Suspense fallback={null}>
-              <PoolSessionRoutes />
-              <LeagueIdentityBar />
-            </Suspense>
-            <MainScrollContainerRefContext.Provider value={mainScrollRef}>
-              <PullToRefreshContainer
-                scrollRef={mainScrollRef}
-                className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden md:min-h-0 md:overflow-visible"
-              >
-                {children}
-              </PullToRefreshContainer>
-            </MainScrollContainerRefContext.Provider>
+            <div
+              className="flex min-h-0 min-w-0 flex-1 flex-col md:min-w-0"
+              style={mobileShellZoomStyle}
+            >
+              <Suspense fallback={null}>
+                <PoolSessionRoutes />
+                <LeagueIdentityBar />
+              </Suspense>
+              <MainScrollContainerRefContext.Provider value={mainScrollRef}>
+                <PullToRefreshContainer
+                  scrollRef={mainScrollRef}
+                  className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden md:min-h-0 md:overflow-visible"
+                >
+                  {children}
+                </PullToRefreshContainer>
+              </MainScrollContainerRefContext.Provider>
+            </div>
           </div>
         </main>
       </div>

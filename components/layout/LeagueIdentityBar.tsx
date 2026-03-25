@@ -200,7 +200,7 @@ export function LeagueIdentityBar() {
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 md:gap-y-1.5">
           {session ? (
             <div
-              className={`min-w-0 flex-1 flex flex-nowrap items-center gap-x-1 sm:gap-x-1.5 overflow-x-auto leading-snug ${barText}`}
+              className={`min-w-0 flex-1 flex flex-nowrap items-center gap-x-1 sm:gap-x-1.5 overflow-x-hidden md:overflow-x-auto leading-snug ${barText}`}
             >
               <span className={`${labelCls}`}>Current League:</span>
               <span className="min-w-0 max-w-[42vw] md:max-w-[11rem] truncate font-semibold text-foreground">

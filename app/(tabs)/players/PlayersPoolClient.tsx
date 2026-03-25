@@ -1182,7 +1182,7 @@ export function PlayersPoolClient({
           <PoolTableSkeleton rows={8} />
         ) : (
         <div className="pool-card pool-card-compact min-w-0">
-          <div className="overflow-x-auto min-w-0">
+          <div className="min-w-0 overflow-x-hidden md:overflow-x-auto">
             <table className="pool-table pool-players-stat-table w-full text-xs min-w-[1040px]">
               <thead>
                 <tr>

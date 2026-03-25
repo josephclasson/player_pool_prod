@@ -27,7 +27,6 @@ import {
 } from "@/lib/player-pool-session";
 import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
 import { PoolTableSkeleton } from "@/components/ui/PoolTableSkeleton";
-import { poolHapticsLight } from "@/lib/pool-mobile-haptics";
 
 type RoundScores = Record<number, number | null | undefined>;
 
@@ -1136,27 +1135,6 @@ function StatTrackerTabPageInner() {
     return [mine, ...list.filter((o) => o.ownerId !== sessionTeamId)];
   }, [selectedOwners, sessionTeamId]);
 
-  const mobileOwnerNavIdxRef = useRef(0);
-  const ownerSwipeRef = useRef<{ x: number; y: number } | null>(null);
-  const ownerNavKey = useMemo(
-    () => orderedSelectedOwners.map((o) => o.ownerId).join("\0"),
-    [orderedSelectedOwners]
-  );
-  useEffect(() => {
-    mobileOwnerNavIdxRef.current = 0;
-  }, [ownerNavKey]);
-
-  const scrollStatOwnerIntoView = useCallback(
-    (idx: number) => {
-      const id = orderedSelectedOwners[idx]?.ownerId;
-      if (!id) return;
-      window.requestAnimationFrame(() => {
-        document.getElementById(`stat-tracker-owner-${id}`)?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-      });
-    },
-    [orderedSelectedOwners]
-  );
-
   const [showOnlyActivePlayers, setShowOnlyActivePlayers] = useState(false);
 
   const collegeTeamOptions = useMemo(() => {
@@ -1734,43 +1712,7 @@ function StatTrackerTabPageInner() {
         </div>
       </div>
 
-      <div
-        className="min-w-0 touch-pan-y"
-        onTouchStart={(e) => {
-          if (e.touches.length !== 1) return;
-          const t = e.touches[0];
-          ownerSwipeRef.current = { x: t.clientX, y: t.clientY };
-        }}
-        onTouchEnd={(e) => {
-          if (orderedSelectedOwners.length < 2) {
-            ownerSwipeRef.current = null;
-            return;
-          }
-          if (typeof window !== "undefined" && window.matchMedia("(min-width: 768px)").matches) {
-            ownerSwipeRef.current = null;
-            return;
-          }
-          const start = ownerSwipeRef.current;
-          ownerSwipeRef.current = null;
-          if (!start || e.changedTouches.length === 0) return;
-          const t = e.changedTouches[0];
-          const dx = t.clientX - start.x;
-          const dy = t.clientY - start.y;
-          if (Math.abs(dx) < 56 || Math.abs(dx) < Math.abs(dy) * 1.05) return;
-          const i = mobileOwnerNavIdxRef.current;
-          if (dx < 0) {
-            const next = Math.min(orderedSelectedOwners.length - 1, i + 1);
-            mobileOwnerNavIdxRef.current = next;
-            scrollStatOwnerIntoView(next);
-            poolHapticsLight();
-          } else {
-            const next = Math.max(0, i - 1);
-            mobileOwnerNavIdxRef.current = next;
-            scrollStatOwnerIntoView(next);
-            poolHapticsLight();
-          }
-        }}
-      >
+      <div className="min-w-0">
       {orderedSelectedOwners.map((owner) => {
         const isOpen = openByOwnerId[owner.ownerId] ?? true;
         const rank = rankByOwnerId.get(owner.ownerId) ?? 0;
@@ -2083,7 +2025,7 @@ function StatTrackerTabPageInner() {
                   </div>
                 </button>
 
-                <div className="mt-1.5 overflow-x-auto">
+                <div className="mt-1.5 overflow-x-hidden md:overflow-x-auto">
                 <table className="pool-table w-full text-xs">
                   <thead>
                     <tr>
