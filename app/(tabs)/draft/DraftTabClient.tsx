@@ -712,6 +712,89 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
         throw new Error(`Pick failed: ${res.status} ${t}`);
       }
 
+      // Optimistically update the board immediately so it doesn't wait for
+      // the full `/api/draft/.../state` reload to finish.
+      setState((prev) => {
+        if (!prev) return prev;
+        const useLeagueTeamId = useProxy ? prev.currentTurn.leagueTeamId : prev.yourLeagueTeamId;
+        if (!useLeagueTeamId) return prev;
+
+        const pickedPlayer = prev.availablePlayers.find((p) => p.id === playerId);
+        if (!pickedPlayer) return prev;
+
+        const pickOverall = prev.draftRoom.currentPickOverall ?? 1;
+        const alreadyThere = prev.picks.some((p) => p.pickOverall === pickOverall && p.player.id === playerId);
+        if (alreadyThere) return prev;
+
+        const ownersCount = prev.draftOrder.length;
+        const roundNumber = prev.currentTurn.roundNumber;
+        const pickNumberInRound = prev.currentTurn.pickNumberInRound;
+
+        const ownerName =
+          prev.leagueTeams?.find((t) => t.id === useLeagueTeamId)?.teamName ??
+          prev.picks.find((p) => p.leagueTeamId === useLeagueTeamId)?.ownerName ??
+          "—";
+
+        const nextPickOverall = pickOverall + 1;
+        const maxPick = (prev.draftRoom.totalRounds ?? 6) * ownersCount;
+        const nextStatus = nextPickOverall > maxPick ? "completed" : prev.draftRoom.status;
+
+        // Recompute next turn (same snake logic as the server).
+        const idx = nextPickOverall - 1;
+        const nextRoundNumber = Math.floor(idx / ownersCount) + 1;
+        const nextPickNumberInRound = (idx % ownersCount) + 1;
+        const snakeOrder = nextRoundNumber % 2 === 1 ? prev.draftOrder : [...prev.draftOrder].reverse();
+        const nextLeagueTeamId = snakeOrder[nextPickNumberInRound - 1] ?? null;
+
+        const picked = {
+          pickOverall,
+          roundNumber,
+          pickNumberInRound,
+          leagueTeamId: useLeagueTeamId,
+          ownerName,
+          player: {
+            id: pickedPlayer.id,
+            name: pickedPlayer.name,
+            shortName: pickedPlayer.shortName ?? null,
+            espnAthleteId: pickedPlayer.espnAthleteId ?? null,
+            position: pickedPlayer.position ?? null,
+            headshotUrls: pickedPlayer.headshotUrls ?? undefined,
+            seasonPpg: pickedPlayer.seasonPpg ?? null,
+            projection: pickedPlayer.projection ?? null,
+            originalProjection: pickedPlayer.originalProjection ?? null,
+            team: pickedPlayer.team
+              ? {
+                  id: pickedPlayer.team.id,
+                  name: pickedPlayer.team.name,
+                  shortName: pickedPlayer.team.shortName ?? null,
+                  seed: pickedPlayer.team.seed,
+                  region: pickedPlayer.team.region,
+                  conference: pickedPlayer.team.conference,
+                  isPower5: Boolean(pickedPlayer.team.isPower5),
+                  logoUrl: pickedPlayer.team.logoUrl ?? null
+                }
+              : null
+          }
+        };
+
+        return {
+          ...prev,
+          picks: [...prev.picks, picked].sort((a, b) => a.pickOverall - b.pickOverall),
+          draftRoom: {
+            ...prev.draftRoom,
+            currentPickOverall: nextPickOverall,
+            status: nextStatus,
+            completedAt: nextStatus === "completed" ? new Date().toISOString() : prev.draftRoom.completedAt
+          },
+          currentTurn: {
+            ...prev.currentTurn,
+            roundNumber: nextRoundNumber,
+            pickNumberInRound: nextPickNumberInRound,
+            leagueTeamId: nextLeagueTeamId
+          }
+        };
+      });
+
       // Don't block the UI on a full draft-state reload.
       // `loadState()` is relatively expensive and was making picks feel delayed.
       void loadState().catch(() => {
