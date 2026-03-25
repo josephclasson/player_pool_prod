@@ -1987,7 +1987,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                         <div className="text-sm font-semibold pool-owner-name min-w-0 truncate max-w-[min(100%,14rem)] sm:max-w-[18rem]">
                           {bucket.ownerName}
                         </div>
-                        <div className="pool-owner-header-stat-meta flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
+                        <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
                           <span>Report Card: {rc.grade}</span>
                           <span className="pool-owner-header-stat-meta-sep select-none" aria-hidden>·</span>
                           <span>
