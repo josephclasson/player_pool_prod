@@ -541,15 +541,15 @@ function PlayersPoolPlayerNameLink({
         className="pool-table-player-link"
         title={playerName}
       >
-        <span className="hidden md:inline">{playerName}</span>
-        <span className="md:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
+        <span className="hidden lg:inline">{playerName}</span>
+        <span className="lg:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
       </a>
     );
   }
   return (
     <span className="font-semibold" title={playerName}>
-      <span className="hidden md:inline">{playerName}</span>
-      <span className="md:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
+      <span className="hidden lg:inline">{playerName}</span>
+      <span className="lg:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
     </span>
   );
 }

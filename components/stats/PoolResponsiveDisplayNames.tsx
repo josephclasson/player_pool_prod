@@ -7,8 +7,8 @@ export function PoolResponsivePlayerNameText({ full }: { full: string }) {
   if (short === full) return <>{full}</>;
   return (
     <>
-      <span className="hidden md:inline">{full}</span>
-      <span className="md:hidden">{short}</span>
+      <span className="hidden lg:inline">{full}</span>
+      <span className="lg:hidden">{short}</span>
     </>
   );
 }
@@ -18,8 +18,8 @@ export function PoolResponsiveOwnerNameText({ full }: { full: string }) {
   if (short === full) return <>{full}</>;
   return (
     <>
-      <span className="hidden md:inline">{full}</span>
-      <span className="md:hidden">{short}</span>
+      <span className="hidden lg:inline">{full}</span>
+      <span className="lg:hidden">{short}</span>
     </>
   );
 }
