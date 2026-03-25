@@ -96,6 +96,31 @@ export function writeStoredStatTrackerShowInlineRanks(show: boolean): void {
   }
 }
 
+/** StatTracker on narrow viewports: `true` = full table; `false` = condensed box score (default). */
+export const STAT_TRACKER_MOBILE_ALL_STATS_KEY = "stat_tracker_mobile_all_stats";
+
+export function readStoredStatTrackerMobileAllStats(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(STAT_TRACKER_MOBILE_ALL_STATS_KEY);
+    if (raw == null) return false;
+    if (raw === "1") return true;
+    if (raw === "0") return false;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function writeStoredStatTrackerMobileAllStats(show: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STAT_TRACKER_MOBILE_ALL_STATS_KEY, show ? "1" : "0");
+  } catch {
+    /* private mode / quota */
+  }
+}
+
 /** `true` = show Probability & Odds columns on Leaderboard (default). */
 export function readStoredLeaderboardShowProbabilityOddsColumns(): boolean {
   if (typeof window === "undefined") return true;

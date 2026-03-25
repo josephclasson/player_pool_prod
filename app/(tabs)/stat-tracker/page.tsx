@@ -7,9 +7,11 @@ import { useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Circle, Radio } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
+  readStoredStatTrackerMobileAllStats,
   readStoredStatTrackerShowInlineRanks,
   readStoredStatTrackerShowTppgColumns,
   writeStoredActiveLeagueId,
+  writeStoredStatTrackerMobileAllStats,
   writeStoredStatTrackerShowInlineRanks,
   writeStoredStatTrackerShowTppgColumns
 } from "@/lib/player-pool-storage";
@@ -936,6 +938,20 @@ function buildOwnerVsOwnerFooterRanks(
   return { byOwnerId };
 }
 
+/** `max-width: 767px` — matches Tailwind `md` breakpoint. */
+function useMaxMdViewport(): boolean {
+  const [narrow, setNarrow] = useState(false);
+  useLayoutEffect(() => {
+    if (typeof window === "undefined") return;
+    const mq = window.matchMedia("(max-width: 767px)");
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener("change", on);
+    return () => mq.removeEventListener("change", on);
+  }, []);
+  return narrow;
+}
+
 function StatTrackerTabPageInner() {
   const sp = useSearchParams();
   const leagueId = useMemo(() => sp.get("leagueId")?.trim() || undefined, [sp]);
@@ -1339,6 +1355,21 @@ function StatTrackerTabPageInner() {
   const TABLE_COLS = showProjectionColumns ? 18 : 13;
   const projBlockDivider = showProjectionColumns ? " pool-table-col-total-divider" : "";
 
+  const isMaxMd = useMaxMdViewport();
+  const [showAllStatsMobile, setShowAllStatsMobile] = useState(false);
+  useLayoutEffect(() => {
+    setShowAllStatsMobile(readStoredStatTrackerMobileAllStats());
+  }, []);
+
+  const condensedBoxscore = isMaxMd && !showAllStatsMobile;
+  const mobHide = condensedBoxscore ? "hidden md:table-cell" : "";
+  /** Condensed mobile = ESPN-style box score: hide extras; projections only when “All stats” is on. */
+  const showProjectionColumnsEffective = showProjectionColumns && !condensedBoxscore;
+  const totalDividerClass = condensedBoxscore ? "" : projBlockDivider;
+  const condensedColCount = 1 + (showTppgColumns ? 1 : 0) + 6 + 1;
+  const emptyRowColSpan = condensedBoxscore ? condensedColCount : TABLE_COLS;
+  const footerLogoColSpan = condensedBoxscore ? 1 : 2;
+
   async function onManualRefresh() {
     setRefreshBusy(true);
     setError(null);
@@ -1450,6 +1481,21 @@ function StatTrackerTabPageInner() {
 
       <div className="pool-panel pool-panel-compact min-w-0">
         <div className="pool-filter-toolbar">
+          <label
+            className="pool-filter-chip md:hidden"
+            title="Full table with logos, seeds, season PPG, TPPG − PPG, projections, and ranks. Off = compact box score (player, TPPG, R1–R6, total) like ESPN."
+          >
+            <input
+              type="checkbox"
+              checked={showAllStatsMobile}
+              onChange={(e) => {
+                const v = e.target.checked;
+                setShowAllStatsMobile(v);
+                writeStoredStatTrackerMobileAllStats(v);
+              }}
+            />
+            <span>All stats</span>
+          </label>
           <label className="pool-filter-chip">
             <input
               type="checkbox"
@@ -1713,11 +1759,14 @@ function StatTrackerTabPageInner() {
             <table className="pool-table pool-table-flush pool-table-collapsed-summary w-full">
               <thead>
                 <tr>
-                  <th className="text-center" title="Roster players whose team is still in the tournament">
+                  <th
+                    className={["text-center", mobHide].filter(Boolean).join(" ")}
+                    title="Roster players whose team is still in the tournament"
+                  >
                     Remain
                   </th>
                   <th
-                    className="text-center pool-table-col-group-end"
+                    className={["text-center pool-table-col-group-end", mobHide].filter(Boolean).join(" ")}
                     title="Players whose team advanced through the league’s current tournament round (survived that round)"
                   >
                     Adv
@@ -1730,22 +1779,22 @@ function StatTrackerTabPageInner() {
                   <th className="text-center">R6</th>
                   <th className="text-center pool-table-col-primary">Total</th>
                   <th
-                    className="text-center"
+                    className={["text-center", mobHide].filter(Boolean).join(" ")}
                     title="Standings rank among selected owners by summed live projections when every roster player has a projection"
                   >
                     Rank
                   </th>
-                  {showProjectionColumns ? <th className="text-center">Orig</th> : null}
-                  {showProjectionColumns ? <th className="text-center">Live</th> : null}
-                  {showProjectionColumns ? <th className="text-center pool-table-col-group-end">+/−</th> : null}
+                  {showProjectionColumnsEffective ? <th className="text-center">Orig</th> : null}
+                  {showProjectionColumnsEffective ? <th className="text-center">Live</th> : null}
+                  {showProjectionColumnsEffective ? <th className="text-center pool-table-col-group-end">+/−</th> : null}
                   <th
-                    className="text-center"
+                    className={["text-center", mobHide].filter(Boolean).join(" ")}
                     title="Model over all league owners: Plackett–Luce weights from live projection (or points fallback), roster share still alive, and share advanced through current round — not affected by Owner filter"
                   >
                     Win %
                   </th>
                   <th
-                    className="text-center"
+                    className={["text-center", mobHide].filter(Boolean).join(" ")}
                     title="Estimated chance to finish in the top 3 among all league owners (top min(3,n) if fewer than 3 teams in the league) — not affected by Owner filter"
                   >
                     Money %
@@ -1754,7 +1803,7 @@ function StatTrackerTabPageInner() {
               </thead>
               <tbody>
                 <tr className="pool-table-row">
-                  <td className="px-1 py-1 text-center font-semibold text-foreground align-middle">
+                  <td className={["px-1 py-1 text-center font-semibold text-foreground align-middle", mobHide].filter(Boolean).join(" ")}>
                     <StatCellWithRank
                       showRank={showInlineRanks}
                       rank={fo.remainingPlayers.rank}
@@ -1764,7 +1813,14 @@ function StatTrackerTabPageInner() {
                       {footer.remainingPlayers}
                     </StatCellWithRank>
                   </td>
-                  <td className="px-1 py-1 text-center font-semibold text-foreground align-middle pool-table-col-group-end">
+                  <td
+                    className={[
+                      "px-1 py-1 text-center font-semibold text-foreground align-middle pool-table-col-group-end",
+                      mobHide
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
                     <StatCellWithRank
                       showRank={showInlineRanks}
                       rank={fo.advanced.rank}
@@ -1835,7 +1891,7 @@ function StatTrackerTabPageInner() {
                     </StatCellWithRank>
                   </td>
                   <td
-                    className={`px-1 py-1 text-center font-semibold sleeper-score-font pool-table-col-primary align-middle${projBlockDivider}`}
+                    className={`px-1 py-1 text-center font-semibold sleeper-score-font pool-table-col-primary align-middle${totalDividerClass}`}
                   >
                     <StatCellWithRank
                       showRank={showInlineRanks}
@@ -1846,10 +1902,14 @@ function StatTrackerTabPageInner() {
                       {footer.totalPts}
                     </StatCellWithRank>
                   </td>
-                  <td className="px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle">
+                  <td
+                    className={["px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle", mobHide]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
                     {projectedRank != null ? ordinalRankLabel(projectedRank) : "—"}
                   </td>
-                  {showProjectionColumns ? (
+                  {showProjectionColumnsEffective ? (
                     <td className="px-1 py-1 text-center font-semibold sleeper-score-font align-middle">
                       <StatCellWithRank
                         showRank={showInlineRanks}
@@ -1861,7 +1921,7 @@ function StatTrackerTabPageInner() {
                       </StatCellWithRank>
                     </td>
                   ) : null}
-                  {showProjectionColumns ? (
+                  {showProjectionColumnsEffective ? (
                     <td className="px-1 py-1 text-center font-semibold sleeper-score-font align-middle">
                       <StatCellWithRank
                         showRank={showInlineRanks}
@@ -1873,7 +1933,7 @@ function StatTrackerTabPageInner() {
                       </StatCellWithRank>
                     </td>
                   ) : null}
-                  {showProjectionColumns ? (
+                  {showProjectionColumnsEffective ? (
                     <td className="px-1 py-1 text-center font-semibold sleeper-score-font align-middle pool-table-col-group-end">
                       <StatCellWithRank
                         showRank={showInlineRanks}
@@ -1885,7 +1945,11 @@ function StatTrackerTabPageInner() {
                       </StatCellWithRank>
                     </td>
                   ) : null}
-                  <td className="px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle">
+                  <td
+                    className={["px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle", mobHide]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
                     <StatCellWithRank
                       showRank={showInlineRanks}
                       rank={outcomeProbRanks?.winPct.rank}
@@ -1895,7 +1959,11 @@ function StatTrackerTabPageInner() {
                       {outcomeProb != null ? `${outcomeProb.winPct.toFixed(1)}%` : "—"}
                     </StatCellWithRank>
                   </td>
-                  <td className="px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle">
+                  <td
+                    className={["px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle", mobHide]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
                     <StatCellWithRank
                       showRank={showInlineRanks}
                       rank={outcomeProbRanks?.moneyPct.rank}
@@ -1964,25 +2032,28 @@ function StatTrackerTabPageInner() {
                 <table className="pool-table w-full text-xs">
                   <thead>
                     <tr>
-                      <th className="w-10 p-1 text-center" scope="col">
+                      <th className={["w-10 p-1 text-center", mobHide].filter(Boolean).join(" ")} scope="col">
                         <span className="sr-only">Team logo</span>
                       </th>
-                      <th className="w-10 p-1 text-center" scope="col">
+                      <th className={["w-10 p-1 text-center", mobHide].filter(Boolean).join(" ")} scope="col">
                         <span className="sr-only">Player photo</span>
                       </th>
                       <th className="text-left min-w-[9rem]" title="Name and position; under — college team and regional bracket">
                         Player
                       </th>
-                      <th className="text-center" title="Regional pod seed (1–16 within the bracket)">
+                      <th
+                        className={["text-center", mobHide].filter(Boolean).join(" ")}
+                        title="Regional pod seed (1–16 within the bracket)"
+                      >
                         SEED
                       </th>
                       <th
-                        className="text-center pool-table-col-group-end"
+                        className={["text-center pool-table-col-group-end", mobHide].filter(Boolean).join(" ")}
                         title="NCAA tournament overall seed (S-curve) 1–68 from the selection committee"
                       >
                         Overall
                       </th>
-                      <th className="text-center" title="Season points per game">
+                      <th className={["text-center", mobHide].filter(Boolean).join(" ")} title="Season points per game">
                         PPG
                       </th>
                       {showTppgColumns ? (
@@ -1995,7 +2066,7 @@ function StatTrackerTabPageInner() {
                       ) : null}
                       {showTppgColumns ? (
                         <th
-                          className="text-center"
+                          className={["text-center", mobHide].filter(Boolean).join(" ")}
                           title="Tournament PPG minus season PPG (TPPG − PPG)"
                         >
                           +/−
@@ -2008,12 +2079,12 @@ function StatTrackerTabPageInner() {
                       <th className="text-center">R5</th>
                       <th className="text-center">R6</th>
                       <th className="text-center pool-table-col-primary">Total</th>
-                      {showProjectionColumns ? (
+                      {showProjectionColumnsEffective ? (
                         <th className="text-center" title="Pre-tournament: season PPG × full chalk expected games">
                           Orig
                         </th>
                       ) : null}
-                      {showProjectionColumns ? (
+                      {showProjectionColumnsEffective ? (
                         <th
                           className="text-center"
                           title="Actual tournament points + season PPG × remaining expected chalk games"
@@ -2021,7 +2092,7 @@ function StatTrackerTabPageInner() {
                           Live
                         </th>
                       ) : null}
-                      {showProjectionColumns ? (
+                      {showProjectionColumnsEffective ? (
                         <th className="text-center w-11" title="Live projection − original projection">
                           +/−
                         </th>
@@ -2045,8 +2116,16 @@ function StatTrackerTabPageInner() {
                           key={p.rosterSlotId ?? p.playerId}
                           className={`cursor-pointer group pool-table-row ${p.eliminated ? "pool-table-row-eliminated" : ""}`}
                         >
-                          <PoolTableTeamLogoCell url={p.teamLogoUrl} teamName={p.teamName} />
-                          <PoolTablePlayerPhotoCell urls={p.headshotUrls} playerName={p.playerName} />
+                          <PoolTableTeamLogoCell
+                            url={p.teamLogoUrl}
+                            teamName={p.teamName}
+                            cellClassName={mobHide || undefined}
+                          />
+                          <PoolTablePlayerPhotoCell
+                            urls={p.headshotUrls}
+                            playerName={p.playerName}
+                            cellClassName={mobHide || undefined}
+                          />
                           <td className="px-1 py-2 transition-colors text-left align-top">
                             <span className="inline-flex items-baseline gap-1 flex-wrap min-w-0">
                               {p.playingInLiveGame ? (
@@ -2077,7 +2156,7 @@ function StatTrackerTabPageInner() {
                             </div>
                           </td>
                           <td
-                            className="px-1 py-2 text-center transition-colors"
+                            className={["px-1 py-2 text-center transition-colors", mobHide].filter(Boolean).join(" ")}
                             title={p.seed != null ? `Regional pod seed ${p.seed}` : undefined}
                           >
                             <StatCellWithRank showRank={false} rank={leagueStatRanks.seed.get(rowKey)} draftedCount={dc}>
@@ -2085,7 +2164,9 @@ function StatTrackerTabPageInner() {
                             </StatCellWithRank>
                           </td>
                           <td
-                            className="px-1 py-2 text-center transition-colors pool-table-col-group-end"
+                            className={["px-1 py-2 text-center transition-colors pool-table-col-group-end", mobHide]
+                              .filter(Boolean)
+                              .join(" ")}
                             title={
                               p.overallSeed != null
                                 ? `NCAA overall seed ${p.overallSeed} of 68 (lower is better)`
@@ -2100,7 +2181,7 @@ function StatTrackerTabPageInner() {
                               {p.overallSeed != null ? String(p.overallSeed) : "—"}
                             </StatCellWithRank>
                           </td>
-                          <td className="px-1 py-2 text-center transition-colors">
+                          <td className={["px-1 py-2 text-center transition-colors", mobHide].filter(Boolean).join(" ")}>
                             <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.ppg.get(rowKey)} draftedCount={dc}>
                               {p.seasonPpg.toFixed(1)}
                             </StatCellWithRank>
@@ -2113,7 +2194,7 @@ function StatTrackerTabPageInner() {
                             </td>
                           ) : null}
                           {showTppgColumns ? (
-                            <td className="px-1 py-2 text-center transition-colors">
+                            <td className={["px-1 py-2 text-center transition-colors", mobHide].filter(Boolean).join(" ")}>
                               <StatCellWithRank
                                 showRank={showInlineRanks}
                                 rank={leagueStatRanks.tppgDelta.get(rowKey)}
@@ -2160,13 +2241,18 @@ function StatTrackerTabPageInner() {
                             </StatCellWithRank>
                           </td>
                           <td
-                            className={`px-1 py-2 text-center transition-colors sleeper-score-font pool-table-col-primary${projBlockDivider}`}
+                            className={[
+                              "px-1 py-2 text-center transition-colors sleeper-score-font pool-table-col-primary",
+                              totalDividerClass,
+                            ]
+                              .filter(Boolean)
+                              .join("")}
                           >
                             <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.total.get(rowKey)} draftedCount={dc}>
                               {p.total}
                             </StatCellWithRank>
                           </td>
-                          {showProjectionColumns ? (
+                          {showProjectionColumnsEffective ? (
                             <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
                               <StatCellWithRank
                                 showRank={showInlineRanks}
@@ -2177,7 +2263,7 @@ function StatTrackerTabPageInner() {
                               </StatCellWithRank>
                             </td>
                           ) : null}
-                          {showProjectionColumns ? (
+                          {showProjectionColumnsEffective ? (
                             <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
                               <StatCellWithRank
                                 showRank={showInlineRanks}
@@ -2188,7 +2274,7 @@ function StatTrackerTabPageInner() {
                               </StatCellWithRank>
                             </td>
                           ) : null}
-                          {showProjectionColumns ? (
+                          {showProjectionColumnsEffective ? (
                             <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
                               <StatCellWithRank
                                 showRank={showInlineRanks}
@@ -2210,19 +2296,24 @@ function StatTrackerTabPageInner() {
                     })}
                     {visiblePlayersAfterTeamFilter.length === 0 && (
                       <tr className="pool-table-empty">
-                        <td colSpan={TABLE_COLS} className="py-4 text-[11px]">
+                        <td colSpan={emptyRowColSpan} className="py-4 text-[11px]">
                           No players match current filters.
                         </td>
                       </tr>
                     )}
                     <tr className="pool-table-footer-row">
-                      <td colSpan={2} className="w-10 p-1 px-1 py-2 text-center text-[11px] font-semibold align-middle">
+                      <td
+                        colSpan={footerLogoColSpan}
+                        className="w-10 p-1 px-1 py-2 text-center text-[11px] font-semibold align-middle"
+                      >
                         TOTALS
                       </td>
                       <td className="px-1 py-2 text-left text-[11px] font-normal tabular-nums opacity-90 align-middle leading-tight">
                         {footer.remainingPlayers} remaining {footer.remainingPlayers === 1 ? "player" : "players"}
                       </td>
-                      <td className="px-1 py-2 text-center font-semibold">
+                      <td
+                        className={["px-1 py-2 text-center font-semibold", mobHide].filter(Boolean).join(" ")}
+                      >
                         <StatCellWithRank
                           showRank={false}
                           rank={fo.seed.rank}
@@ -2232,7 +2323,11 @@ function StatTrackerTabPageInner() {
                           {seedFooterOnly}
                         </StatCellWithRank>
                       </td>
-                      <td className="px-1 py-2 text-center font-semibold pool-table-col-group-end">
+                      <td
+                        className={["px-1 py-2 text-center font-semibold pool-table-col-group-end", mobHide]
+                          .filter(Boolean)
+                          .join(" ")}
+                      >
                         <StatCellWithRank
                           showRank={false}
                           rank={fo.overallSeedSum.rank}
@@ -2242,7 +2337,7 @@ function StatTrackerTabPageInner() {
                           {overallFooterOnly}
                         </StatCellWithRank>
                       </td>
-                      <td className="px-1 py-2 text-center font-semibold">
+                      <td className={["px-1 py-2 text-center font-semibold", mobHide].filter(Boolean).join(" ")}>
                         <StatCellWithRank
                           showRank={showInlineRanks}
                           rank={fo.seasonPpg.rank}
@@ -2265,7 +2360,11 @@ function StatTrackerTabPageInner() {
                         </td>
                       ) : null}
                       {showTppgColumns ? (
-                        <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
+                        <td
+                          className={["px-1 py-2 text-center font-semibold sleeper-score-font", mobHide]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
                           <StatCellWithRank
                             showRank={showInlineRanks}
                             rank={fo.tppgDelta.rank}
@@ -2336,7 +2435,14 @@ function StatTrackerTabPageInner() {
                           {formatMaybeNumber(footer.roundScores[6])}
                         </StatCellWithRank>
                       </td>
-                      <td className="px-1 py-2 text-center font-semibold sleeper-score-font pool-table-col-primary">
+                      <td
+                        className={[
+                          "px-1 py-2 text-center font-semibold sleeper-score-font pool-table-col-primary",
+                          totalDividerClass,
+                        ]
+                          .filter(Boolean)
+                          .join("")}
+                      >
                         <StatCellWithRank
                           showRank={showInlineRanks}
                           rank={fo.total.rank}
@@ -2346,7 +2452,7 @@ function StatTrackerTabPageInner() {
                           {footer.totalPts}
                         </StatCellWithRank>
                       </td>
-                      {showProjectionColumns ? (
+                      {showProjectionColumnsEffective ? (
                         <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                           <StatCellWithRank
                             showRank={showInlineRanks}
@@ -2358,7 +2464,7 @@ function StatTrackerTabPageInner() {
                           </StatCellWithRank>
                         </td>
                       ) : null}
-                      {showProjectionColumns ? (
+                      {showProjectionColumnsEffective ? (
                         <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                           <StatCellWithRank
                             showRank={showInlineRanks}
@@ -2370,7 +2476,7 @@ function StatTrackerTabPageInner() {
                           </StatCellWithRank>
                         </td>
                       ) : null}
-                      {showProjectionColumns ? (
+                      {showProjectionColumnsEffective ? (
                         <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                           <StatCellWithRank
                             showRank={showInlineRanks}

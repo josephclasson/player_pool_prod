@@ -44,11 +44,13 @@ function PoolTableImageCell({
   label,
   alt,
   fit,
-  initialsFromLabel
+  initialsFromLabel,
+  cellClassName
 }: CellProps & {
   urls?: string[];
   /** When all image URLs fail, show initials from this name instead of "—". */
   initialsFromLabel?: string;
+  cellClassName?: string;
 }) {
   const list = urls?.length
     ? urls
@@ -69,7 +71,7 @@ function PoolTableImageCell({
       : "block h-full w-full rounded-full object-cover object-center";
 
   return (
-    <td className="w-10 max-w-[2.5rem] px-1 py-1 align-middle">
+    <td className={["w-10 max-w-[2.5rem] px-1 py-1 align-middle", cellClassName].filter(Boolean).join(" ")}>
       {showImg ? (
         <div className={CIRCLE_CLIP}>
           {/* eslint-disable-next-line @next/next/no-img-element -- external CDNs; avoid next/image domain config for now */}
@@ -97,30 +99,46 @@ function PoolTableImageCell({
 
 export function PoolTableTeamLogoCell({
   url,
-  teamName
+  teamName,
+  cellClassName
 }: {
   url: string | null | undefined;
   teamName: string;
+  cellClassName?: string;
 }) {
   return (
-    <PoolTableImageCell url={url} label={teamName} alt={`${teamName} logo`} fit="contain" />
+    <PoolTableImageCell
+      url={url}
+      label={teamName}
+      alt={`${teamName} logo`}
+      fit="contain"
+      cellClassName={cellClassName}
+    />
   );
 }
 
 export function PoolTablePlayerPhotoCell({
   url,
   urls,
-  playerName
+  playerName,
+  cellClassName
 }: {
   url?: string | null | undefined;
   /** Tried in order until one loads (e.g. roster CDN URL then ESPN PNG/JPG fallbacks). */
   urls?: string[] | null | undefined;
   playerName: string;
+  cellClassName?: string;
 }) {
   const merged =
     urls?.filter((u) => typeof u === "string" && u.trim()) ??
     (url?.trim() ? [url.trim()] : []);
   return (
-    <PoolTableImageCell urls={merged} label={playerName} alt={`${playerName} headshot`} fit="cover" />
+    <PoolTableImageCell
+      urls={merged}
+      label={playerName}
+      alt={`${playerName} headshot`}
+      fit="cover"
+      cellClassName={cellClassName}
+    />
   );
 }

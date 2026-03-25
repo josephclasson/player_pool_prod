@@ -15,6 +15,7 @@ import {
   BarChart3,
   GraduationCap,
   History,
+  Menu,
   Radio,
   ShieldCheck,
   Trophy,
@@ -38,6 +39,16 @@ const navTabs: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/history", label: "Player Pool History", icon: History },
   { href: "/commissioner", label: "Commissioner Tools", icon: ShieldCheck }
 ];
+
+/** Mobile bottom bar: four primary destinations + “More” (ESPN-style). Labels shortened to fit fixed slots. */
+const mobilePrimaryNav: readonly { href: string; label: string; icon: LucideIcon }[] = [
+  { href: "/draft", label: "Draft", icon: GraduationCap },
+  { href: "/stat-tracker", label: "Scores", icon: Radio },
+  { href: "/leaderboard", label: "Leaders", icon: Trophy },
+  { href: "/players", label: "Players", icon: UsersRound }
+];
+
+type MobileMoreItem = { href: string; label: string; subtitle: string; icon: LucideIcon };
 
 function SidebarNav({
   pathname,
@@ -149,54 +160,143 @@ function SidebarNav({
   );
 }
 
-function BottomTabNav({
+function MobileBottomTabNav({
   pathname,
   onNavigate,
-  navItems
+  moreItems
 }: {
   pathname: string;
   onNavigate: (href: string) => void;
-  navItems: readonly { href: string; label: string; icon: LucideIcon }[];
+  moreItems: readonly MobileMoreItem[];
 }) {
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  useEffect(() => {
+    if (!moreOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = prev;
+    };
+  }, [moreOpen]);
+
+  const moreActive = moreItems.some((t) => pathname.startsWith(t.href));
+
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
+
   return (
-    <nav
-      className="md:hidden fixed bottom-0 left-0 right-0 bg-background/80 border-t border-border/70 backdrop-blur-xl z-40"
-      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
-    >
-      <div className="flex overflow-x-auto">
-        {navItems.map((t) => {
-          const active = pathname.startsWith(t.href);
-          const Icon = t.icon;
-          return (
-            <button
-              key={t.href}
-              type="button"
-              onClick={() => onNavigate(t.href)}
-              className="flex-1 min-w-[4.25rem] min-h-[44px] py-2 flex flex-col items-center justify-center gap-1 transition-colors shrink-0"
-            >
-              <div
+    <>
+      <nav
+        className="app-mobile-tab-bar md:hidden fixed bottom-0 left-0 right-0 z-40 flex flex-col bg-background/95 border-t border-border/70 backdrop-blur-xl"
+        aria-label="Primary"
+      >
+        <div className="grid h-[52px] grid-cols-5 w-full">
+          {mobilePrimaryNav.map((t) => {
+            const active = pathname.startsWith(t.href);
+            const Icon = t.icon;
+            return (
+              <button
+                key={t.href}
+                type="button"
+                onClick={() => {
+                  setMoreOpen(false);
+                  onNavigate(t.href);
+                }}
                 className={[
-                  "rounded-full px-2.5 py-1 flex items-center justify-center border transition-all duration-300",
-                  active
-                    ? "bg-accent/15 border-accent/25 text-accent"
-                    : "bg-background/10 border-border/60 text-foreground/45"
-                ].join(" ")}
-              >
-                <Icon className="h-4 w-4" />
-              </div>
-              <div
-                className={[
-                  "text-[9px] font-semibold tracking-tight text-center px-0.5 leading-tight",
+                  "flex flex-col items-center justify-center gap-0.5 px-0.5 transition-colors",
                   active ? "text-accent" : "text-foreground/50"
                 ].join(" ")}
               >
-                {t.label}
-              </div>
-            </button>
-          );
-        })}
-      </div>
-    </nav>
+                <span
+                  className={[
+                    "flex h-8 w-10 items-center justify-center rounded-full border",
+                    active ? "border-accent/35 bg-accent/15" : "border-border/50 bg-background/30"
+                  ].join(" ")}
+                >
+                  <Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />
+                </span>
+                <span className="max-w-full truncate text-[10px] font-semibold leading-none tracking-tight">{t.label}</span>
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            onClick={() => setMoreOpen((o) => !o)}
+            aria-expanded={moreOpen}
+            aria-controls="mobile-nav-more-sheet"
+            className={[
+              "flex flex-col items-center justify-center gap-0.5 px-0.5 transition-colors",
+              moreOpen || moreActive ? "text-accent" : "text-foreground/50"
+            ].join(" ")}
+          >
+            <span
+              className={[
+                "flex h-8 w-10 items-center justify-center rounded-full border",
+                moreOpen || moreActive ? "border-accent/35 bg-accent/15" : "border-border/50 bg-background/30"
+              ].join(" ")}
+            >
+              <Menu className="h-[18px] w-[18px] shrink-0" aria-hidden />
+            </span>
+            <span className="max-w-full truncate text-[10px] font-semibold leading-none tracking-tight">More</span>
+          </button>
+        </div>
+        <div
+          className="shrink-0 bg-background/95"
+          style={{ height: "env(safe-area-inset-bottom, 0px)" }}
+          aria-hidden
+        />
+      </nav>
+
+      {moreOpen ? (
+        <div className="md:hidden fixed inset-0 z-[45] flex flex-col justify-end" role="presentation">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/55"
+            aria-label="Close menu"
+            onClick={() => setMoreOpen(false)}
+          />
+          <div
+            id="mobile-nav-more-sheet"
+            className="relative max-h-[min(72vh,520px)] overflow-y-auto rounded-t-2xl border border-border/60 border-b-0 bg-background px-2 pb-3 pt-2 shadow-2xl"
+            style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+          >
+            <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-foreground/20" aria-hidden />
+            <div className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/45">More</div>
+            <ul className="flex flex-col gap-0.5">
+              {moreItems.map((t) => {
+                const Icon = t.icon;
+                const active = pathname.startsWith(t.href);
+                return (
+                  <li key={t.href}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMoreOpen(false);
+                        onNavigate(t.href);
+                      }}
+                      className={[
+                        "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors",
+                        active ? "bg-accent/15 text-accent" : "hover:bg-muted/40 text-foreground"
+                      ].join(" ")}
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-background/40">
+                        <Icon className="h-4 w-4" aria-hidden />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold leading-tight">{t.label}</span>
+                        <span className="mt-0.5 block text-[11px] leading-snug text-foreground/45">{t.subtitle}</span>
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -221,10 +321,18 @@ export function AppShell({ children }: { children: ReactNode }) {
     ? navTabs
     : navTabs.filter((t) => t.href !== "/commissioner");
 
-  // Mobile bottom tabs: keep focused on core gameplay. Tools / under-construction pages are accessed via the top bar.
-  const navTabsMobile = navTabsEffective.filter(
-    (t) => t.href !== "/commissioner" && t.href !== "/analytics" && t.href !== "/history"
-  );
+  const mobileMoreItems: MobileMoreItem[] = [
+    { href: "/analytics", label: "Advanced Analytics", subtitle: "Under construction", icon: BarChart3 },
+    { href: "/history", label: "Player Pool History", subtitle: "Under construction", icon: History }
+  ];
+  if (commUnlocked) {
+    mobileMoreItems.push({
+      href: "/commissioner",
+      label: "Commissioner Tools",
+      subtitle: "Sync, draft admin, invites",
+      icon: ShieldCheck
+    });
+  }
 
   const navigateWithLeague = (href: string) => {
     const pathOnly = href.split("?")[0] ?? href;
@@ -241,36 +349,40 @@ export function AppShell({ children }: { children: ReactNode }) {
   };
 
   return (
-    <div className="safe-area-wrapper flex min-h-screen text-foreground">
-      <SidebarNav
-        pathname={pathname}
-        onNavigate={navigateWithLeague}
-        navItems={navTabsEffective}
-        compactFooter={pathname !== "/"}
-      />
+    <div className="safe-area-wrapper flex min-h-dvh w-full flex-col text-foreground md:min-h-screen">
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <SidebarNav
+          pathname={pathname}
+          onNavigate={navigateWithLeague}
+          navItems={navTabsEffective}
+          compactFooter={pathname !== "/"}
+        />
 
-      <main className="flex-1">
-        <div
-          className={
-            pathname === "/"
-              ? "px-3 md:px-6 py-4 max-w-6xl mx-auto"
-              : "px-3 md:px-5 py-1.5 md:py-2 max-w-6xl mx-auto"
-          }
-        >
-          {pathname === "/" ? (
-            <div className="flex justify-end items-center gap-2 mb-1 min-h-[2.25rem]">
-              <AppearancePicker />
+        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+          <div
+            className={
+              pathname === "/"
+                ? "flex min-h-0 flex-1 flex-col px-3 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-4 max-w-6xl mx-auto w-full md:px-6 md:pb-4"
+                : "flex min-h-0 flex-1 flex-col px-3 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-1.5 max-w-6xl mx-auto w-full md:px-5 md:py-2 md:pb-2"
+            }
+          >
+            {pathname === "/" ? (
+              <div className="flex justify-end items-center gap-2 mb-1 min-h-[2.25rem] shrink-0">
+                <AppearancePicker />
+              </div>
+            ) : null}
+            <Suspense fallback={null}>
+              <PoolSessionRoutes />
+              <LeagueIdentityBar />
+            </Suspense>
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden md:min-h-0 md:overflow-visible">
+              {children}
             </div>
-          ) : null}
-          <Suspense fallback={null}>
-            <PoolSessionRoutes />
-            <LeagueIdentityBar />
-          </Suspense>
-          {children}
-        </div>
-      </main>
+          </div>
+        </main>
+      </div>
 
-      <BottomTabNav pathname={pathname} onNavigate={navigateWithLeague} navItems={navTabsMobile} />
+      <MobileBottomTabNav pathname={pathname} onNavigate={navigateWithLeague} moreItems={mobileMoreItems} />
     </div>
   );
 }

@@ -271,7 +271,7 @@ export function LeagueIdentityBar() {
 
           <div className="flex w-full shrink-0 flex-nowrap items-center justify-end gap-2 sm:ml-auto sm:w-auto">
             <AppearancePicker />
-            <div className="relative shrink-0">
+            <div className="relative hidden shrink-0 md:block">
               <button
                 type="button"
                 onClick={() => setMenuOpen((o) => !o)}

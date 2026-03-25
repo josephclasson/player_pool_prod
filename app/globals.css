@@ -881,7 +881,15 @@ body {
 @media (max-width: 768px) {
   .safe-area-wrapper {
     padding-top: env(safe-area-inset-top);
-    padding-bottom: env(safe-area-inset-bottom);
+    /* Bottom inset is handled by the fixed mobile tab bar + main content padding. */
+    padding-bottom: 0;
+  }
+
+  /* ESPN-style bottom bar: avoid global 44px min-height blowing up fixed slots. */
+  .app-mobile-tab-bar button {
+    min-height: unset;
+    min-width: unset;
+    touch-action: manipulation;
   }
 
   /* iOS input sizing: avoid auto-zoom + keep Apple HIG touch targets. */
