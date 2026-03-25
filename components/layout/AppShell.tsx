@@ -221,6 +221,11 @@ export function AppShell({ children }: { children: ReactNode }) {
     ? navTabs
     : navTabs.filter((t) => t.href !== "/commissioner");
 
+  // Mobile bottom tabs: keep focused on core gameplay. Tools / under-construction pages are accessed via the top bar.
+  const navTabsMobile = navTabsEffective.filter(
+    (t) => t.href !== "/commissioner" && t.href !== "/analytics" && t.href !== "/history"
+  );
+
   const navigateWithLeague = (href: string) => {
     const pathOnly = href.split("?")[0] ?? href;
     if (poolRouteIsPublic(pathOnly)) {
@@ -265,7 +270,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </main>
 
-      <BottomTabNav pathname={pathname} onNavigate={navigateWithLeague} navItems={navTabsEffective} />
+      <BottomTabNav pathname={pathname} onNavigate={navigateWithLeague} navItems={navTabsMobile} />
     </div>
   );
 }

@@ -1329,8 +1329,15 @@ function StatTrackerTabPageInner() {
     writeStoredStatTrackerShowInlineRanks(showInlineRanks);
   }, [showInlineRanks]);
 
-  const TABLE_COLS = showTppgColumns ? 18 : 16;
-  const projBlockDivider = showTppgColumns ? " pool-table-col-total-divider" : "";
+  /**
+   * UI toggle labeled "Show projections".
+   * Historically it only controlled the TPPG columns; it now also controls the projection block at the end:
+   * Orig / Live / +/−.
+   */
+  const showProjectionColumns = showTppgColumns;
+
+  const TABLE_COLS = showProjectionColumns ? 18 : 13;
+  const projBlockDivider = showProjectionColumns ? " pool-table-col-total-divider" : "";
 
   async function onManualRefresh() {
     setRefreshBusy(true);
@@ -1453,7 +1460,7 @@ function StatTrackerTabPageInner() {
           </label>
           <label
             className="pool-filter-chip"
-            title="Checked: TPPG and TPPG−PPG +/− columns (tournament PPG vs season PPG). Orig, Live, and projection +/− stay visible either way."
+            title="Checked: show projection-related columns (TPPG, TPPG−PPG, Orig, Live, and projection +/−). Unchecked: hide them for a more compact table."
           >
             <input
               type="checkbox"
@@ -1728,9 +1735,9 @@ function StatTrackerTabPageInner() {
                   >
                     Rank
                   </th>
-                  <th className="text-center">Orig</th>
-                  <th className="text-center">Live</th>
-                  <th className="text-center pool-table-col-group-end">+/−</th>
+                  {showProjectionColumns ? <th className="text-center">Orig</th> : null}
+                  {showProjectionColumns ? <th className="text-center">Live</th> : null}
+                  {showProjectionColumns ? <th className="text-center pool-table-col-group-end">+/−</th> : null}
                   <th
                     className="text-center"
                     title="Model over all league owners: Plackett–Luce weights from live projection (or points fallback), roster share still alive, and share advanced through current round — not affected by Owner filter"
@@ -1842,36 +1849,42 @@ function StatTrackerTabPageInner() {
                   <td className="px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle">
                     {projectedRank != null ? ordinalRankLabel(projectedRank) : "—"}
                   </td>
-                  <td className="px-1 py-1 text-center font-semibold sleeper-score-font align-middle">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.origProj.rank}
-                      draftedCount={fo.origProj.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {footer.origProjSum}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="px-1 py-1 text-center font-semibold sleeper-score-font align-middle">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.liveProj.rank}
-                      draftedCount={fo.liveProj.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {footer.liveProjSum != null ? String(footer.liveProjSum) : "—"}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="px-1 py-1 text-center font-semibold sleeper-score-font align-middle pool-table-col-group-end">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.projPlusMinus.rank}
-                      draftedCount={fo.projPlusMinus.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      <span className={projFooterClass}>{projFooterText}</span>
-                    </StatCellWithRank>
-                  </td>
+                  {showProjectionColumns ? (
+                    <td className="px-1 py-1 text-center font-semibold sleeper-score-font align-middle">
+                      <StatCellWithRank
+                        showRank={showInlineRanks}
+                        rank={fo.origProj.rank}
+                        draftedCount={fo.origProj.pool}
+                        rankContext="owner-aggregate"
+                      >
+                        {footer.origProjSum}
+                      </StatCellWithRank>
+                    </td>
+                  ) : null}
+                  {showProjectionColumns ? (
+                    <td className="px-1 py-1 text-center font-semibold sleeper-score-font align-middle">
+                      <StatCellWithRank
+                        showRank={showInlineRanks}
+                        rank={fo.liveProj.rank}
+                        draftedCount={fo.liveProj.pool}
+                        rankContext="owner-aggregate"
+                      >
+                        {footer.liveProjSum != null ? String(footer.liveProjSum) : "—"}
+                      </StatCellWithRank>
+                    </td>
+                  ) : null}
+                  {showProjectionColumns ? (
+                    <td className="px-1 py-1 text-center font-semibold sleeper-score-font align-middle pool-table-col-group-end">
+                      <StatCellWithRank
+                        showRank={showInlineRanks}
+                        rank={fo.projPlusMinus.rank}
+                        draftedCount={fo.projPlusMinus.pool}
+                        rankContext="owner-aggregate"
+                      >
+                        <span className={projFooterClass}>{projFooterText}</span>
+                      </StatCellWithRank>
+                    </td>
+                  ) : null}
                   <td className="px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle">
                     <StatCellWithRank
                       showRank={showInlineRanks}
@@ -1995,24 +2008,24 @@ function StatTrackerTabPageInner() {
                       <th className="text-center">R5</th>
                       <th className="text-center">R6</th>
                       <th className="text-center pool-table-col-primary">Total</th>
-                      <th
-                        className="text-center"
-                        title="Pre-tournament: season PPG × full chalk expected games"
-                      >
-                        Orig
-                      </th>
-                      <th
-                        className="text-center"
-                        title="Actual tournament points + season PPG × remaining expected chalk games"
-                      >
-                        Live
-                      </th>
-                      <th
-                        className="text-center w-11"
-                        title="Live projection − original projection"
-                      >
-                        +/−
-                      </th>
+                      {showProjectionColumns ? (
+                        <th className="text-center" title="Pre-tournament: season PPG × full chalk expected games">
+                          Orig
+                        </th>
+                      ) : null}
+                      {showProjectionColumns ? (
+                        <th
+                          className="text-center"
+                          title="Actual tournament points + season PPG × remaining expected chalk games"
+                        >
+                          Live
+                        </th>
+                      ) : null}
+                      {showProjectionColumns ? (
+                        <th className="text-center w-11" title="Live projection − original projection">
+                          +/−
+                        </th>
+                      ) : null}
                     </tr>
                   </thead>
                   <tbody>
@@ -2153,31 +2166,45 @@ function StatTrackerTabPageInner() {
                               {p.total}
                             </StatCellWithRank>
                           </td>
-                          <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                            <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.origProj.get(rowKey)} draftedCount={dc}>
-                              {origR != null ? String(origR) : "—"}
-                            </StatCellWithRank>
-                          </td>
-                          <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                            <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.liveProj.get(rowKey)} draftedCount={dc}>
-                              {String(liveR)}
-                            </StatCellWithRank>
-                          </td>
-                          <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                            <StatCellWithRank
-                              showRank={showInlineRanks}
-                              rank={leagueStatRanks.projPlusMinus.get(rowKey)}
-                              draftedCount={dc}
-                            >
-                              {projPm.value == null ? (
-                                projPm.text
-                              ) : (
-                                <span className={projPm.value >= 0 ? "text-success" : "text-danger"}>
-                                  {projPm.text}
-                                </span>
-                              )}
-                            </StatCellWithRank>
-                          </td>
+                          {showProjectionColumns ? (
+                            <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
+                              <StatCellWithRank
+                                showRank={showInlineRanks}
+                                rank={leagueStatRanks.origProj.get(rowKey)}
+                                draftedCount={dc}
+                              >
+                                {origR != null ? String(origR) : "—"}
+                              </StatCellWithRank>
+                            </td>
+                          ) : null}
+                          {showProjectionColumns ? (
+                            <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
+                              <StatCellWithRank
+                                showRank={showInlineRanks}
+                                rank={leagueStatRanks.liveProj.get(rowKey)}
+                                draftedCount={dc}
+                              >
+                                {String(liveR)}
+                              </StatCellWithRank>
+                            </td>
+                          ) : null}
+                          {showProjectionColumns ? (
+                            <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
+                              <StatCellWithRank
+                                showRank={showInlineRanks}
+                                rank={leagueStatRanks.projPlusMinus.get(rowKey)}
+                                draftedCount={dc}
+                              >
+                                {projPm.value == null ? (
+                                  projPm.text
+                                ) : (
+                                  <span className={projPm.value >= 0 ? "text-success" : "text-danger"}>
+                                    {projPm.text}
+                                  </span>
+                                )}
+                              </StatCellWithRank>
+                            </td>
+                          ) : null}
                         </tr>
                       );
                     })}
@@ -2319,36 +2346,42 @@ function StatTrackerTabPageInner() {
                           {footer.totalPts}
                         </StatCellWithRank>
                       </td>
-                      <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
-                        <StatCellWithRank
-                          showRank={showInlineRanks}
-                          rank={fo.origProj.rank}
-                          draftedCount={fo.origProj.pool}
-                          rankContext="owner-aggregate"
-                        >
-                          {footer.origProjSum}
-                        </StatCellWithRank>
-                      </td>
-                      <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
-                        <StatCellWithRank
-                          showRank={showInlineRanks}
-                          rank={fo.liveProj.rank}
-                          draftedCount={fo.liveProj.pool}
-                          rankContext="owner-aggregate"
-                        >
-                          {footer.liveProjSum != null ? String(footer.liveProjSum) : "—"}
-                        </StatCellWithRank>
-                      </td>
-                      <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
-                        <StatCellWithRank
-                          showRank={showInlineRanks}
-                          rank={fo.projPlusMinus.rank}
-                          draftedCount={fo.projPlusMinus.pool}
-                          rankContext="owner-aggregate"
-                        >
-                          <span className={projFooterClass}>{projFooterText}</span>
-                        </StatCellWithRank>
-                      </td>
+                      {showProjectionColumns ? (
+                        <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
+                          <StatCellWithRank
+                            showRank={showInlineRanks}
+                            rank={fo.origProj.rank}
+                            draftedCount={fo.origProj.pool}
+                            rankContext="owner-aggregate"
+                          >
+                            {footer.origProjSum}
+                          </StatCellWithRank>
+                        </td>
+                      ) : null}
+                      {showProjectionColumns ? (
+                        <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
+                          <StatCellWithRank
+                            showRank={showInlineRanks}
+                            rank={fo.liveProj.rank}
+                            draftedCount={fo.liveProj.pool}
+                            rankContext="owner-aggregate"
+                          >
+                            {footer.liveProjSum != null ? String(footer.liveProjSum) : "—"}
+                          </StatCellWithRank>
+                        </td>
+                      ) : null}
+                      {showProjectionColumns ? (
+                        <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
+                          <StatCellWithRank
+                            showRank={showInlineRanks}
+                            rank={fo.projPlusMinus.rank}
+                            draftedCount={fo.projPlusMinus.pool}
+                            rankContext="owner-aggregate"
+                          >
+                            <span className={projFooterClass}>{projFooterText}</span>
+                          </StatCellWithRank>
+                        </td>
+                      ) : null}
                     </tr>
                   </tbody>
                 </table>

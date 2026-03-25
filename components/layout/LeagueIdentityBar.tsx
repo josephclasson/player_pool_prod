@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Briefcase, Pause, Play } from "lucide-react";
+import { Briefcase, Pause, Play, Menu } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BossModeOverlay } from "@/components/layout/BossModeOverlay";
 import { AppearancePicker } from "@/components/theme/AppearancePicker";
@@ -15,6 +15,7 @@ import {
   writeCommissionerSecretToSession,
   PLAYER_POOL_IDENTITY_CHANGE_EVENT
 } from "@/lib/player-pool-session";
+import { hrefWithLeagueId } from "@/lib/pool-navigation";
 
 /** “One Shining Moment 30” on Bandcamp — track 1 is the original. */
 const ONE_SHINING_MOMENT_BANDCAMP_EMBED =
@@ -33,6 +34,7 @@ export function LeagueIdentityBar() {
   const [commPw, setCommPw] = useState("");
   const [commOpen, setCommOpen] = useState(false);
   const [commUnlocked, setCommUnlocked] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [bossOpen, setBossOpen] = useState(false);
   const [oneShiningOpen, setOneShiningOpen] = useState(false);
 
@@ -116,6 +118,37 @@ export function LeagueIdentityBar() {
     writeCommissionerSecretToSession("");
     refreshCommissioner();
   }, [refreshCommissioner]);
+
+  const openCommissionerTools = useCallback(() => {
+    const s = readPlayerPoolSession();
+    if (s?.leagueId) {
+      router.push(hrefWithLeagueId("/commissioner", s.leagueId));
+    } else {
+      router.push("/commissioner");
+    }
+  }, [router]);
+
+  const menuItems = useMemo(
+    () =>
+      [
+        { href: "/analytics", label: "Advanced Analytics", subtitle: "Under construction" },
+        { href: "/history", label: "Player Pool History", subtitle: "Under construction" }
+      ] as const,
+    []
+  );
+
+  const openMenuHref = useCallback(
+    (href: string) => {
+      const s = readPlayerPoolSession();
+      setMenuOpen(false);
+      if (s?.leagueId) {
+        router.push(hrefWithLeagueId(href, s.leagueId));
+      } else {
+        router.push(href);
+      }
+    },
+    [router]
+  );
 
   if (pathname === "/") {
     return null;
@@ -238,6 +271,38 @@ export function LeagueIdentityBar() {
 
           <div className="flex w-full shrink-0 flex-nowrap items-center justify-end gap-2 sm:ml-auto sm:w-auto">
             <AppearancePicker />
+            <div className="relative shrink-0">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((o) => !o)}
+                aria-pressed={menuOpen}
+                aria-label="Open menu"
+                className={[
+                  "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-semibold transition",
+                  menuOpen
+                    ? "border-accent/45 bg-accent/15 text-accent"
+                    : "border-border/55 bg-background/45 text-foreground/85 hover:bg-muted/50"
+                ].join(" ")}
+              >
+                <Menu className="h-3 w-3" aria-hidden />
+                Menu
+              </button>
+              {menuOpen ? (
+                <div className="absolute right-0 top-[calc(100%+0.35rem)] z-[100] w-[min(calc(100vw-1.5rem),18rem)] rounded-md border border-border/50 bg-background/95 p-1.5 shadow-lg backdrop-blur-md">
+                  {menuItems.map((i) => (
+                    <button
+                      key={i.href}
+                      type="button"
+                      onClick={() => openMenuHref(i.href)}
+                      className="w-full text-left rounded-md px-2 py-1.5 hover:bg-muted/40 transition"
+                    >
+                      <div className="text-[11px] font-semibold text-foreground/85 leading-tight">{i.label}</div>
+                      <div className="text-[10px] text-foreground/45 leading-tight mt-0.5">{i.subtitle}</div>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
             <div className="min-w-0 flex-1 rounded-md border border-border/35 bg-background/35 px-1.5 py-1 sm:flex-initial sm:max-w-[260px]">
             <button
               type="button"
@@ -259,6 +324,13 @@ export function LeagueIdentityBar() {
                     Same value as server env <code className="pool-code">COMMISSIONER_API_SECRET</code>. Unlocks commissioner
                     APIs, tools, and proxy draft picks.
                   </p>
+                )}
+                {commUnlocked && (
+                  <div className="flex flex-wrap gap-1.5">
+                    <Button type="button" size="sm" variant="secondary" className="h-7 text-xs px-2" onClick={openCommissionerTools}>
+                      Open tools
+                    </Button>
+                  </div>
                 )}
                 {!commUnlocked && (
                   <p className="text-[10px] text-foreground/50 leading-snug">Enter the commissioner password for this browser.</p>
