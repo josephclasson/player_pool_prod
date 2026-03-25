@@ -124,16 +124,10 @@ function eliminatedRoundForPlayer(p: PoolPlayer): number | null {
   const chalkRemN = chalkRem == null ? null : Number(chalkRem);
   const completedN = completed == null ? null : Number(completed);
 
-  // Elimination is ambiguous when `chalkGamesRemaining === 0` (winners can also end with 0).
-  // Use `completedTournamentGames` vs `expectedChalkGamesTotal` to decide eliminated.
-  if (chalkRemN == null || !Number.isFinite(chalkRemN)) return null;
-  if (chalkRemN !== 0) return null;
+  // Backend convention: `chalkGamesRemaining = 0` means eliminated.
+  if (chalkRemN == null || !Number.isFinite(chalkRemN) || chalkRemN !== 0) return null;
 
-  const expected = p.expectedChalkGamesTotal;
-  const expectedN = expected == null ? null : Number(expected);
-  if (expectedN != null && Number.isFinite(expectedN) && completedN != null && Number.isFinite(completedN)) {
-    // Not eliminated: played all expected chalk games.
-    if (completedN >= expectedN) return null;
+  if (completedN != null && Number.isFinite(completedN)) {
     const er = Math.trunc(completedN);
     if (er >= 1 && er <= 6) return er;
   }
