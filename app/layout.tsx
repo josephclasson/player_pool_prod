@@ -31,9 +31,9 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  /** Fit-to-width by default; explicit caps so iOS/Android allow pinch-zoom (avoid implicit maximum-scale=1). */
-  maximumScale: 5,
-  userScalable: true
+  /** Keep page zoom at 100% (no pinch/zoom above 1.0). */
+  maximumScale: 1,
+  userScalable: false
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

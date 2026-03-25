@@ -351,15 +351,8 @@ export function AppShell({ children }: { children: ReactNode }) {
         setMobileFitZoom(1);
         return;
       }
-      const outer = mainScrollRef.current;
-      const inner = mobileZoomContentRef.current;
-      if (!outer || !inner) return;
-      const avail = Math.max(160, outer.clientWidth);
-      const needed = measureMobileContentWidthPx(inner);
-      /* Slightly aggressive so full desktop-width tables fit without horizontal pan; pinch-zoom reads detail. */
-      // Slightly more aggressive on mobile so more table columns remain visible.
-      const z = Math.min(1, Math.max(0.05, (avail * 0.92) / needed));
-      setMobileFitZoom((cur) => (Math.abs(cur - z) < 0.004 ? cur : z));
+      // Mobile: keep layout fluid (no shell scaling). Tables/overflow rules handle fitting.
+      setMobileFitZoom(1);
     }, 50);
   }, []);
 
@@ -457,9 +450,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <div
                     ref={mobileZoomContentRef}
                     className={[
-                      "flex min-h-0 flex-col",
-                      /* Mobile: full desktop-width layout plane (not shrink-to-fit to viewport — `self-start` caused that). */
-                      "max-md:min-w-[72rem] max-md:w-max max-md:flex-none max-md:shrink-0",
+                      "flex min-h-0 flex-col w-full min-w-0",
                       "md:min-h-0 md:min-w-0 md:flex-1 md:w-full"
                     ].join(" ")}
                     style={mobileShellZoomStyle}
