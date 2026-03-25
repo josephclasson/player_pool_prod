@@ -439,7 +439,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   const [refreshBusy, setRefreshBusy] = useState(false);
   /** One automatic draft-room ensure per league id per page visit (retried after failed ensure). */
   const draftEnsurePassRef = useRef<string | null>(null);
-  const draftCellInputRef = useRef<HTMLInputElement | null>(null);
+  const draftCellInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [draftSort, setDraftSort] = useState<{ column: DraftSortColumn | null; dir: "asc" | "desc" }>({
     column: null,
@@ -1330,7 +1330,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                           : cellIsEditable ? (
                             <div className="w-full relative">
                               <div className="flex items-center gap-1">
-                                <input
+                                <textarea
                                   ref={draftCellInputRef}
                                   value={draftCellInput}
                                   title={draftCellInput.trim() ? draftCellInput : undefined}
@@ -1344,8 +1344,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                     submitDraftCellPickFromInput();
                                   }}
                                   placeholder="Type name..."
-                                  className="w-auto min-w-[3rem] max-w-none rounded-sm border border-border/40 bg-background/50 px-1 py-0.5 text-[11px] outline-none focus:border-[#b89a3a]/70 focus:ring-0"
-                                  style={{ width: `${Math.max(10, draftCellInput.trim().length)}ch` }}
+                                  rows={2}
+                                  className="w-full min-w-0 resize-none overflow-hidden rounded-sm border border-border/40 bg-background/50 px-1 py-0.5 text-[11px] leading-tight outline-none focus:border-[#b89a3a]/70 focus:ring-0"
                                   aria-label={`Draft board cell for round ${roundNumber}`}
                                 />
                                 <button
@@ -1393,14 +1393,11 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                         onClick={() => {
                                           setDraftCellInput(p.name);
                                           setError(null);
-                                          // Improve visibility for long names in narrow cells.
                                           requestAnimationFrame(() => {
                                             const el = draftCellInputRef.current;
                                             if (!el) return;
                                             el.focus();
                                             el.setSelectionRange(0, String(p.name ?? "").length);
-                                            // Scroll to end so the selection isn't clipped.
-                                            el.scrollLeft = el.scrollWidth;
                                           });
                                         }}
                                       >
