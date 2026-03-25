@@ -381,8 +381,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     mobileFitZoom < 0.999 ? { zoom: mobileFitZoom } : undefined;
 
   return (
-    <div className="safe-area-wrapper flex min-h-dvh w-full flex-col text-foreground md:min-h-screen">
-      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+    <div className="safe-area-wrapper flex h-dvh min-h-0 w-full flex-col overflow-hidden text-foreground md:min-h-screen md:h-auto md:overflow-visible">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row md:overflow-visible">
         <SidebarNav
           pathname={pathname}
           onNavigate={navigateWithLeague}
@@ -404,7 +404,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               </div>
             ) : null}
             <div
-              className="flex min-h-0 min-w-0 flex-1 flex-col md:min-w-0"
+              className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:min-w-0 md:overflow-visible"
               style={mobileShellZoomStyle}
             >
               <Suspense fallback={null}>

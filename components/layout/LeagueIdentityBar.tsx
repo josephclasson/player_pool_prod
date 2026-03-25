@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Briefcase, Pause, Play, Menu } from "lucide-react";
+import { Briefcase, Pause, Play, Menu, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BossModeOverlay } from "@/components/layout/BossModeOverlay";
-import { useMainScrollContainerRef } from "@/components/layout/MainScrollContainerContext";
 import { AppearancePicker } from "@/components/theme/AppearancePicker";
 import { clearStoredActiveLeagueId } from "@/lib/player-pool-storage";
 import {
@@ -151,66 +150,68 @@ export function LeagueIdentityBar() {
     [router]
   );
 
-  const mainScrollRef = useMainScrollContainerRef();
-  const [barCompact, setBarCompact] = useState(false);
-  const lastScrollY = useRef(0);
-  const scrollAccum = useRef(0);
-
-  useEffect(() => {
-    if (pathname === "/") return;
-    const el = mainScrollRef?.current;
-    if (!el) return;
-    const onScroll = () => {
-      if (window.matchMedia("(min-width: 768px)").matches) {
-        setBarCompact(false);
-        scrollAccum.current = 0;
-        return;
-      }
-      const y = el.scrollTop;
-      const delta = y - lastScrollY.current;
-      lastScrollY.current = y;
-      if (y < 20) {
-        setBarCompact(false);
-        scrollAccum.current = 0;
-        return;
-      }
-      scrollAccum.current += delta;
-      if (scrollAccum.current > 16) setBarCompact(true);
-      if (scrollAccum.current < -12) setBarCompact(false);
-      if (Math.abs(scrollAccum.current) > 48) {
-        scrollAccum.current = scrollAccum.current > 0 ? 24 : -24;
-      }
-    };
-    el.addEventListener("scroll", onScroll, { passive: true });
-    return () => el.removeEventListener("scroll", onScroll);
-  }, [mainScrollRef, pathname]);
-
   if (pathname === "/") {
     return null;
   }
 
-  const barText = "text-[10px] sm:text-[11px]";
   const labelCls = "text-foreground/50 shrink-0 hidden md:inline";
-  const sepCls = "text-foreground/30 select-none shrink-0";
+  const sepCls = "text-foreground/30 select-none shrink-0 max-md:opacity-80";
+
+  const commissionerFormFields = (
+    <>
+      {commUnlocked && (
+        <p className="hidden sm:block text-[11px] pool-text-muted-sm leading-snug">
+          Same value as server env <code className="pool-code">COMMISSIONER_API_SECRET</code>. Unlocks commissioner APIs,
+          tools, and proxy draft picks.
+        </p>
+      )}
+      {commUnlocked && (
+        <div className="flex flex-wrap gap-1 sm:gap-1.5">
+          <Button type="button" size="sm" variant="outline" className="h-6 text-[10px] px-1.5 sm:h-7 sm:text-xs sm:px-2" onClick={openCommissionerTools}>
+            Open tools
+          </Button>
+        </div>
+      )}
+      {!commUnlocked && (
+        <p className="text-[9px] text-foreground/50 leading-tight sm:text-[10px] sm:leading-snug">
+          Commissioner password for this browser.
+        </p>
+      )}
+      <input
+        className="pool-field font-mono text-[10px] !h-7 sm:!h-8"
+        type="password"
+        autoComplete="off"
+        value={commPw}
+        onChange={(e) => setCommPw(e.target.value)}
+        placeholder="Password"
+      />
+      <div className="flex flex-wrap gap-1 sm:gap-1.5">
+        <Button type="button" size="sm" className="h-6 text-[10px] px-1.5 sm:h-7 sm:text-xs sm:px-2" onClick={saveCommissionerPassword}>
+          Save
+        </Button>
+        <Button type="button" size="sm" variant="outline" className="h-6 text-[10px] px-1.5 sm:h-7 sm:text-xs sm:px-2" onClick={clearCommissionerPassword}>
+          Clear
+        </Button>
+      </div>
+    </>
+  );
 
   return (
     <>
       <BossModeOverlay open={bossOpen} onClose={() => setBossOpen(false)} />
-      <div className="mb-1 md:mb-1.5 rounded-md border border-border/35 bg-muted/[0.07] px-2 py-1 md:py-1.5 text-xs transition-[padding] duration-200 max-md:data-[compact=true]:py-0.5" data-compact={barCompact || undefined}>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 md:gap-y-1.5">
+      <div className="relative mb-1 md:mb-1.5 rounded-md border border-border/35 bg-muted/[0.07] px-1 py-0.5 text-[8px] leading-tight md:px-2 md:py-1.5 md:text-xs md:leading-normal">
+        <div className="flex flex-nowrap items-center gap-x-1 md:flex-wrap md:gap-x-2 md:gap-y-1.5">
           {session ? (
-            <div
-              className={`min-w-0 flex-1 flex flex-nowrap items-center gap-x-1 sm:gap-x-1.5 overflow-x-hidden md:overflow-x-auto leading-snug ${barText}`}
-            >
+            <div className="min-w-0 flex-1 flex flex-nowrap items-center gap-x-0.5 overflow-hidden md:gap-x-1.5 md:overflow-x-auto md:leading-snug">
               <span className={`${labelCls}`}>Current League:</span>
-              <span className="min-w-0 max-w-[42vw] md:max-w-[11rem] truncate font-semibold text-foreground">
-                {leagueMetaLoading ? "Loading…" : resolvedLeagueName ?? "—"}
+              <span className="min-w-0 max-w-[28vw] sm:max-w-[32vw] md:max-w-[11rem] truncate font-semibold text-foreground">
+                {leagueMetaLoading ? "…" : resolvedLeagueName ?? "—"}
               </span>
               <span className={sepCls} aria-hidden>
                 ·
               </span>
               <span className={labelCls}>User:</span>
-              <span className="min-w-0 max-w-[38vw] md:max-w-[9rem] truncate font-medium text-foreground">
+              <span className="min-w-0 max-w-[22vw] sm:max-w-[26vw] md:max-w-[9rem] truncate font-medium text-foreground">
                 {session.teamName}
               </span>
               <span className={sepCls} aria-hidden>
@@ -218,21 +219,25 @@ export function LeagueIdentityBar() {
               </span>
               <span className={labelCls}>League ID:</span>
               <code
-                className="hidden md:inline min-w-0 max-w-[10rem] truncate font-mono text-[9px] sm:text-[10px] text-foreground/90"
+                className="min-w-0 max-w-[2.65rem] shrink-0 truncate font-mono text-[7px] text-foreground/85 md:max-w-[10rem] md:text-[10px] md:text-foreground/90"
                 title={session.leagueId}
               >
                 {session.leagueId}
               </code>
-              <span className="hidden md:inline sepCls" aria-hidden>
+              <span className={sepCls} aria-hidden>
                 ·
               </span>
-              <button type="button" className="pool-link shrink-0 font-medium whitespace-nowrap" onClick={switchPool}>
-                <span className="md:hidden">Switch…</span>
+              <button
+                type="button"
+                className="pool-link max-w-[2.85rem] shrink-0 truncate font-medium whitespace-nowrap md:max-w-none md:whitespace-normal"
+                onClick={switchPool}
+              >
+                <span className="md:hidden">Switch</span>
                 <span className="hidden md:inline">Switch pool or user…</span>
               </button>
             </div>
           ) : (
-            <div className={`min-w-0 flex-1 ${barText} pool-text-muted`}>
+            <div className="min-w-0 flex-1 text-[8px] text-foreground/65 sm:text-[10px] md:text-[11px]">
               No pool —{" "}
               <button type="button" className="pool-link font-medium" onClick={() => router.push("/")}>
                 Home
@@ -305,16 +310,8 @@ export function LeagueIdentityBar() {
             </button>
           </div>
 
-          {/* Theme + commissioner: hide on mobile when scrolled down to maximize roster space */}
-          <div
-            className={[
-              "flex w-full shrink-0 flex-nowrap items-center justify-end gap-1.5 sm:gap-2 sm:ml-auto sm:w-auto max-md:min-w-0",
-              barCompact ? "max-md:hidden" : ""
-            ]
-              .filter(Boolean)
-              .join(" ")}
-          >
-            <AppearancePicker triggerClassName="max-md:!h-7 max-md:!w-7 max-md:!min-w-[1.75rem] max-md:!p-0 max-md:shrink-0" />
+          <div className="flex shrink-0 flex-nowrap items-center gap-0.5 md:ml-auto md:gap-2">
+            <AppearancePicker triggerClassName="max-md:!h-[1.35rem] max-md:!w-[1.35rem] max-md:!min-w-[1.35rem] max-md:!p-0 max-md:[&_svg]:!h-2.5 max-md:[&_svg]:!w-2.5 shrink-0" />
             <div className="relative hidden shrink-0 md:block">
               <button
                 type="button"
@@ -347,58 +344,54 @@ export function LeagueIdentityBar() {
                 </div>
               ) : null}
             </div>
-            <div className="min-w-0 flex-1 rounded-md border border-border/35 bg-background/35 px-1 py-0.5 sm:px-1.5 sm:py-1 sm:flex-initial sm:max-w-[260px]">
-            <button
-              type="button"
-              onClick={() => setCommOpen((o) => !o)}
-              className="flex w-full min-w-0 items-center gap-1 flex-nowrap text-left text-[10px] font-semibold text-foreground/75 sm:gap-1.5 sm:text-[11px]"
-            >
-              <span className="min-w-0 flex-1 truncate">Commissioner</span>
-              <span className="text-foreground/40 shrink-0 text-[10px]">{commOpen ? "▾" : "▸"}</span>
-              {commUnlocked ? (
-                <span className="shrink-0 text-[9px] font-medium text-emerald-600/90 dark:text-emerald-400/90 sm:text-[10px]">
-                  Unlocked.
-                </span>
-              ) : null}
-            </button>
-            {commOpen && (
-              <div className="mt-1 space-y-1 border-t border-border/30 pt-1 sm:mt-1.5 sm:space-y-1.5 sm:pt-1.5">
-                {commUnlocked && (
-                  <p className="hidden sm:block text-[11px] pool-text-muted-sm leading-snug">
-                    Same value as server env <code className="pool-code">COMMISSIONER_API_SECRET</code>. Unlocks commissioner
-                    APIs, tools, and proxy draft picks.
-                  </p>
-                )}
-                {commUnlocked && (
-                  <div className="flex flex-wrap gap-1 sm:gap-1.5">
-                    <Button type="button" size="sm" variant="outline" className="h-6 text-[10px] px-1.5 sm:h-7 sm:text-xs sm:px-2" onClick={openCommissionerTools}>
-                      Open tools
-                    </Button>
-                  </div>
-                )}
-                {!commUnlocked && (
-                  <p className="text-[9px] text-foreground/50 leading-tight sm:text-[10px] sm:leading-snug">
-                    Commissioner password for this browser.
-                  </p>
-                )}
-                <input
-                  className="pool-field font-mono text-[10px] !h-7 sm:!h-8"
-                  type="password"
-                  autoComplete="off"
-                  value={commPw}
-                  onChange={(e) => setCommPw(e.target.value)}
-                  placeholder="Password"
-                />
-                <div className="flex flex-wrap gap-1 sm:gap-1.5">
-                  <Button type="button" size="sm" className="h-6 text-[10px] px-1.5 sm:h-7 sm:text-xs sm:px-2" onClick={saveCommissionerPassword}>
-                    Save
-                  </Button>
-                  <Button type="button" size="sm" variant="outline" className="h-6 text-[10px] px-1.5 sm:h-7 sm:text-xs sm:px-2" onClick={clearCommissionerPassword}>
-                    Clear
-                  </Button>
+            <div className="hidden min-w-0 flex-1 rounded-md border border-border/35 bg-background/35 px-1 py-0.5 sm:flex-initial sm:px-1.5 sm:py-1 sm:max-w-[260px] md:block">
+              <button
+                type="button"
+                onClick={() => setCommOpen((o) => !o)}
+                className="flex w-full min-w-0 items-center gap-1 flex-nowrap text-left text-[10px] font-semibold text-foreground/75 sm:gap-1.5 sm:text-[11px]"
+              >
+                <span className="min-w-0 flex-1 truncate">Commissioner</span>
+                <span className="text-foreground/40 shrink-0 text-[10px]">{commOpen ? "▾" : "▸"}</span>
+                {commUnlocked ? (
+                  <span className="shrink-0 text-[9px] font-medium text-emerald-600/90 dark:text-emerald-400/90 sm:text-[10px]">
+                    Unlocked.
+                  </span>
+                ) : null}
+              </button>
+              {commOpen ? (
+                <div className="mt-1 space-y-1 border-t border-border/30 pt-1 sm:mt-1.5 sm:space-y-1.5 sm:pt-1.5">
+                  {commissionerFormFields}
                 </div>
-              </div>
-            )}
+              ) : null}
+            </div>
+            <div className="relative shrink-0 md:hidden">
+              <button
+                type="button"
+                onClick={() => setCommOpen((o) => !o)}
+                aria-expanded={commOpen}
+                aria-label="Commissioner login"
+                title="Commissioner"
+                className={[
+                  "inline-flex h-[1.35rem] w-[1.35rem] items-center justify-center rounded-md border transition",
+                  commOpen ? "border-accent/45 bg-accent/15 text-accent" : "border-border/55 bg-background/45 text-foreground/80",
+                  commUnlocked && !commOpen ? "text-emerald-600/95 dark:text-emerald-400/90" : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <ShieldCheck className="h-2.5 w-2.5 shrink-0" strokeWidth={2.25} aria-hidden />
+              </button>
+              {commOpen ? (
+                <div className="absolute right-0 top-[calc(100%+3px)] z-[120] w-[min(18rem,calc(100vw-0.75rem))] space-y-1.5 rounded-md border border-border/50 bg-background/98 p-2 text-[10px] shadow-xl backdrop-blur-md">
+                  <div className="flex items-center justify-between gap-2 border-b border-border/25 pb-1.5">
+                    <span className="font-semibold text-foreground/85">Commissioner</span>
+                    {commUnlocked ? (
+                      <span className="text-[9px] font-medium text-emerald-600/90 dark:text-emerald-400/90">Unlocked</span>
+                    ) : null}
+                  </div>
+                  {commissionerFormFields}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
