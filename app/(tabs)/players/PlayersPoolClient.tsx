@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, UsersRound, RefreshCcw, ShieldCheck } from "lucide-react";
 import {
@@ -1054,111 +1055,117 @@ export function PlayersPoolClient({
               </span>
               <ChevronDown className="size-3 shrink-0 opacity-45" strokeWidth={2.25} aria-hidden />
             </button>
-            {teamPickerOpen && teamPickerPos && (
-              <>
-                <div className="pool-modal-overlay" onClick={closeTeamPicker} />
-                <div
-                  className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
-                  style={{
-                    top: teamPickerPos.top,
-                    left: teamPickerPos.left,
-                    width: Math.max(220, Math.min(360, teamPickerPos.width))
-                  }}
-                >
-                  <div className="flex gap-2 mb-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCollegeTeams(collegeTeamOptions)}
-                      disabled={allTeamsSelected}
-                      className="pool-btn-ghost flex-1"
+            {teamPickerOpen && teamPickerPos && typeof document !== "undefined"
+              ? createPortal(
+                  <>
+                    <div className="pool-modal-overlay" onClick={closeTeamPicker} />
+                    <div
+                      className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
+                      style={{
+                        top: teamPickerPos.top,
+                        left: teamPickerPos.left,
+                        width: Math.max(220, Math.min(360, teamPickerPos.width))
+                      }}
                     >
-                      All
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCollegeTeams([])}
-                      disabled={selectedCollegeTeams.length === 0}
-                      className="pool-btn-ghost flex-1"
-                    >
-                      None
-                    </button>
-                  </div>
-                  <div>
-                    {collegeTeamOptions.map((t) => {
-                      const checked = selectedCollegeTeamsSet.has(t);
-                      return (
-                        <label key={t} className="pool-picker-row w-full">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() =>
-                              setSelectedCollegeTeams((prev) =>
-                                prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
-                              )
-                            }
-                          />
-                          <span className="truncate">{t}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
+                      <div className="flex gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCollegeTeams(collegeTeamOptions)}
+                          disabled={allTeamsSelected}
+                          className="pool-btn-ghost flex-1"
+                        >
+                          All
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCollegeTeams([])}
+                          disabled={selectedCollegeTeams.length === 0}
+                          className="pool-btn-ghost flex-1"
+                        >
+                          None
+                        </button>
+                      </div>
+                      <div>
+                        {collegeTeamOptions.map((t) => {
+                          const checked = selectedCollegeTeamsSet.has(t);
+                          return (
+                            <label key={t} className="pool-picker-row w-full">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() =>
+                                  setSelectedCollegeTeams((prev) =>
+                                    prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
+                                  )
+                                }
+                              />
+                              <span className="truncate">{t}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>,
+                  document.body
+                )
+              : null}
           </div>
-          {ownerPickerOpen && ownerPickerPos && (
-            <>
-              <div className="pool-modal-overlay" onClick={closeOwnerPicker} />
-              <div
-                className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
-                style={{
-                  top: ownerPickerPos.top,
-                  left: ownerPickerPos.left,
-                  width: Math.max(220, Math.min(360, ownerPickerPos.width))
-                }}
-              >
-                <div className="flex gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOwnerNames(ownerOptions)}
-                    disabled={allOwnersSelected}
-                    className="pool-btn-ghost flex-1"
+          {ownerPickerOpen && ownerPickerPos && typeof document !== "undefined"
+            ? createPortal(
+                <>
+                  <div className="pool-modal-overlay" onClick={closeOwnerPicker} />
+                  <div
+                    className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
+                    style={{
+                      top: ownerPickerPos.top,
+                      left: ownerPickerPos.left,
+                      width: Math.max(220, Math.min(360, ownerPickerPos.width))
+                    }}
                   >
-                    All
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOwnerNames([])}
-                    disabled={selectedOwnerNames.length === 0}
-                    className="pool-btn-ghost flex-1"
-                  >
-                    None
-                  </button>
-                </div>
-                <div className="max-h-56 overflow-y-auto">
-                  {ownerOptions.map((name) => {
-                    const checked = selectedOwnerNameSet.has(name);
-                    return (
-                      <label key={name} className="pool-picker-row w-full">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() =>
-                            setSelectedOwnerNames((prev) =>
-                              prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]
-                            )
-                          }
-                        />
-                        <span className="truncate">
-                          <PoolResponsiveOwnerNameText full={name} />
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
-          )}
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOwnerNames(ownerOptions)}
+                        disabled={allOwnersSelected}
+                        className="pool-btn-ghost flex-1"
+                      >
+                        All
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOwnerNames([])}
+                        disabled={selectedOwnerNames.length === 0}
+                        className="pool-btn-ghost flex-1"
+                      >
+                        None
+                      </button>
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      {ownerOptions.map((name) => {
+                        const checked = selectedOwnerNameSet.has(name);
+                        return (
+                          <label key={name} className="pool-picker-row w-full">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setSelectedOwnerNames((prev) =>
+                                  prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]
+                                )
+                              }
+                            />
+                            <span className="truncate">
+                              <PoolResponsiveOwnerNameText full={name} />
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>,
+                document.body
+              )
+            : null}
           <HeatBadgeLegend className="ml-auto pool-mobile-hidden md:flex md:items-center md:pl-2" />
         </div>
 

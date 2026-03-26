@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Circle, Radio, RefreshCcw, ShieldCheck } from "lucide-react";
@@ -1599,111 +1600,117 @@ function StatTrackerTabPageInner() {
               </span>
               <ChevronDown className="size-3 shrink-0 opacity-45" strokeWidth={2.25} aria-hidden />
             </button>
-            {teamPickerOpen && teamPickerPos && (
-              <>
-                <div className="pool-modal-overlay" onClick={closeTeamPicker} />
-                <div
-                  className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
-                  style={{
-                    top: teamPickerPos.top,
-                    left: teamPickerPos.left,
-                    width: Math.max(220, Math.min(360, teamPickerPos.width))
-                  }}
-                >
-                  <div className="flex gap-2 mb-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCollegeTeams(collegeTeamOptions)}
-                      disabled={allTeamsSelected}
-                      className="pool-btn-ghost flex-1"
+            {teamPickerOpen && teamPickerPos && typeof document !== "undefined"
+              ? createPortal(
+                  <>
+                    <div className="pool-modal-overlay" onClick={closeTeamPicker} />
+                    <div
+                      className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
+                      style={{
+                        top: teamPickerPos.top,
+                        left: teamPickerPos.left,
+                        width: Math.max(220, Math.min(360, teamPickerPos.width))
+                      }}
                     >
-                      {toBookTitleCase("all")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedCollegeTeams([])}
-                      disabled={selectedCollegeTeams.length === 0}
-                      className="pool-btn-ghost flex-1"
-                    >
-                      {toBookTitleCase("none")}
-                    </button>
-                  </div>
-                  <div>
-                    {collegeTeamOptions.map((t) => {
-                      const checked = selectedCollegeTeamsSet.has(t);
-                      return (
-                        <label key={t} className="pool-picker-row w-full">
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() =>
-                              setSelectedCollegeTeams((prev) =>
-                                prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
-                              )
-                            }
-                          />
-                          <span className="truncate">{t}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              </>
-            )}
+                      <div className="flex gap-2 mb-2">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCollegeTeams(collegeTeamOptions)}
+                          disabled={allTeamsSelected}
+                          className="pool-btn-ghost flex-1"
+                        >
+                          {toBookTitleCase("all")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedCollegeTeams([])}
+                          disabled={selectedCollegeTeams.length === 0}
+                          className="pool-btn-ghost flex-1"
+                        >
+                          {toBookTitleCase("none")}
+                        </button>
+                      </div>
+                      <div>
+                        {collegeTeamOptions.map((t) => {
+                          const checked = selectedCollegeTeamsSet.has(t);
+                          return (
+                            <label key={t} className="pool-picker-row w-full">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() =>
+                                  setSelectedCollegeTeams((prev) =>
+                                    prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
+                                  )
+                                }
+                              />
+                              <span className="truncate">{t}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </>,
+                  document.body
+                )
+              : null}
           </div>
-          {ownerPickerOpen && ownerPickerPos && (
-            <>
-              <div className="pool-modal-overlay" onClick={closeOwnerPicker} />
-              <div
-                className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
-                style={{
-                  top: ownerPickerPos.top,
-                  left: ownerPickerPos.left,
-                  width: Math.max(220, Math.min(360, ownerPickerPos.width))
-                }}
-              >
-                <div className="flex gap-2 mb-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOwnerIds(ownersSorted.map((o) => o.ownerId))}
-                    className="pool-btn-ghost flex-1"
+          {ownerPickerOpen && ownerPickerPos && typeof document !== "undefined"
+            ? createPortal(
+                <>
+                  <div className="pool-modal-overlay" onClick={closeOwnerPicker} />
+                  <div
+                    className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
+                    style={{
+                      top: ownerPickerPos.top,
+                      left: ownerPickerPos.left,
+                      width: Math.max(220, Math.min(360, ownerPickerPos.width))
+                    }}
                   >
-                    {toBookTitleCase("all")}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setSelectedOwnerIds([])}
-                    className="pool-btn-ghost flex-1"
-                  >
-                    {toBookTitleCase("none")}
-                  </button>
-                </div>
-                <div className="max-h-56 overflow-y-auto">
-                  {ownersSorted.map((o) => {
-                    const checked = selectedOwnerIdSet.has(o.ownerId);
-                    return (
-                      <label key={o.ownerId} className="pool-picker-row w-full">
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() =>
-                            setSelectedOwnerIds((prev) =>
-                              prev.includes(o.ownerId)
-                                ? prev.filter((id) => id !== o.ownerId)
-                                : [...prev, o.ownerId]
-                            )
-                          }
-                        />
-                        <span className="truncate">
-                          <PoolResponsiveOwnerNameText full={o.ownerName} />
-                        </span>
-                      </label>
-                    );
-                  })}
-                </div>
-              </div>
-            </>
-          )}
+                    <div className="flex gap-2 mb-2">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOwnerIds(ownersSorted.map((o) => o.ownerId))}
+                        className="pool-btn-ghost flex-1"
+                      >
+                        {toBookTitleCase("all")}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedOwnerIds([])}
+                        className="pool-btn-ghost flex-1"
+                      >
+                        {toBookTitleCase("none")}
+                      </button>
+                    </div>
+                    <div className="max-h-56 overflow-y-auto">
+                      {ownersSorted.map((o) => {
+                        const checked = selectedOwnerIdSet.has(o.ownerId);
+                        return (
+                          <label key={o.ownerId} className="pool-picker-row w-full">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() =>
+                                setSelectedOwnerIds((prev) =>
+                                  prev.includes(o.ownerId)
+                                    ? prev.filter((id) => id !== o.ownerId)
+                                    : [...prev, o.ownerId]
+                                )
+                              }
+                            />
+                            <span className="truncate">
+                              <PoolResponsiveOwnerNameText full={o.ownerName} />
+                            </span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>,
+                document.body
+              )
+            : null}
           <HeatBadgeLegend className="ml-auto pool-mobile-hidden md:flex md:items-center md:pl-2" />
         </div>
       </div>
