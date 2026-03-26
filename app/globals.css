@@ -1056,13 +1056,13 @@ body {
 .pool-modal-overlay {
   position: fixed;
   inset: 0;
-  z-index: 40;
+  z-index: 4000;
   background: rgba(0, 0, 0, 0.45);
 }
 
 .pool-modal-sheet {
   position: fixed;
-  z-index: 50;
+  z-index: 4010;
   border-radius: 0.5rem;
   border: 1px solid rgb(var(--pool-stats-border) / 0.85);
   background: rgb(var(--pool-stats-bg-odd) / 0.96);
@@ -1216,6 +1216,8 @@ body {
 
   /* Owner/Team filter pickers: centered popout multi-select on mobile. */
   .pool-modal-sheet.pool-modal-sheet--anchored {
+    position: fixed !important;
+    z-index: 4020 !important;
     left: 50% !important;
     top: 50% !important;
     right: auto !important;
