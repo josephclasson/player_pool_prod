@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { IceBoxBadge } from "@/components/stats/IceBoxBadge";
 import { InMoneyBadge } from "@/components/stats/InMoneyBadge";
 import { LeaderboardOwnerBadgesLegend } from "@/components/stats/LeaderboardOwnerBadgesLegend";
@@ -395,6 +396,7 @@ function StatCellWithOwnerRank({
 }
 
 export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
+  const router = useRouter();
   type LeaderboardViewMode = "base" | "proj" | "betting";
   const [data, setData] = useState<LeaderboardApiPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -417,6 +419,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
   const inFlightRef = useRef(false);
   const loadControllerRef = useRef<AbortController | null>(null);
   const etagRef = useRef<string | null>(null);
+  const lastLoadedAtRef = useRef(0);
   const [unchangedRefreshStreak, setUnchangedRefreshStreak] = useState(0);
   const cacheKey = useMemo(() => (leagueId ? leaderboardSnapshotKey({ leagueId }) : null), [leagueId]);
 
@@ -573,26 +576,29 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
 
   const load = useCallback(async (opts?: { manual?: boolean; force?: boolean; silent?: boolean }) => {
     if (!leagueId) return;
+    const force = opts?.force === true;
     if (inFlightRef.current) {
-      // Replace stale in-flight requests to avoid missed initial loads on remounts.
+      if (!force) return;
       loadControllerRef.current?.abort();
     }
+    if (!force && Date.now() - lastLoadedAtRef.current < 2500) return;
     const controller = new AbortController();
     loadControllerRef.current = controller;
     inFlightRef.current = true;
     if (opts?.manual) setError(null);
     try {
       const params = new URLSearchParams();
-      if (opts?.force) params.set("refresh", "1");
+      if (force) params.set("refresh", "1");
       const qs = params.toString();
       const headers: Record<string, string> = {};
-      if (!opts?.force && etagRef.current) headers["If-None-Match"] = etagRef.current;
+      if (!force && etagRef.current) headers["If-None-Match"] = etagRef.current;
       const res = await fetch(`/api/leaderboard/${encodeURIComponent(leagueId)}${qs ? `?${qs}` : ""}`, {
         signal: controller.signal,
         headers
       });
       if (res.status === 304) {
         setUnchangedRefreshStreak((n) => n + 1);
+        lastLoadedAtRef.current = Date.now();
         return;
       }
       const json = (await res.json()) as LeaderboardApiPayload & { error?: string };
@@ -608,6 +614,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
           etag: etagRef.current
         });
       }
+      lastLoadedAtRef.current = Date.now();
     } catch (e: unknown) {
       if ((e as Error)?.name === "AbortError") return;
       setError(e instanceof Error ? e.message : "Load failed");
@@ -846,7 +853,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
     : null;
 
   return (
-    <div className="pool-page-stack pool-page-stack-tight">
+    <div className="pool-page-stack pool-page-stack-tight pool-leaderboard-page">
       <div className="pool-hero pool-hero-databallr">
         <div className="grid grid-cols-[5rem_1fr_5rem] items-center gap-2 md:grid-cols-[auto_1fr_auto]">
           <div className="flex items-center justify-start md:justify-start">
@@ -857,11 +864,11 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
               <Trophy className="h-4 w-4 text-accent" />
             </div>
           </div>
-          <div className="min-w-0 text-center md:text-left">
-            <h1 className="stat-tracker-page-title text-center md:text-left">Leaderboard</h1>
+          <div className="min-w-0 text-center md:text-center">
+            <h1 className="stat-tracker-page-title text-center md:text-center">Leaderboard</h1>
               {data?.lastSyncedAt ? (
                 <div
-                  className={`text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block ${
+                  className={`text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block text-center ${
                     heroPulse ? "motion-safe:animate-pulse" : ""
                   }`}
                 >
@@ -871,7 +878,9 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                   ) : null}
                 </div>
               ) : (
-                <div className="text-[10px] text-foreground/45 mt-0.5 hidden md:block">Live leaderboard status</div>
+                <div className="text-[10px] text-foreground/45 mt-0.5 hidden md:block text-center">
+                  Live leaderboard status
+                </div>
               )}
           </div>
           <div className="flex items-center justify-end gap-1">
@@ -891,7 +900,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
               className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm shrink-0 !p-1 !w-9 !h-9 flex items-center justify-center"
               onClick={() => {
                 const href = leagueId ? `/commissioner?leagueId=${encodeURIComponent(leagueId)}` : "/commissioner";
-                window.location.assign(href);
+                router.push(href);
               }}
               aria-label="Commissioner login"
             >

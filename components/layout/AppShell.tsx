@@ -35,11 +35,11 @@ import { PoolSessionRoutes } from "@/components/layout/PoolSessionRoutes";
  */
 const navTabs: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/draft", label: "Draft", icon: GraduationCap },
-  { href: "/stat-tracker", label: "StatTracker", icon: Radio },
+  { href: "/stat-tracker", label: "Scores", icon: Radio },
   { href: "/leaderboard", label: "Leaderboard", icon: Trophy },
-  { href: "/players", label: "Player Statistics", icon: UsersRound },
-  { href: "/analytics", label: "Advanced Analytics", icon: BarChart3 },
-  { href: "/history", label: "Player Pool History", icon: History },
+  { href: "/players", label: "Players", icon: UsersRound },
+  { href: "/analytics", label: "Analytics", icon: BarChart3 },
+  { href: "/history", label: "History", icon: History },
   { href: "/commissioner", label: "Commissioner Tools", icon: ShieldCheck }
 ];
 
@@ -457,6 +457,20 @@ export function AppShell({ children }: { children: ReactNode }) {
       router.push(href);
     }
   };
+
+  useEffect(() => {
+    const s = readPlayerPoolSession();
+    const toPrefetch = new Set<string>();
+    for (const t of navTabsEffective) toPrefetch.add(t.href);
+    for (const t of mobilePrimaryNav) toPrefetch.add(t.href);
+    for (const t of mobileMoreItems) toPrefetch.add(t.href);
+    for (const href of toPrefetch) {
+      const pathOnly = href.split("?")[0] ?? href;
+      const target =
+        s?.leagueId && !poolRouteIsPublic(pathOnly) ? hrefWithLeagueId(href, s.leagueId) : href;
+      router.prefetch(target);
+    }
+  }, [router, navTabsEffective, mobileMoreItems]);
 
   return (
     <div className="safe-area-wrapper flex h-dvh min-h-0 w-full flex-col overflow-hidden text-foreground md:min-h-screen md:h-auto md:overflow-visible">

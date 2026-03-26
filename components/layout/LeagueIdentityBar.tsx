@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Briefcase, Pause, Play, Menu, ShieldCheck } from "lucide-react";
+import { Briefcase, Pause, Play, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BossModeOverlay } from "@/components/layout/BossModeOverlay";
 import { AppearancePicker } from "@/components/theme/AppearancePicker";
@@ -19,10 +19,13 @@ import { hrefWithLeagueId } from "@/lib/pool-navigation";
 
 /** “One Shining Moment 30” on Bandcamp — track 1 is the original. */
 const ONE_SHINING_MOMENT_BANDCAMP_EMBED =
-  "https://bandcamp.com/EmbeddedPlayer/album=4167384688/size=small/bgcol=1b212c/linkcol=facc15/tracklist=false/artwork=small/track=1/transparent=true/";
+  // autoplay=1 is required for reliable playback after the iframe is mounted.
+  // Keep this as a compact, text-focused embed (no artwork) so the dropdown feels clean.
+  "https://bandcamp.com/EmbeddedPlayer/album=4167384688/size=small/bgcol=000000/linkcol=facc15/tracklist=false/artwork=none/track=1/transparent=true/autoplay=1/";
 
-const ONE_SHINING_MOMENT_BANDCAMP_TRACK_URL =
-  "https://davidbarrett.bandcamp.com/track/one-shining-moment-original";
+// Preload version (no autoplay) to reduce the click-to-play latency.
+const ONE_SHINING_MOMENT_BANDCAMP_EMBED_NO_AUTOPLAY =
+  "https://bandcamp.com/EmbeddedPlayer/album=4167384688/size=small/bgcol=000000/linkcol=facc15/tracklist=false/artwork=none/track=1/transparent=true/";
 
 export function LeagueIdentityBar() {
   const router = useRouter();
@@ -34,9 +37,46 @@ export function LeagueIdentityBar() {
   const [commPw, setCommPw] = useState("");
   const [commOpen, setCommOpen] = useState(false);
   const [commUnlocked, setCommUnlocked] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
   const [bossOpen, setBossOpen] = useState(false);
   const [oneShiningOpen, setOneShiningOpen] = useState(false);
+  const [oneShiningLoaded, setOneShiningLoaded] = useState(false);
+  const oneShiningIframeRef = useRef<HTMLIFrameElement | null>(null);
+
+  const startOneShiningMoment = useCallback(() => {
+    setOneShiningLoaded(false);
+    setOneShiningOpen(true);
+    const iframe = oneShiningIframeRef.current;
+    if (iframe) {
+      // Wait a frame so the panel becomes visible before the iframe starts.
+      requestAnimationFrame(() => {
+        if (oneShiningIframeRef.current) oneShiningIframeRef.current.src = ONE_SHINING_MOMENT_BANDCAMP_EMBED;
+      });
+    }
+  }, []);
+
+  const stopOneShiningMoment = useCallback(() => {
+    setOneShiningLoaded(false);
+    setOneShiningOpen(false);
+    const iframe = oneShiningIframeRef.current;
+    // Reload into the non-autoplay embed to stop audio without forcing a full re-fetch.
+    if (iframe) iframe.src = ONE_SHINING_MOMENT_BANDCAMP_EMBED_NO_AUTOPLAY;
+  }, []);
+
+  // Idle-preload to make the first click feel instant.
+  useEffect(() => {
+    const iframe = oneShiningIframeRef.current;
+    if (!iframe) return;
+
+    const schedule =
+      typeof window !== "undefined" && "requestIdleCallback" in window
+        ? (cb: () => void) => (window as any).requestIdleCallback(cb, { timeout: 2000 })
+        : (cb: () => void) => window.setTimeout(cb, 250);
+
+    schedule(() => {
+      // If the user already interacted, don't waste time preloading again.
+      if (!oneShiningOpen) iframe.src = ONE_SHINING_MOMENT_BANDCAMP_EMBED_NO_AUTOPLAY;
+    });
+  }, [oneShiningOpen]);
 
   const refreshCommissioner = useCallback(() => {
     setCommUnlocked(readCommissionerSecretFromSession().length > 0);
@@ -65,11 +105,11 @@ export function LeagueIdentityBar() {
   useEffect(() => {
     if (!oneShiningOpen) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOneShiningOpen(false);
+      if (e.key === "Escape") stopOneShiningMoment();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [oneShiningOpen]);
+  }, [oneShiningOpen, stopOneShiningMoment]);
 
   useEffect(() => {
     if (!session?.leagueId) {
@@ -127,28 +167,6 @@ export function LeagueIdentityBar() {
       router.push("/commissioner");
     }
   }, [router]);
-
-  const menuItems = useMemo(
-    () =>
-      [
-        { href: "/analytics", label: "Advanced Analytics", subtitle: "Under construction" },
-        { href: "/history", label: "Player Pool History", subtitle: "Under construction" }
-      ] as const,
-    []
-  );
-
-  const openMenuHref = useCallback(
-    (href: string) => {
-      const s = readPlayerPoolSession();
-      setMenuOpen(false);
-      if (s?.leagueId) {
-        router.push(hrefWithLeagueId(href, s.leagueId));
-      } else {
-        router.push(href);
-      }
-    },
-    [router]
-  );
 
   if (pathname === "/") {
     return null;
@@ -217,16 +235,6 @@ export function LeagueIdentityBar() {
               <span className={sepCls} aria-hidden>
                 ·
               </span>
-              <span className={labelCls}>League ID:</span>
-              <code
-                className="min-w-0 max-w-[2.65rem] shrink-0 truncate font-mono text-[7px] text-foreground/85 md:max-w-[10rem] md:text-[10px] md:text-foreground/90"
-                title={session.leagueId}
-              >
-                {session.leagueId}
-              </code>
-              <span className={sepCls} aria-hidden>
-                ·
-              </span>
               <button
                 type="button"
                 className="pool-link max-w-[2.85rem] shrink-0 truncate font-medium whitespace-nowrap md:max-w-none md:whitespace-normal"
@@ -249,7 +257,7 @@ export function LeagueIdentityBar() {
             <div className="relative shrink-0">
               <button
                 type="button"
-                onClick={() => setOneShiningOpen((o) => !o)}
+                onClick={() => (oneShiningOpen ? stopOneShiningMoment() : startOneShiningMoment())}
                 aria-pressed={oneShiningOpen}
                 title={
                   oneShiningOpen
@@ -264,7 +272,7 @@ export function LeagueIdentityBar() {
                 className={[
                   "inline-flex items-center gap-1 rounded-md border px-2 py-1 text-[10px] font-semibold transition",
                   oneShiningOpen
-                    ? "border-accent/45 bg-accent/15 text-accent"
+                    ? "border-accent/45 bg-accent/15 text-foreground/85"
                     : "border-border/55 bg-background/45 text-foreground/85 hover:bg-muted/50"
                 ].join(" ")}
               >
@@ -275,28 +283,29 @@ export function LeagueIdentityBar() {
                 )}
                 One Shining Moment
               </button>
-              {oneShiningOpen ? (
-                <div className="absolute left-0 top-[calc(100%+0.35rem)] z-[100] w-[min(calc(100vw-1.5rem),22rem)] rounded-md border border-border/50 bg-background/95 p-2 shadow-lg backdrop-blur-md">
-                  <iframe
-                    className="h-[120px] w-full max-w-[22rem] rounded border-0 bg-black/20"
-                    src={ONE_SHINING_MOMENT_BANDCAMP_EMBED}
-                    title="One Shining Moment (Original) by David Barrett — Bandcamp player"
-                    allow="encrypted-media; autoplay"
-                  />
-                  <p className="mt-1.5 text-[9px] leading-snug text-foreground/50">
-                    <a
-                      href={ONE_SHINING_MOMENT_BANDCAMP_TRACK_URL}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="pool-link font-medium"
-                    >
-                      One Shining Moment (Original)
-                    </a>
-                    {" · "}
-                    David Barrett on Bandcamp
-                  </p>
-                </div>
-              ) : null}
+              <div
+                className={[
+                  "absolute right-0 top-full mt-1 z-[2500] overflow-hidden rounded-md border border-border/55 bg-black shadow-lg backdrop-blur-sm",
+                  oneShiningOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none",
+                  "w-[320px] max-w-[80vw]",
+                  "h-[40px] transition-opacity duration-150"
+                ].join(" ")}
+                aria-hidden={!oneShiningOpen}
+              >
+                {!oneShiningLoaded ? <div className="absolute inset-0 bg-black animate-pulse" /> : null}
+                <iframe
+                  ref={oneShiningIframeRef}
+                  className="absolute left-0 top-0 h-[32px] w-full border-0 transition-opacity duration-150"
+                  style={{ opacity: oneShiningLoaded ? 1 : 0 }}
+                  src="about:blank"
+                  title="One Shining Moment (Original) by David Barrett — Bandcamp player"
+                  allow="autoplay; encrypted-media; fullscreen"
+                  loading="eager"
+                  onLoad={() => {
+                    if (oneShiningOpen) setOneShiningLoaded(true);
+                  }}
+                />
+              </div>
             </div>
             <button
               type="button"
@@ -312,38 +321,6 @@ export function LeagueIdentityBar() {
 
           <div className="hidden md:flex shrink-0 flex-nowrap items-center gap-0.5 md:ml-auto md:gap-2">
             <AppearancePicker triggerClassName="max-md:!h-[1.35rem] max-md:!w-[1.35rem] max-md:!min-w-[1.35rem] max-md:!p-0 max-md:[&_svg]:!h-2.5 max-md:[&_svg]:!w-2.5 shrink-0" />
-            <div className="relative hidden shrink-0 md:block">
-              <button
-                type="button"
-                onClick={() => setMenuOpen((o) => !o)}
-                aria-pressed={menuOpen}
-                aria-label="Open menu"
-                className={[
-                  "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10px] font-semibold transition",
-                  menuOpen
-                    ? "border-accent/45 bg-accent/15 text-accent"
-                    : "border-border/55 bg-background/45 text-foreground/85 hover:bg-muted/50"
-                ].join(" ")}
-              >
-                <Menu className="h-3 w-3" aria-hidden />
-                Menu
-              </button>
-              {menuOpen ? (
-                <div className="absolute right-0 top-[calc(100%+0.35rem)] z-[100] w-[min(calc(100vw-1.5rem),18rem)] rounded-md border border-border/50 bg-background/95 p-1.5 shadow-lg backdrop-blur-md">
-                  {menuItems.map((i) => (
-                    <button
-                      key={i.href}
-                      type="button"
-                      onClick={() => openMenuHref(i.href)}
-                      className="w-full text-left rounded-md px-2 py-1.5 hover:bg-muted/40 transition"
-                    >
-                      <div className="text-[11px] font-semibold text-foreground/85 leading-tight">{i.label}</div>
-                      <div className="text-[10px] text-foreground/45 leading-tight mt-0.5">{i.subtitle}</div>
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
             <div className="hidden min-w-0 flex-1 rounded-md border border-border/35 bg-background/35 px-1 py-0.5 sm:flex-initial sm:px-1.5 sm:py-1 sm:max-w-[260px] md:block">
               <button
                 type="button"

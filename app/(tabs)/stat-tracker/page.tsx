@@ -4,11 +4,14 @@ import type { ReactNode } from "react";
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Circle, Radio, RefreshCcw, ShieldCheck } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
+  readStoredSnapshot,
   readStoredStatTrackerShowInlineRanks,
+  statTrackerSnapshotKey,
+  writeStoredSnapshot,
   writeStoredActiveLeagueId,
   writeStoredStatTrackerShowInlineRanks
 } from "@/lib/player-pool-storage";
@@ -932,9 +935,14 @@ function buildOwnerVsOwnerFooterRanks(
 }
 
 function StatTrackerTabPageInner() {
+  const router = useRouter();
   type StatTrackerViewMode = "base" | "proj";
   const sp = useSearchParams();
   const leagueId = useMemo(() => sp.get("leagueId")?.trim() || undefined, [sp]);
+  const snapshotKey = useMemo(
+    () => (leagueId ? statTrackerSnapshotKey({ leagueId }) : null),
+    [leagueId]
+  );
 
   useEffect(() => {
     if (leagueId) writeStoredActiveLeagueId(leagueId);
@@ -944,10 +952,31 @@ function StatTrackerTabPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [authHint, setAuthHint] = useState<string | null>(null);
+  const loadInFlightRef = useRef(false);
+  const lastLoadedAtRef = useRef(0);
+  const authTokenCacheRef = useRef<{ token: string | null; checkedAt: number }>({
+    token: null,
+    checkedAt: 0
+  });
 
-  const loadData = useCallback(async () => {
+  useEffect(() => {
+    if (!snapshotKey) return;
+    const snap = readStoredSnapshot<StatTrackerApiResponse>(snapshotKey, 1000 * 60 * 10);
+    if (snap) setApi(snap);
+  }, [snapshotKey]);
+
+  useEffect(() => {
+    if (!snapshotKey || !api) return;
+    writeStoredSnapshot<StatTrackerApiResponse>(snapshotKey, api);
+  }, [snapshotKey, api]);
+
+  const loadData = useCallback(async (opts?: { force?: boolean }) => {
     if (!leagueId) return;
-    setError(null);
+    const force = opts?.force === true;
+    if (loadInFlightRef.current) return;
+    if (!force && Date.now() - lastLoadedAtRef.current < 2500) return;
+    loadInFlightRef.current = true;
+    if (force) setError(null);
     try {
       const res = await fetch(`/api/stat-tracker/${encodeURIComponent(leagueId)}`, {
         cache: "no-store",
@@ -958,15 +987,28 @@ function StatTrackerTabPageInner() {
       setApi(json);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Load failed");
+    } finally {
+      lastLoadedAtRef.current = Date.now();
+      loadInFlightRef.current = false;
     }
   }, [leagueId]);
 
-  const pullLiveIfAuthed = useCallback(async (): Promise<boolean> => {
-    if (!leagueId) return false;
+  const readAuthedToken = useCallback(async (): Promise<string | null> => {
+    const now = Date.now();
+    if (now - authTokenCacheRef.current.checkedAt < 60_000) {
+      return authTokenCacheRef.current.token;
+    }
     const sb = createBrowserSupabaseClient();
     const { data: sess } =
       sb != null ? await sb.auth.getSession() : { data: { session: null as null } };
-    const token = sess?.session?.access_token;
+    const token = sess?.session?.access_token ?? null;
+    authTokenCacheRef.current = { token, checkedAt: now };
+    return token;
+  }, []);
+
+  const pullLiveIfAuthed = useCallback(async (): Promise<boolean> => {
+    if (!leagueId) return false;
+    const token = await readAuthedToken();
     if (!token) return false;
 
     const res = await fetch(`/api/stat-tracker/${encodeURIComponent(leagueId)}/live-sync`, {
@@ -979,10 +1021,11 @@ function StatTrackerTabPageInner() {
     setApi(json);
     setAuthHint(null);
     return true;
-  }, [leagueId]);
+  }, [leagueId, readAuthedToken]);
 
   const tick = useCallback(async () => {
     if (!leagueId) return;
+    if (loadInFlightRef.current) return;
     try {
       const pulled = await pullLiveIfAuthed();
       if (!pulled) await loadData();
@@ -1020,7 +1063,10 @@ function StatTrackerTabPageInner() {
   const pollMs = api?.anyLiveGames ? 20_000 : 45_000;
   useEffect(() => {
     if (!leagueId) return;
-    const id = window.setInterval(() => void tick(), pollMs);
+    const id = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void tick();
+    }, pollMs);
     return () => window.clearInterval(id);
   }, [leagueId, pollMs, tick]);
 
@@ -1372,11 +1418,11 @@ function StatTrackerTabPageInner() {
       const pulled = await pullLiveIfAuthed();
       if (!pulled) {
         setAuthHint("Sign in to pull live NCAA scores. Showing cached pool data.");
-        await loadData();
+        await loadData({ force: true });
       }
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Refresh failed");
-      await loadData();
+      await loadData({ force: true });
     } finally {
       setRefreshBusy(false);
     }
@@ -1399,7 +1445,7 @@ function StatTrackerTabPageInner() {
       : ({ minWidth: "min(8.5rem, 36vw)", maxWidth: "min(8.5rem, 36vw)" } as const);
 
   return (
-    <div className="pool-page-stack pool-page-stack-tight">
+    <div className="pool-page-stack pool-page-stack-tight pool-scores-page">
       <div
         ref={collapsedOwnerRowMeasureRef}
         className="pointer-events-none fixed left-0 top-0 -z-[999] flex items-center gap-1 whitespace-nowrap px-2 opacity-0"
@@ -1421,16 +1467,16 @@ function StatTrackerTabPageInner() {
               <Radio className="h-4 w-4 text-accent" />
             </div>
           </div>
-          <div className="min-w-0 text-center md:text-left">
-            <h1 className="stat-tracker-page-title text-center md:text-left">
+          <div className="min-w-0 text-center md:text-center">
+            <h1 className="stat-tracker-page-title text-center md:text-center">
               <span className="md:hidden">Scores</span>
-              <span className="hidden md:inline">StatTracker</span>
+              <span className="hidden md:inline">Scores</span>
             </h1>
               {api?.lastSyncedAt ? (
                 <>
                   <div
                     className={[
-                      "text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block",
+                      "text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block text-center",
                       heroPulse ? "motion-safe:animate-pulse" : ""
                     ]
                       .filter(Boolean)
@@ -1443,7 +1489,7 @@ function StatTrackerTabPageInner() {
                   </div>
                 </>
               ) : (
-                <div className="text-[10px] text-foreground/45 mt-0.5 hidden md:block">
+                <div className="text-[10px] text-foreground/45 mt-0.5 hidden md:block text-center">
                   Live R1–R6 scoring &amp; projections
                 </div>
               )}
@@ -1465,7 +1511,7 @@ function StatTrackerTabPageInner() {
               className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm shrink-0 !p-1 !w-9 !h-9 flex items-center justify-center"
               onClick={() => {
                 const href = leagueId ? `/commissioner?leagueId=${encodeURIComponent(leagueId)}` : "/commissioner";
-                window.location.assign(href);
+                router.push(href);
               }}
               aria-label="Commissioner login"
             >
@@ -1630,7 +1676,7 @@ function StatTrackerTabPageInner() {
                           {toBookTitleCase("none")}
                         </button>
                       </div>
-                      <div>
+                      <div className="max-h-56 overflow-y-auto">
                         {collegeTeamOptions.map((t) => {
                           const checked = selectedCollegeTeamsSet.has(t);
                           return (
@@ -1648,6 +1694,11 @@ function StatTrackerTabPageInner() {
                             </label>
                           );
                         })}
+                      </div>
+                      <div className="mt-2 border-t border-border/50 pt-2">
+                        <button type="button" onClick={closeTeamPicker} className="pool-btn-ghost w-full">
+                          Done
+                        </button>
                       </div>
                     </div>
                   </>,
@@ -1706,6 +1757,11 @@ function StatTrackerTabPageInner() {
                         );
                       })}
                     </div>
+                    <div className="mt-2 border-t border-border/50 pt-2">
+                      <button type="button" onClick={closeOwnerPicker} className="pool-btn-ghost w-full">
+                        Done
+                      </button>
+                    </div>
                   </div>
                 </>,
                 document.body
@@ -1715,7 +1771,7 @@ function StatTrackerTabPageInner() {
         </div>
       </div>
 
-      <div className="min-w-0">
+      <div className="min-w-0 pool-scores-owner-list">
       {orderedSelectedOwners.map((owner) => {
         const isOpen = openByOwnerId[owner.ownerId] ?? true;
         const rank = rankByOwnerId.get(owner.ownerId) ?? 0;
@@ -2007,7 +2063,7 @@ function StatTrackerTabPageInner() {
                       {owner.ownerName}
                     </div>
                   </div>
-                  <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
+                  <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-wrap items-baseline justify-start gap-x-1.5 gap-y-0.5 text-left text-[10px] sm:text-[11px] font-normal tabular-nums">
                     {projectedRank != null ? (
                       <span>
                         Projected Rank: {ordinalRankLabel(projectedRank)}
@@ -2565,7 +2621,7 @@ function StatTrackerTabPageInner() {
                   </div>
                 </div>
 
-                <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-x-1 text-right text-[10px] font-normal tabular-nums leading-none whitespace-nowrap">
+                <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-nowrap items-center justify-start gap-x-1 text-left text-[10px] font-normal tabular-nums leading-none whitespace-nowrap">
                   {projectedRank != null ? (
                     <span>
                       Projected Rank: {ordinalRankLabel(projectedRank)}

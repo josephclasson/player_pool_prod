@@ -2,8 +2,16 @@
 
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp, GraduationCap, RefreshCcw, ShieldCheck } from "lucide-react";
-import { readStoredActiveLeagueId, writeStoredActiveLeagueId } from "@/lib/player-pool-storage";
+import {
+  draftSnapshotKey,
+  readStoredActiveLeagueId,
+  readStoredSnapshot,
+  writeStoredActiveLeagueId,
+  writeStoredSnapshot
+} from "@/lib/player-pool-storage";
 import {
   PLAYER_POOL_IDENTITY_CHANGE_EVENT,
   readPlayerPoolSession,
@@ -431,6 +439,7 @@ function reportCardBlurb(opts: {
 }
 
 export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }) {
+  const router = useRouter();
   const leagueIdFromQuery = initialLeagueId?.trim() || undefined;
   /** Fallback for draft state API when session has no leagueTeamId yet */
   const [username, setUsername] = useState("You");
@@ -453,6 +462,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   const [refreshBusy, setRefreshBusy] = useState(false);
   /** One automatic draft-room ensure per league id per page visit (retried after failed ensure). */
   const draftEnsurePassRef = useRef<string | null>(null);
+  const loadInFlightRef = useRef(false);
+  const lastLoadedAtRef = useRef(0);
   const draftCellInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const [draftSort, setDraftSort] = useState<{ column: DraftSortColumn | null; dir: "asc" | "desc" }>({
@@ -562,6 +573,11 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     return fromQuery || fromPool || fromLocal || null;
   }, [leagueIdFromQuery, poolSession?.leagueId, storedActiveLeagueId]);
 
+  const snapshotKey = useMemo(
+    () => (activeLeagueId ? draftSnapshotKey({ leagueId: activeLeagueId }) : null),
+    [activeLeagueId]
+  );
+
   useEffect(() => {
     if (poolSession?.teamName?.trim()) setUsername(poolSession.teamName.trim());
   }, [poolSession?.teamName]);
@@ -569,6 +585,17 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   useEffect(() => {
     if (activeLeagueId) writeStoredActiveLeagueId(activeLeagueId);
   }, [activeLeagueId]);
+
+  useEffect(() => {
+    if (!snapshotKey) return;
+    const snap = readStoredSnapshot<DraftStateResponse>(snapshotKey, 1000 * 60 * 10);
+    if (snap) setState(snap);
+  }, [snapshotKey]);
+
+  useEffect(() => {
+    if (!snapshotKey || !state) return;
+    writeStoredSnapshot<DraftStateResponse>(snapshotKey, state);
+  }, [snapshotKey, state]);
 
   useEffect(() => {
     draftEnsurePassRef.current = null;
@@ -611,7 +638,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     }
     const tick = () => setTimerNowMs(Date.now());
     tick();
-    const id = window.setInterval(tick, 250);
+    const id = window.setInterval(tick, 1000);
     return () => window.clearInterval(id);
   }, [
     state?.draftRoom?.startedAt,
@@ -629,11 +656,20 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     return Math.max(0, (endsAt - timerNowMs) / 1000);
   }, [state, timerNowMs]);
 
-  async function loadState() {
+  const pollIntervalMs = useMemo(() => {
+    if (state?.draftRoom?.status === "in_progress") return 8000;
+    return 20000;
+  }, [state?.draftRoom?.status]);
+
+  async function loadState(opts?: { force?: boolean }) {
     if (!activeLeagueId) return;
+    const force = opts?.force === true;
+    if (loadInFlightRef.current) return;
+    if (!force && Date.now() - lastLoadedAtRef.current < 3000) return;
+    loadInFlightRef.current = true;
+    try {
     const sp = new URLSearchParams();
-    const ps = readPlayerPoolSession();
-    if (ps?.leagueTeamId) sp.set("leagueTeamId", ps.leagueTeamId);
+    if (poolSession?.leagueTeamId) sp.set("leagueTeamId", poolSession.leagueTeamId);
     else sp.set("username", username);
 
     const stateUrl = `/api/draft/${encodeURIComponent(activeLeagueId)}/state?${sp.toString()}`;
@@ -720,13 +756,17 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
         availablePlayers: (json.availablePlayers ?? []).filter((p) => !pickedPlayerIds.has(p.id))
       };
     });
+    } finally {
+      lastLoadedAtRef.current = Date.now();
+      loadInFlightRef.current = false;
+    }
   }
 
   async function onManualRefresh() {
     if (!activeLeagueId || refreshBusy) return;
     setRefreshBusy(true);
     try {
-      await loadState();
+      await loadState({ force: true });
     } finally {
       setRefreshBusy(false);
     }
@@ -737,17 +777,18 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     if (!activeLeagueId) return;
     const tick = async () => {
       if (cancelled) return;
+      if (document.visibilityState !== "visible") return;
       if (pickInFlightRef.current) return;
       await loadState();
     };
     tick();
-    const id = window.setInterval(tick, 8000);
+    const id = window.setInterval(tick, pollIntervalMs);
     return () => {
       cancelled = true;
       window.clearInterval(id);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeLeagueId, poolSession?.leagueTeamId, username, commissionerSecret]);
+  }, [activeLeagueId, poolSession?.leagueTeamId, username, commissionerSecret, pollIntervalMs]);
 
   async function handlePick(playerId: number) {
     if (!activeLeagueId || !state?.draftRoom) return;
@@ -869,7 +910,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
 
       // Don't block the UI on a full draft-state reload.
       // `loadState()` is relatively expensive and was making picks feel delayed.
-      void loadState().catch(() => {
+      void loadState({ force: true }).catch(() => {
         /* ignore background refresh failures; draft will recover on next interval */
       });
     } catch (e: any) {
@@ -903,7 +944,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
         throw new Error(`Undo pick failed: ${res.status} ${t}`);
       }
       setDraftCellInput("");
-      await loadState();
+      await loadState({ force: true });
     } catch (e: any) {
       setError(e?.message ?? "Undo pick failed");
     } finally {
@@ -1250,8 +1291,9 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   })();
 
   return (
-    <div className="pool-page-stack pool-page-stack-tight flex flex-col pb-8 md:pb-0">
-      <div className="pool-hero pool-hero-databallr shrink-0">
+    <div className="pool-page-stack pool-page-stack-tight pool-draft-page flex flex-col pb-8 md:pb-0">
+      <div className="shrink-0">
+        <div className="pool-hero pool-hero-databallr">
         <div className="grid grid-cols-[5rem_1fr_5rem] items-center gap-2 md:grid-cols-[auto_1fr_auto]">
           <div className="flex items-center justify-start">
             <div
@@ -1261,9 +1303,11 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
               <GraduationCap className="h-4 w-4 text-accent" />
             </div>
           </div>
-          <div className="min-w-0 text-center md:text-left">
-            <h1 className="stat-tracker-page-title text-center md:text-left">Draft</h1>
-              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block">{draftStatusLine}</div>
+          <div className="min-w-0 text-center md:text-center">
+            <h1 className="stat-tracker-page-title text-center md:text-center">Draft</h1>
+              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block text-center">
+                {draftStatusLine}
+              </div>
           </div>
           <div className="flex items-center justify-end gap-1">
             <button
@@ -1282,7 +1326,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
               className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm !p-1 !w-9 !h-9 flex items-center justify-center"
               onClick={() => {
                 const href = activeLeagueId ? `/commissioner?leagueId=${encodeURIComponent(activeLeagueId)}` : "/commissioner";
-                window.location.assign(href);
+                router.push(href);
               }}
               aria-label="Commissioner login"
             >
@@ -1305,6 +1349,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
             {error}
           </div>
         )}
+        </div>
 
         {state && draftBoardRows.length > 0 && (
           <div className="pool-card pool-card-compact mt-2">
@@ -1323,7 +1368,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
             {draftBoardOpen ? (
             <div className="pool-table-viewport mt-1 shrink-0 overflow-x-auto md:overflow-x-auto">
               <table
-                className="pool-table pool-table-fixed w-full min-w-0 text-[10px] sm:text-[11px] md:min-w-[520px]"
+                className="pool-table pool-table-fixed pool-draft-board-table w-full min-w-0 text-[10px] sm:text-[11px] md:min-w-[520px]"
                 aria-label="Draft board by round"
               >
               <thead>
@@ -1591,11 +1636,12 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                             ? teamNameById.get(selectedTeamIds[0]!) ?? "1 team"
                             : `${selectedTeamIds.length} teams`}
                       </button>
-                      {teamPickerOpen && teamPickerPos && (
-                        <>
+                      {teamPickerOpen && teamPickerPos && typeof document !== "undefined"
+                        ? createPortal(
+                          <>
                           <div className="pool-modal-overlay" onClick={closeTeamPicker} />
                           <div
-                            className="pool-modal-sheet max-h-[360px] overflow-y-auto"
+                            className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
                             style={{
                               top: teamPickerPos.top,
                               left: teamPickerPos.left,
@@ -1622,7 +1668,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                 None
                               </button>
                             </div>
-                            <div>
+                            <div className="max-h-56 overflow-y-auto">
                               {teamOptions.map((t) => {
                                 const checked = selectedTeamIdsSet.has(t.id);
                                 return (
@@ -1646,9 +1692,16 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                 );
                               })}
                             </div>
+                            <div className="mt-2 border-t border-border/50 pt-2 px-2">
+                              <button type="button" onClick={closeTeamPicker} className="pool-btn-ghost w-full">
+                                Done
+                              </button>
+                            </div>
                           </div>
-                        </>
-                      )}
+                          </>,
+                          document.body
+                        )
+                        : null}
                     </div>
                   </div>
                 </div>
@@ -1931,11 +1984,12 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                       </span>
                       <ChevronDown className="size-3 shrink-0 opacity-45" strokeWidth={2.25} aria-hidden />
                     </button>
-                    {resultOwnerPickerOpen && resultOwnerPickerPos && (
+                    {resultOwnerPickerOpen && resultOwnerPickerPos && typeof document !== "undefined"
+                      ? createPortal(
                       <>
                         <div className="pool-modal-overlay" onClick={closeResultOwnerPicker} />
                         <div
-                          className="pool-modal-sheet max-h-[360px] overflow-y-auto"
+                          className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
                           style={{
                             top: resultOwnerPickerPos.top,
                             left: resultOwnerPickerPos.left,
@@ -1962,7 +2016,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                               None
                             </button>
                           </div>
-                          <div>
+                          <div className="max-h-56 overflow-y-auto">
                             {resultOwnerOptions.map((o) => {
                               const checked = selectedResultOwnerIdSet.has(o.leagueTeamId);
                               return (
@@ -1988,9 +2042,16 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                               );
                             })}
                           </div>
+                          <div className="mt-2 border-t border-border/50 pt-2 px-2">
+                            <button type="button" onClick={closeResultOwnerPicker} className="pool-btn-ghost w-full">
+                              Done
+                            </button>
+                          </div>
                         </div>
-                      </>
-                    )}
+                      </>,
+                      document.body
+                    )
+                      : null}
                   </div>
                 </div>
               </div>

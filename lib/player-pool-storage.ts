@@ -9,6 +9,8 @@ export const STAT_TRACKER_SHOW_INLINE_RANKS_KEY = "stat_tracker_show_inline_rank
 export const LEADERBOARD_SHOW_PROBABILITY_ODDS_KEY = "leaderboard_show_probability_odds";
 export const PLAYER_STATS_SNAPSHOT_PREFIX = "player_stats_snapshot_v1";
 export const LEADERBOARD_SNAPSHOT_PREFIX = "leaderboard_snapshot_v1";
+export const DRAFT_SNAPSHOT_PREFIX = "draft_snapshot_v1";
+export const STAT_TRACKER_SNAPSHOT_PREFIX = "stat_tracker_snapshot_v1";
 
 export function readStoredActiveLeagueId(): string {
   if (typeof window === "undefined") return "";
@@ -171,6 +173,14 @@ export function leaderboardSnapshotKey(opts: { leagueId: string }): string {
   return `${LEADERBOARD_SNAPSHOT_PREFIX}:${opts.leagueId.trim()}`;
 }
 
+export function draftSnapshotKey(opts: { leagueId: string }): string {
+  return `${DRAFT_SNAPSHOT_PREFIX}:${opts.leagueId.trim()}`;
+}
+
+export function statTrackerSnapshotKey(opts: { leagueId: string }): string {
+  return `${STAT_TRACKER_SNAPSHOT_PREFIX}:${opts.leagueId.trim()}`;
+}
+
 export function readStoredSnapshot<T>(key: string, maxAgeMs: number): T | null {
   if (typeof window === "undefined") return null;
   try {
@@ -195,6 +205,10 @@ export function writeStoredSnapshot<T>(key: string, value: T): void {
       pruneSnapshotPrefix(PLAYER_STATS_SNAPSHOT_PREFIX, 24);
     } else if (key.startsWith(LEADERBOARD_SNAPSHOT_PREFIX)) {
       pruneSnapshotPrefix(LEADERBOARD_SNAPSHOT_PREFIX, 16);
+    } else if (key.startsWith(DRAFT_SNAPSHOT_PREFIX)) {
+      pruneSnapshotPrefix(DRAFT_SNAPSHOT_PREFIX, 12);
+    } else if (key.startsWith(STAT_TRACKER_SNAPSHOT_PREFIX)) {
+      pruneSnapshotPrefix(STAT_TRACKER_SNAPSHOT_PREFIX, 16);
     }
   } catch {
     /* private mode / quota */

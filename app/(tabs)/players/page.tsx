@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { PlayersPoolClient } from "./PlayersPoolClient";
 
 export const metadata: Metadata = {
-  title: "Player Statistics"
+  title: "Players"
 };
 
 type PageProps = {

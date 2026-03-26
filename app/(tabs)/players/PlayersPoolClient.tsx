@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, UsersRound, RefreshCcw, ShieldCheck } from "lucide-react";
 import {
   playerStatsSnapshotKey,
@@ -624,6 +624,7 @@ export function PlayersPoolClient({
   initialSeasonYear: number;
   initialQ: string;
 }) {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const leagueIdFromUrl = useMemo(() => searchParams.get("leagueId")?.trim() ?? "", [searchParams]);
 
@@ -638,6 +639,7 @@ export function PlayersPoolClient({
   const inFlightRef = useRef(false);
   const loadControllerRef = useRef<AbortController | null>(null);
   const etagRef = useRef<string | null>(null);
+  const lastLoadedAtRef = useRef(0);
   const [unchangedRefreshStreak, setUnchangedRefreshStreak] = useState(0);
 
   const effectiveLeagueId = leagueIdFromUrl || storedLeagueId;
@@ -668,11 +670,12 @@ export function PlayersPoolClient({
   }, [snapshotKey]);
 
   const load = useCallback(async (opts?: { manual?: boolean; force?: boolean; silent?: boolean }) => {
+    const force = opts?.force === true;
     if (inFlightRef.current) {
-      // Always replace stale in-flight requests so remount/effect re-runs (Strict Mode)
-      // cannot leave the page empty waiting for the next poll tick.
+      if (!force) return;
       loadControllerRef.current?.abort();
     }
+    if (!force && Date.now() - lastLoadedAtRef.current < 2500) return;
     const controller = new AbortController();
     loadControllerRef.current = controller;
     inFlightRef.current = true;
@@ -686,12 +689,13 @@ export function PlayersPoolClient({
       sp.set("limit", "8000");
       const lid = effectiveLeagueId.trim();
       if (lid) sp.set("leagueId", lid);
-      if (opts?.force) sp.set("refresh", "1");
+      if (force) sp.set("refresh", "1");
       const headers: Record<string, string> = {};
-      if (!opts?.force && etagRef.current) headers["If-None-Match"] = etagRef.current;
+      if (!force && etagRef.current) headers["If-None-Match"] = etagRef.current;
       const res = await fetch(`/api/players/pool?${sp.toString()}`, { signal: controller.signal, headers });
       if (res.status === 304) {
         setUnchangedRefreshStreak((n) => n + 1);
+        lastLoadedAtRef.current = Date.now();
         return;
       }
       const json = (await res.json()) as {
@@ -721,6 +725,7 @@ export function PlayersPoolClient({
         meta: nextMeta,
         etag: etagRef.current
       });
+      lastLoadedAtRef.current = Date.now();
     } catch (e: unknown) {
       if ((e as Error)?.name === "AbortError") return;
       setError(e instanceof Error ? e.message : "Load failed");
@@ -927,12 +932,12 @@ export function PlayersPoolClient({
               <UsersRound className="h-4 w-4 text-accent" />
             </div>
           </div>
-          <div className="min-w-0 text-center md:text-left">
-            <h1 className="stat-tracker-page-title text-center md:text-left">
+          <div className="min-w-0 text-center md:text-center">
+            <h1 className="stat-tracker-page-title text-center md:text-center">
               <span className="md:hidden">Players</span>
-              <span className="hidden md:inline">Player Statistics</span>
+              <span className="hidden md:inline">Players</span>
             </h1>
-              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block">
+              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block text-center">
                 {meta ? (
                   <>
                     {meta.lastSyncedAt ? `Synced ${new Date(meta.lastSyncedAt).toLocaleString()}` : "Synced —"}
@@ -966,7 +971,7 @@ export function PlayersPoolClient({
               className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm shrink-0 !p-1 !w-9 !h-9 flex items-center justify-center"
               onClick={() => {
                 const href = effectiveLeagueId ? `/commissioner?leagueId=${encodeURIComponent(effectiveLeagueId)}` : "/commissioner";
-                window.location.assign(href);
+                router.push(href);
               }}
               aria-label="Commissioner login"
             >
@@ -1085,7 +1090,7 @@ export function PlayersPoolClient({
                           None
                         </button>
                       </div>
-                      <div>
+                      <div className="max-h-56 overflow-y-auto">
                         {collegeTeamOptions.map((t) => {
                           const checked = selectedCollegeTeamsSet.has(t);
                           return (
@@ -1103,6 +1108,11 @@ export function PlayersPoolClient({
                             </label>
                           );
                         })}
+                      </div>
+                      <div className="mt-2 border-t border-border/50 pt-2">
+                        <button type="button" onClick={closeTeamPicker} className="pool-btn-ghost w-full">
+                          Done
+                        </button>
                       </div>
                     </div>
                   </>,
@@ -1160,6 +1170,11 @@ export function PlayersPoolClient({
                           </label>
                         );
                       })}
+                    </div>
+                    <div className="mt-2 border-t border-border/50 pt-2">
+                      <button type="button" onClick={closeOwnerPicker} className="pool-btn-ghost w-full">
+                        Done
+                      </button>
                     </div>
                   </div>
                 </>,

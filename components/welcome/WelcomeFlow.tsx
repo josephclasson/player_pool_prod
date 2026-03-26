@@ -168,7 +168,7 @@ export function WelcomeFlow() {
               href={`/stat-tracker?leagueId=${encodeURIComponent(existing.leagueId)}`}
               className="pool-btn-outline-cta text-xs flex-1 text-center"
             >
-              StatTracker
+              Scores
             </Link>
             <Link
               href={`/players?leagueId=${encodeURIComponent(existing.leagueId)}`}

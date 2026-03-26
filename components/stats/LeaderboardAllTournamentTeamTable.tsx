@@ -454,7 +454,6 @@ function EmptyHighlightTableRow({ showTppgColumns }: { showTppgColumns: boolean 
       <PoolTableTeamLogoCell url={null} teamName="" cellClassName="hidden md:table-cell" />
       <PoolTablePlayerPhotoCell urls={[]} playerName="" />
       <td className={`${dLeft} align-top pool-table-player-col`}>—</td>
-      <td className={`${d} hidden tabular-nums pool-table-col-group-end md:table-cell`}>—</td>
       <td className={d}>—</td>
       {showTppgColumns ? (
         <>
@@ -501,11 +500,6 @@ function LeaderboardPlayersHighlightTable({
   const leagueStatRanks = buildLeagueStatRanks(allTablePlayers);
   const filledRows = bodyRows.filter((p): p is TablePlayer => p != null);
   const footer = computeFooterTotals(filledRows, currentRound);
-  const overallSum = filledRows.reduce((sum, p) => sum + (p.overallSeed ?? 0), 0);
-  const hasAnyOverall = filledRows.some((p) => p.overallSeed != null);
-  const overallFooterDisplay: ReactNode =
-    filledRows.length === 0 || !hasAnyOverall ? "—" : <span className="tabular-nums font-semibold">{overallSum}</span>;
-
   const tppgFooterText =
     footer.tppgDeltaHasAny
       ? `${footer.tppgDeltaSum > 0 ? "+" : ""}${footer.tppgDeltaSum.toFixed(1)}`
@@ -566,12 +560,6 @@ function LeaderboardPlayersHighlightTable({
                 title="Player name and position; below — college team, regional pod seed, and drafting fantasy owner"
               >
                 Player
-              </th>
-              <th
-                className="hidden text-center pool-table-col-group-end md:table-cell"
-                title="NCAA tournament overall seed (S-curve) 1–68 from the selection committee"
-              >
-                Overall
               </th>
               <th className="text-center" title="Season points per game">
                 PPG
@@ -684,22 +672,6 @@ function LeaderboardPlayersHighlightTable({
                       />
                     </div>
                   </td>
-                  <td
-                    className="hidden px-1 py-2 text-center transition-colors tabular-nums pool-table-col-group-end md:table-cell"
-                    title={
-                      p.overallSeed != null
-                        ? `NCAA overall seed ${p.overallSeed} of 68 (selection committee S-curve)`
-                        : undefined
-                    }
-                  >
-                    <StatCellWithRank
-                      showRank={false}
-                      rank={leagueStatRanks.overallSeed.get(rowKey)}
-                      draftedCount={dc}
-                    >
-                      {p.overallSeed != null ? p.overallSeed : "—"}
-                    </StatCellWithRank>
-                  </td>
                   <td className="px-1 py-2 text-center transition-colors">
                     <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.ppg.get(rowKey)} draftedCount={dc}>
                       {p.seasonPpg.toFixed(1)}
@@ -801,11 +773,6 @@ function LeaderboardPlayersHighlightTable({
               </td>
               <td className="px-1 py-2 text-center text-[11px] font-normal tabular-nums opacity-90 align-middle leading-tight pool-table-col-group-end pool-table-player-col min-w-0">
                 {footer.remainingPlayers} remaining
-              </td>
-              <td className="hidden px-1 py-2 text-center font-semibold tabular-nums pool-table-col-group-end md:table-cell">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
-                  {overallFooterDisplay}
-                </StatCellWithRank>
               </td>
               <td className="px-1 py-2 text-center font-semibold">
                 <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
