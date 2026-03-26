@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   patchPlayerPoolSessionSeasonYear,
@@ -13,26 +13,21 @@ import { AppearancePicker } from "@/components/theme/AppearancePicker";
 import {
   type LucideIcon,
   BarChart3,
+  ChevronDown,
   GraduationCap,
   History,
   Menu,
+  Palette,
   Radio,
   ShieldCheck,
   Trophy,
   UsersRound
 } from "lucide-react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Suspense } from "react";
 import { LeagueIdentityBar } from "@/components/layout/LeagueIdentityBar";
 import { MainScrollContainerRefContext } from "@/components/layout/MainScrollContainerContext";
-import { PullToRefreshContainer } from "@/components/layout/PullToRefreshContainer";
 import { PoolSessionRoutes } from "@/components/layout/PoolSessionRoutes";
-
-/** Minimum content width used when layout has not measured yet (avoids absurd zoom). */
-const MOBILE_ZOOM_MIN_CONTENT_PX = 320;
-
-/** Match `max-w-6xl` (72rem) so mobile lays out like desktop, then shell zoom fits the canvas to the viewport. */
-const MOBILE_DESKTOP_CANVAS_MIN_PX = 1152;
 
 /**
  * Icons aligned with databallr.com/stats nav (same Lucide glyphs they ship) where applicable:
@@ -48,7 +43,7 @@ const navTabs: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/commissioner", label: "Commissioner Tools", icon: ShieldCheck }
 ];
 
-/** Mobile bottom bar: four primary destinations + “More” (ESPN-style). Labels shortened to fit fixed slots. */
+/** Mobile bottom bar: four primary destinations + “More” (ESPN-style). */
 const mobilePrimaryNav: readonly { href: string; label: string; icon: LucideIcon }[] = [
   { href: "/draft", label: "Draft", icon: GraduationCap },
   { href: "/stat-tracker", label: "Scores", icon: Radio },
@@ -57,6 +52,17 @@ const mobilePrimaryNav: readonly { href: string; label: string; icon: LucideIcon
 ];
 
 type MobileMoreItem = { href: string; label: string; subtitle: string; icon: LucideIcon };
+type MobileThemeKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "mono" | "crazy_people";
+const MOBILE_THEME_OPTIONS: Array<{ key: MobileThemeKey; label: string }> = [
+  { key: "red", label: "Red" },
+  { key: "orange", label: "Orange" },
+  { key: "yellow", label: "Yellow" },
+  { key: "green", label: "Green" },
+  { key: "blue", label: "Blue" },
+  { key: "purple", label: "Purple" },
+  { key: "mono", label: "Black & White" },
+  { key: "crazy_people", label: "Crazy People" }
+];
 
 function SidebarNav({
   pathname,
@@ -72,6 +78,7 @@ function SidebarNav({
   const [identityRev, setIdentityRev] = useState(0);
   /** Session lives in sessionStorage — must match SSR (no storage) on first paint to avoid hydration mismatch. */
   const [tournamentSubtitle, setTournamentSubtitle] = useState("March Madness");
+  const [seasonYear, setSeasonYear] = useState<number | null>(null);
 
   useEffect(() => {
     const onIdent = () => setIdentityRev((n) => n + 1);
@@ -81,11 +88,13 @@ function SidebarNav({
 
   useEffect(() => {
     const poolSession = readPlayerPoolSession();
-    setTournamentSubtitle(
+    const nextSeasonYear =
       poolSession?.seasonYear != null && Number.isFinite(poolSession.seasonYear)
-        ? `March Madness ${Math.trunc(poolSession.seasonYear)}`
-        : "March Madness"
-    );
+        ? Math.trunc(poolSession.seasonYear)
+        : null;
+
+    setSeasonYear(nextSeasonYear);
+    setTournamentSubtitle(nextSeasonYear != null ? `March Madness ${nextSeasonYear}` : "March Madness");
   }, [identityRev]);
 
   useEffect(() => {
@@ -178,6 +187,32 @@ function MobileBottomTabNav({
   moreItems: readonly MobileMoreItem[];
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
+  const [themesOpen, setThemesOpen] = useState(false);
+  const [mobileTheme, setMobileTheme] = useState<MobileThemeKey>("yellow");
+
+  useEffect(() => {
+    const raw = localStorage.getItem("theme-preference");
+    const normalized: MobileThemeKey =
+      raw === "red" ||
+      raw === "orange" ||
+      raw === "yellow" ||
+      raw === "green" ||
+      raw === "blue" ||
+      raw === "purple" ||
+      raw === "mono" ||
+      raw === "crazy_people"
+        ? raw
+        : raw === "indigo" || raw === "violet"
+          ? "purple"
+          : "yellow";
+    setMobileTheme(normalized);
+  }, []);
+
+  const applyMobileTheme = (theme: MobileThemeKey) => {
+    setMobileTheme(theme);
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("theme-preference", theme);
+  };
 
   useEffect(() => {
     if (!moreOpen) return;
@@ -192,6 +227,7 @@ function MobileBottomTabNav({
 
   useEffect(() => {
     setMoreOpen(false);
+    setThemesOpen(false);
   }, [pathname]);
 
   return (
@@ -258,7 +294,7 @@ function MobileBottomTabNav({
       </nav>
 
       {moreOpen ? (
-        <div className="md:hidden fixed inset-0 z-[45] flex flex-col justify-end" role="presentation">
+        <div className="md:hidden absolute inset-0 z-[45] flex flex-col justify-end" role="presentation">
           <button
             type="button"
             className="absolute inset-0 bg-black/55"
@@ -300,6 +336,52 @@ function MobileBottomTabNav({
                   </li>
                 );
               })}
+              <li>
+                <button
+                  type="button"
+                  onClick={() => setThemesOpen((v) => !v)}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors text-foreground hover:bg-muted/40"
+                  aria-expanded={themesOpen}
+                  aria-controls="mobile-more-themes-panel"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-background/40">
+                      <Palette className="h-4 w-4" aria-hidden />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold leading-tight">Themes</span>
+                      <span className="mt-0.5 block text-[11px] leading-snug text-foreground/45">
+                        Select mobile appearance
+                      </span>
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-foreground/45" aria-hidden>
+                    <ChevronDown className={["h-4 w-4 transition-transform", themesOpen ? "rotate-180" : ""].join(" ")} />
+                  </span>
+                </button>
+                {themesOpen ? (
+                  <div id="mobile-more-themes-panel" className="rounded-xl border border-border/50 bg-background/40 px-2 py-1.5">
+                    <div className="grid grid-cols-3 gap-1">
+                      {MOBILE_THEME_OPTIONS.map((t) => (
+                        <button
+                          key={t.key}
+                          type="button"
+                          onClick={() => applyMobileTheme(t.key)}
+                          className={[
+                            "rounded-md border px-2 py-1 text-[11px] font-semibold transition-colors",
+                            mobileTheme === t.key
+                              ? "border-accent/45 bg-accent/15 text-accent"
+                              : "border-border/50 bg-background/40 text-foreground/75 hover:bg-muted/40"
+                          ].join(" ")}
+                          aria-pressed={mobileTheme === t.key}
+                        >
+                          {t.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </li>
             </ul>
           </div>
         </div>
@@ -308,28 +390,14 @@ function MobileBottomTabNav({
   );
 }
 
-function measureMobileContentWidthPx(el: HTMLElement): number {
-  const prevZoom = el.style.zoom;
-  el.style.zoom = "1";
-  void el.offsetWidth;
-  let w = el.scrollWidth;
-  for (const t of el.querySelectorAll("table.pool-table")) {
-    w = Math.max(w, (t as HTMLElement).scrollWidth);
-  }
-  if (prevZoom) el.style.zoom = prevZoom;
-  else el.style.removeProperty("zoom");
-  return Math.max(w, MOBILE_ZOOM_MIN_CONTENT_PX);
-}
-
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const mainScrollRef = useRef<HTMLDivElement>(null);
-  const mobileZoomContentRef = useRef<HTMLDivElement>(null);
-  const mobileZoomDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [commUnlocked, setCommUnlocked] = useState(() => readCommissionerSecretFromSession().length > 0);
-  const [mobileFitZoom, setMobileFitZoom] = useState(1);
+  /** Must match SSR (no sessionStorage); existing effect syncs after mount. */
+  const [commUnlocked, setCommUnlocked] = useState(false);
+  const [seasonYear, setSeasonYear] = useState<number | null>(null);
 
   useEffect(() => {
     const sync = () => setCommUnlocked(readCommissionerSecretFromSession().length > 0);
@@ -342,43 +410,22 @@ export function AppShell({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const scheduleMobileZoomMeasure = useCallback(() => {
-    if (mobileZoomDebounceRef.current) clearTimeout(mobileZoomDebounceRef.current);
-    mobileZoomDebounceRef.current = setTimeout(() => {
-      mobileZoomDebounceRef.current = null;
-      const mobileMq = window.matchMedia("(max-width: 767px)");
-      if (!mobileMq.matches) {
-        setMobileFitZoom(1);
-        return;
-      }
-      // Mobile: keep layout fluid (no shell scaling). Tables/overflow rules handle fitting.
-      setMobileFitZoom(1);
-    }, 50);
-  }, []);
-
-  useLayoutEffect(() => {
-    scheduleMobileZoomMeasure();
-  }, [pathname, scheduleMobileZoomMeasure]);
-
-  useLayoutEffect(() => {
-    const mobileMq = window.matchMedia("(max-width: 767px)");
-    if (!mobileMq.matches) return;
-    const outer = mainScrollRef.current;
-    const inner = mobileZoomContentRef.current;
-    if (!inner) return;
-    const ro = new ResizeObserver(() => scheduleMobileZoomMeasure());
-    ro.observe(inner);
-    if (outer) ro.observe(outer);
-    window.addEventListener("resize", scheduleMobileZoomMeasure);
-    const vv = window.visualViewport;
-    vv?.addEventListener("resize", scheduleMobileZoomMeasure);
-    return () => {
-      ro.disconnect();
-      window.removeEventListener("resize", scheduleMobileZoomMeasure);
-      vv?.removeEventListener("resize", scheduleMobileZoomMeasure);
-      if (mobileZoomDebounceRef.current) clearTimeout(mobileZoomDebounceRef.current);
+  useEffect(() => {
+    // Keep the initial server-render hidden (no sessionStorage access) to avoid hydration mismatch.
+    const sync = () => {
+      const s = readPlayerPoolSession();
+      const next =
+        s?.seasonYear != null && Number.isFinite(s.seasonYear) ? Math.trunc(s.seasonYear) : null;
+      setSeasonYear(next);
     };
-  }, [pathname, scheduleMobileZoomMeasure]);
+    window.addEventListener(PLAYER_POOL_IDENTITY_CHANGE_EVENT, sync);
+    window.addEventListener("focus", sync);
+    sync();
+    return () => {
+      window.removeEventListener(PLAYER_POOL_IDENTITY_CHANGE_EVENT, sync);
+      window.removeEventListener("focus", sync);
+    };
+  }, []);
 
   const navTabsEffective = commUnlocked
     ? navTabs
@@ -411,12 +458,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   };
 
-  const mobileShellZoomStyle: CSSProperties | undefined =
-    mobileFitZoom < 0.999 ? { zoom: mobileFitZoom } : undefined;
-
   return (
     <div className="safe-area-wrapper flex h-dvh min-h-0 w-full flex-col overflow-hidden text-foreground md:min-h-screen md:h-auto md:overflow-visible">
-      <div className="flex min-h-0 flex-1 flex-col overflow-hidden md:flex-row md:overflow-visible">
+      <div className="flex min-h-0 flex-1 flex-col items-stretch overflow-hidden md:flex-row md:overflow-visible">
         <SidebarNav
           pathname={pathname}
           onNavigate={navigateWithLeague}
@@ -424,47 +468,52 @@ export function AppShell({ children }: { children: ReactNode }) {
           compactFooter={pathname !== "/"}
         />
 
-        <main className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <div
-            className={
-              pathname === "/"
-                ? "flex min-h-0 flex-1 flex-col px-0 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-2 max-w-6xl mx-auto w-full md:px-6 md:pb-4"
-                : "flex min-h-0 flex-1 flex-col px-0 pb-[calc(52px+env(safe-area-inset-bottom,0px))] pt-1 max-w-6xl mx-auto w-full md:px-5 md:py-2 md:pb-2"
-            }
-          >
-            {pathname === "/" ? (
-              <div className="hidden md:flex justify-end items-center gap-2 mb-1 min-h-[2.25rem] shrink-0">
-                <AppearancePicker />
-              </div>
-            ) : null}
-            <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:min-w-0 md:overflow-visible">
-              <Suspense fallback={null}>
-                <PoolSessionRoutes />
-                <LeagueIdentityBar />
-              </Suspense>
-              <MainScrollContainerRefContext.Provider value={mainScrollRef}>
-                <PullToRefreshContainer
-                  scrollRef={mainScrollRef}
-                  className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden md:min-h-0 md:overflow-x-visible md:overflow-visible"
-                >
-                  <div
-                    ref={mobileZoomContentRef}
-                    className={[
-                      "flex min-h-0 flex-col w-full min-w-0",
-                      "md:min-h-0 md:min-w-0 md:flex-1 md:w-full"
-                    ].join(" ")}
-                    style={mobileShellZoomStyle}
-                  >
-                    {children}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-hidden">
+            <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+              <div
+                className={
+                  pathname === "/"
+                    ? "flex min-h-0 flex-1 flex-col px-0 pt-2 max-w-6xl mx-auto w-full md:px-6 md:pb-4"
+                    : "flex min-h-0 flex-1 flex-col px-0 pt-1 max-w-6xl mx-auto w-full md:px-5 md:py-2 md:pb-2"
+                }
+              >
+                {pathname === "/" ? (
+                  <div className="hidden md:flex justify-end items-center gap-2 mb-1 min-h-[2.25rem] shrink-0">
+                    <AppearancePicker />
                   </div>
-                </PullToRefreshContainer>
-              </MainScrollContainerRefContext.Provider>
-            </div>
-          </div>
-        </main>
-      </div>
+                ) : null}
+                <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:min-w-0 md:overflow-visible">
+                  <Suspense fallback={null}>
+                    <PoolSessionRoutes />
+                    <div className="hidden md:block">
+                      <LeagueIdentityBar />
+                    </div>
+                  </Suspense>
+                  <MainScrollContainerRefContext.Provider value={mainScrollRef}>
+                    <div
+                      ref={mainScrollRef}
+                      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overflow-x-hidden overscroll-y-contain pb-[calc(86px+env(safe-area-inset-bottom,0px))] md:min-h-0 md:overflow-x-visible md:overflow-visible md:pb-0"
+                    >
+                      <div className="flex min-h-0 w-full min-w-0 flex-col md:min-h-0 md:min-w-0 md:flex-1 md:w-full">
+                        {children}
+                        {seasonYear != null ? (
+                          <div className="pt-6 pb-2 text-center text-[10px] text-foreground/40 space-y-0.5">
+                            <div>Player Pool {seasonYear}</div>
+                            <div>© {seasonYear} Player Pool. All rights reserved.</div>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  </MainScrollContainerRefContext.Provider>
+                </div>
+              </div>
+            </main>
 
-      <MobileBottomTabNav pathname={pathname} onNavigate={navigateWithLeague} moreItems={mobileMoreItems} />
+            <MobileBottomTabNav pathname={pathname} onNavigate={navigateWithLeague} moreItems={mobileMoreItems} />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

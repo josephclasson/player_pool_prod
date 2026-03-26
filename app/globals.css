@@ -8,7 +8,7 @@
 
 /* Theme tokens (RGB triples) used by Tailwind via tailwind.config.ts */
 :root {
-  --theme-background: 5 7 17; /* #050711 */
+  --theme-background: 6 6 8; /* near-black */
   --theme-foreground: 249 250 251; /* #F9FAFB */
   --theme-muted: 17 24 39; /* #111827 */
   --theme-accent: 37 99 235; /* #2563EB */
@@ -18,20 +18,20 @@
   --theme-success: 34 197 94; /* #22C55E */
   --theme-warning: 249 115 22; /* #F97316 */
 
-  --theme-gradient-top: 31 41 55; /* #1f2937 */
-  --theme-gradient-mid: 2 6 23; /* #020617 */
+  --theme-gradient-top: 24 24 28;
+  --theme-gradient-mid: 8 8 12;
   --theme-gradient-bottom: 0 0 0; /* #000000 */
 
   /*
    * Databallr.com/stats base chrome (fixed RGB — NOT overridden by theme switcher).
    * Grey header bands + gold primary columns / owner bar.
    */
-  --pool-stats-bg-odd: 27 33 44;
-  --pool-stats-bg-even: 34 41 54;
-  --pool-stats-header-bg: 48 55 70;
-  --pool-stats-header-label: 163 171 186;
+  --pool-stats-bg-odd: 18 18 20;
+  --pool-stats-bg-even: 28 28 32;
+  --pool-stats-header-bg: 38 38 42;
+  --pool-stats-header-label: 170 170 176;
   --pool-stats-accent: 255 200 87;
-  --pool-stats-border: 52 60 74;
+  --pool-stats-border: 78 78 84;
   --pool-stats-body-text: 248 250 252;
 }
 
@@ -72,17 +72,22 @@ html[data-theme="orange"] {
 
 html[data-theme="yellow"] {
   color-scheme: dark;
-  --theme-background: 27 33 44; /* #1b212c */
-  --theme-muted: 40 47 60;
+  --theme-background: 10 10 12;
+  --theme-muted: 30 30 34;
   --theme-border: 52 60 74;
   --theme-accent: 255 200 87;
   --theme-accent-soft: 56 189 248;
   --theme-foreground: 250 250 250;
   --theme-danger: 251 113 133;
   --theme-success: 74 222 128;
-  --theme-gradient-top: 36 42 54;
-  --theme-gradient-mid: 27 33 44;
-  --theme-gradient-bottom: 20 24 32;
+  --theme-gradient-top: 30 30 36;
+  --theme-gradient-mid: 12 12 16;
+  --theme-gradient-bottom: 2 2 4;
+  --pool-stats-bg-odd: 18 18 20;
+  --pool-stats-bg-even: 28 28 32;
+  --pool-stats-header-bg: 38 38 42;
+  --pool-stats-header-label: 170 170 176;
+  --pool-stats-border: 78 78 84;
   --pool-stats-accent: 255 200 87;
 }
 
@@ -134,12 +139,137 @@ html[data-theme="purple"] {
   --pool-stats-accent: 192 132 252;
 }
 
+html[data-theme="mono"] {
+  color-scheme: dark;
+  --theme-background: 8 8 8;
+  --theme-muted: 34 34 34;
+  --theme-border: 86 86 86;
+  --theme-accent: 245 245 245;
+  --theme-accent-soft: 209 209 209;
+  --theme-foreground: 250 250 250;
+  --theme-danger: 251 113 133;
+  --theme-success: 74 222 128;
+  --theme-gradient-top: 28 28 28;
+  --theme-gradient-mid: 8 8 8;
+  --theme-gradient-bottom: 0 0 0;
+  --pool-stats-bg-odd: 10 10 10;
+  --pool-stats-bg-even: 22 22 22;
+  --pool-stats-header-bg: 32 32 32;
+  --pool-stats-header-label: 178 178 178;
+  --pool-stats-accent: 245 245 245;
+  --pool-stats-border: 74 74 74;
+  --pool-stats-body-text: 245 245 245;
+}
+
+html[data-theme="crazy_people"] {
+  color-scheme: light;
+  --theme-background: 248 248 249;
+  --theme-foreground: 18 18 20;
+  --theme-muted: 234 234 236;
+  --theme-accent: 38 38 38;
+  --theme-accent-soft: 92 92 96;
+  --theme-border: 198 198 204;
+  --theme-danger: 220 38 38;
+  --theme-success: 22 163 74;
+  --theme-warning: 217 119 6;
+  --theme-gradient-top: 255 255 255;
+  --theme-gradient-mid: 245 245 247;
+  --theme-gradient-bottom: 232 232 235;
+  --pool-stats-bg-odd: 246 246 248;
+  --pool-stats-bg-even: 236 236 239;
+  --pool-stats-header-bg: 226 226 231;
+  --pool-stats-header-label: 62 62 70;
+  --pool-stats-accent: 24 24 28;
+  --pool-stats-border: 190 190 196;
+  --pool-stats-body-text: 24 24 27;
+}
+
+html[data-theme="crazy_people"] .stat-tracker-page-title {
+  color: rgb(245 245 248);
+}
+
+html[data-theme="crazy_people"] .pool-hero,
+html[data-theme="crazy_people"] .pool-hero-databallr,
+html[data-theme="crazy_people"] .pool-card-header,
+html[data-theme="crazy_people"] .pool-owner-header {
+  background: rgb(26 26 30 / 0.9) !important;
+  color: rgb(245 245 248) !important;
+  border-color: rgb(62 62 70 / 0.9) !important;
+}
+
+html[data-theme="crazy_people"] .pool-owner-header .pool-owner-rank,
+html[data-theme="crazy_people"] .pool-owner-header .pool-owner-name,
+html[data-theme="crazy_people"] .pool-owner-header .pool-owner-chevron,
+html[data-theme="crazy_people"] .pool-owner-header .pool-owner-header-stat-meta {
+  color: rgb(245 245 248) !important;
+}
+
+html[data-theme="crazy_people"] .pool-hero .h-9.w-9.rounded-md[aria-hidden] {
+  border-color: rgb(var(--pool-stats-border) / 0.75) !important;
+  background: rgb(var(--pool-stats-bg-even) / 0.35) !important;
+}
+
+html[data-theme="crazy_people"] .pool-hero .h-9.w-9.rounded-md[aria-hidden] svg {
+  color: rgb(245 245 248) !important;
+}
+
+html[data-theme="crazy_people"] .pool-owner-header .pool-view-tab,
+html[data-theme="crazy_people"] .pool-owner-header .pool-view-tab:hover,
+html[data-theme="crazy_people"] .pool-owner-header .pool-view-tab[aria-pressed="true"] {
+  color: rgb(245 245 248) !important;
+}
+
+html[data-theme="crazy_people"] .pool-owner-header .pool-view-tab[aria-pressed="true"] {
+  border-bottom-color: rgb(245 245 248) !important;
+}
+
+html[data-theme="crazy_people"] .pool-table thead th.pool-table-col-primary {
+  background: rgb(205 205 212 / 0.74);
+  color: rgb(22 22 28);
+}
+
+html[data-theme="crazy_people"] .pool-table tbody tr.pool-table-row:nth-child(odd) td.pool-table-col-primary {
+  background: rgb(198 198 206 / 0.45);
+  color: rgb(22 22 28);
+}
+
+html[data-theme="crazy_people"] .pool-table tbody tr.pool-table-row:nth-child(even) td.pool-table-col-primary {
+  background: rgb(198 198 206 / 0.4);
+  color: rgb(22 22 28);
+}
+
+html[data-theme="crazy_people"] .pool-table tbody tr.pool-table-footer-row td.pool-table-col-primary,
+html[data-theme="crazy_people"] .pool-table tfoot tr.pool-table-footer-row td.pool-table-col-primary {
+  background: rgb(205 205 212 / 0.82);
+  color: rgb(22 22 28);
+}
+
+html[data-theme="crazy_people"] .pool-table thead th,
+html[data-theme="crazy_people"] .pool-table thead tr.pool-table-group-header th {
+  color: rgb(24 24 28);
+}
+
+html[data-theme="crazy_people"] .pool-table tbody tr.pool-table-row td:not(:first-child):not(.pool-table-player-col):not(.pool-table-col-primary):not(.text-left):not(.align-top) {
+  color: rgb(32 32 38);
+}
+
+html[data-theme="crazy_people"] .pool-table tbody tr.pool-table-footer-row td,
+html[data-theme="crazy_people"] .pool-table tfoot tr.pool-table-footer-row td {
+  color: rgb(24 24 28) !important;
+}
+
+html[data-theme="crazy_people"] .pool-table tbody td.pool-table-col-primary .pool-inline-rank {
+  color: rgb(40 40 46) !important;
+}
+
 html[data-theme="red"] body,
 html[data-theme="orange"] body,
 html[data-theme="yellow"] body,
 html[data-theme="green"] body,
 html[data-theme="blue"] body,
-html[data-theme="purple"] body {
+html[data-theme="purple"] body,
+html[data-theme="mono"] body,
+html[data-theme="crazy_people"] body {
   font-family: var(--font-databallr, "DM Sans"), system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
@@ -148,7 +278,9 @@ html[data-theme="orange"] .sleeper-score-font,
 html[data-theme="yellow"] .sleeper-score-font,
 html[data-theme="green"] .sleeper-score-font,
 html[data-theme="blue"] .sleeper-score-font,
-html[data-theme="purple"] .sleeper-score-font {
+html[data-theme="purple"] .sleeper-score-font,
+html[data-theme="mono"] .sleeper-score-font,
+html[data-theme="crazy_people"] .sleeper-score-font {
   font-family: var(--font-databallr, "DM Sans"), system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1;
@@ -223,12 +355,21 @@ body {
 }
 
 .pool-table {
-  width: 100%;
   border-collapse: separate;
   border-spacing: 0;
   border: 1px solid rgb(var(--pool-stats-border) / 0.42);
   border-radius: 0.375rem;
   overflow: hidden;
+  /* Columns size to cell content; table at least full width of container. */
+  table-layout: auto;
+  width: max-content;
+  min-width: 100%;
+}
+
+/* Draft / commissioner grids that need sticky columns and predictable widths */
+.pool-table.pool-table-fixed {
+  table-layout: fixed;
+  width: 100%;
 }
 
 /* Embedded in collapsed owner strip — one outer border only */
@@ -246,42 +387,43 @@ body {
 }
 
 .pool-table.pool-table-collapsed-summary {
-  table-layout: fixed;
+  table-layout: auto;
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .pool-table.pool-table-collapsed-summary thead th {
   white-space: nowrap;
-  padding: 0.3rem 0.12rem;
-  font-size: 0.5rem;
-  line-height: 1.12;
+  padding: 0.2rem 0.2rem;
+  font-size: 0.5625rem;
+  line-height: 1.1;
   letter-spacing: 0.04em;
+  overflow: visible;
+  text-overflow: clip;
+  vertical-align: middle;
+}
+
+@media (min-width: 640px) {
+  .pool-table.pool-table-collapsed-summary thead th {
+    font-size: 0.625rem;
+    padding: 0.22rem 0.25rem;
+  }
+}
+
+.pool-table.pool-table-collapsed-summary tbody td {
+  padding: 0.2rem 0.2rem;
+  font-size: 0.5625rem;
+  line-height: 1.1;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 @media (min-width: 640px) {
-  .pool-table.pool-table-collapsed-summary thead th {
-    font-size: 0.5625rem;
-    padding: 0.35rem 0.18rem;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-
-.pool-table.pool-table-collapsed-summary tbody td {
-  padding: 0.28rem 0.12rem;
-  font-size: 0.5625rem;
-  line-height: 1.15;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-}
-
-@media (min-width: 640px) {
   .pool-table.pool-table-collapsed-summary tbody td {
     font-size: 0.625rem;
-    padding: 0.32rem 0.18rem;
+    padding: 0.22rem 0.25rem;
   }
 }
 
@@ -292,14 +434,16 @@ body {
 
 .pool-table thead th {
   background-color: rgb(var(--pool-stats-header-bg));
-  color: rgb(var(--pool-stats-header-label));
+  color: rgb(255 255 255 / 0.92);
   border-bottom: 1px solid rgb(var(--pool-stats-border) / 0.95);
-  font-weight: 600;
-  font-size: 0.625rem;
-  line-height: 1.2;
+  font-weight: 400;
+  /* Match footer-row `td` sizing (which inherits table font sizing). */
+  font-size: inherit;
+  line-height: inherit;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  padding: 0.5rem 0.5rem;
+  /* Match footer-row cell padding for consistent header/footer sizing. */
+  padding: 0.25rem 0.35rem;
   vertical-align: middle;
   white-space: nowrap;
   transition: color 0.3s ease, background-color 0.3s ease;
@@ -308,11 +452,11 @@ body {
 /* Leaderboard (and similar): merged column-group labels above sortable headers */
 .pool-table thead tr.pool-table-group-header th {
   border-bottom: 1px solid rgb(var(--pool-stats-border) / 0.65);
-  font-size: 0.5625rem;
+  font-size: inherit;
   letter-spacing: 0.08em;
-  padding-top: 0.35rem;
-  padding-bottom: 0.35rem;
-  color: rgb(var(--pool-stats-header-label) / 0.88);
+  padding: 0.25rem 0.35rem;
+  line-height: inherit;
+  color: rgb(255 255 255 / 0.88);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -337,7 +481,13 @@ body {
 .pool-table thead th button {
   font: inherit;
   color: inherit;
+  font-weight: 400 !important;
   text-transform: uppercase;
+  padding: 0;
+  margin: 0;
+  line-height: inherit;
+  min-height: 0;
+  min-width: 0;
 }
 
 /* Databallr-style: any column header goes gold on hover (mouse only) */
@@ -367,10 +517,38 @@ body {
 
 .pool-table tbody td {
   color: rgb(var(--pool-stats-body-text) / 0.92);
-  padding: 0.45rem 0.5rem;
+  padding: 0.25rem 0.35rem;
   vertical-align: middle;
   border-bottom: 1px solid rgb(var(--pool-stats-border) / 0.45);
   transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  white-space: nowrap;
+}
+
+/* Standard numeric/value cells: use softer gray (exclude key identity/primary columns). */
+.pool-table tbody tr.pool-table-row td:not(:first-child):not(.pool-table-player-col):not(.pool-table-col-primary):not(.text-left):not(.align-top) {
+  color: rgb(var(--pool-stats-header-label) / 0.9);
+}
+
+/* Player / notes cells: sublines under name stay multi-line */
+.pool-table tbody td.align-top {
+  white-space: normal;
+  vertical-align: top;
+}
+
+/* Fixed-ish player column: long names ellipsize instead of stretching the table */
+.pool-table thead th.pool-table-player-col,
+.pool-table tbody td.pool-table-player-col {
+  width: 9.25rem;
+  max-width: 9.25rem;
+  box-sizing: border-box;
+}
+
+@media (min-width: 768px) {
+  .pool-table thead th.pool-table-player-col,
+  .pool-table tbody td.pool-table-player-col {
+    width: 12rem;
+    max-width: 12rem;
+  }
 }
 
 /*
@@ -524,6 +702,13 @@ body {
   border-bottom: none;
   font-weight: 600;
   color: rgb(255 255 255 / 0.95) !important;
+  white-space: nowrap;
+}
+
+/* Footer “totals” narrative (e.g. remaining players) can wrap */
+.pool-table tbody tr.pool-table-footer-row td.text-left,
+.pool-table tfoot tr.pool-table-footer-row td.text-left {
+  white-space: normal;
 }
 
 /* Total + projection columns stay gold */
@@ -549,6 +734,7 @@ body {
   color: rgb(var(--pool-stats-header-label));
   border-bottom: none;
   text-align: center;
+  white-space: normal;
 }
 
 /*
@@ -901,11 +1087,16 @@ body {
 }
 
 @media (max-width: 768px) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+
   .safe-area-wrapper {
     padding-top: env(safe-area-inset-top);
     padding-left: env(safe-area-inset-left);
     padding-right: env(safe-area-inset-right);
-    /* Bottom inset is handled by the fixed mobile tab bar + main content padding. */
+    /* Bottom inset: fixed tab bar sits above safe area; scroll padding handled in AppShell. */
     padding-bottom: 0;
   }
 
@@ -946,6 +1137,29 @@ body {
     min-height: 44px;
     min-width: 44px;
     touch-action: manipulation;
+  }
+
+  /* Table section headers (e.g. Leaderboard expand/collapse) must be thinner than tap-target buttons. */
+  .pool-owner-header {
+    min-height: unset !important;
+    min-width: unset !important;
+  }
+
+  /* Top-right refresh/commissioner icon buttons: match title icon size exactly. */
+  .pool-top-icon-btn {
+    min-height: 2.25rem !important;
+    min-width: 2.25rem !important;
+    height: 2.25rem !important;
+    width: 2.25rem !important;
+    padding: 0.25rem !important;
+  }
+
+  /* StatTracker BASE/PROJ view tabs: compact, but with minimum touch target. */
+  .stattracker-view-toggle {
+    min-height: 30px !important;
+    min-width: unset !important;
+    display: inline-flex !important;
+    align-items: center;
   }
 
   .pool-btn-ghost,
@@ -1020,19 +1234,134 @@ body {
     border-radius: 12px;
   }
 
-  /* Mobile table density: smaller cell padding so more columns fit. */
-  .pool-table thead th {
-    padding: 0.2rem 0.25rem !important;
+  /*
+   * Mobile tables: intrinsic column widths, no wrap, compact header band;
+   * sort buttons skip the global 44px min-height. Horizontal scroll when needed.
+   */
+  .pool-table:not(.pool-table-fixed) {
+    table-layout: auto !important;
+    width: max-content !important;
+    min-width: 100% !important;
+    font-size: 0.75rem !important;
+    line-height: 1.12 !important;
   }
 
-  .pool-table tbody td {
-    padding: 0.25rem 0.25rem !important;
+  .pool-table.pool-table-fixed {
+    width: 100% !important;
+    min-width: 0 !important;
   }
 
-  /* ESPN-like mobile table behavior (condensed, fixed width canvas, sticky header). */
-  .pool-table {
+  /* Player Statistics: make mobile columns feel "fitted" (like StatTracker tables). */
+  .pool-table.pool-players-stat-table {
     table-layout: fixed !important;
     width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Player Statistics: slightly narrower player column on mobile so rounds/TOT fit better. */
+  .pool-table.pool-players-stat-table thead th.pool-table-player-col,
+  .pool-table.pool-players-stat-table tbody td.pool-table-player-col {
+    width: 6.6rem !important;
+    max-width: 6.6rem !important;
+  }
+
+  /* Player Statistics: compact search row (match Active Only/Owner/Team chips). */
+  .pool-players-filters .pool-players-search-shell {
+    min-height: 1.75rem !important;
+  }
+
+  .pool-players-filters .pool-players-search-shell .pool-filter-label {
+    min-height: 1.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    font-size: 0.6875rem !important;
+    line-height: 1.25 !important;
+  }
+
+  .pool-players-filters .pool-players-search-shell input.pool-players-search-input {
+    min-height: 1.75rem !important;
+    height: 1.75rem !important;
+    max-height: 1.75rem !important;
+    padding: 0.25rem 0.5rem !important;
+    border-radius: 0 !important;
+    font-size: 0.6875rem !important;
+    line-height: 1.25 !important;
+    -webkit-appearance: none !important;
+    appearance: none !important;
+  }
+
+  /* Players page: distribute Active/Owner/Team evenly across row on mobile. */
+  .pool-players-toolbar {
+    display: grid !important;
+    grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+    width: 100% !important;
+    gap: 0.5rem !important;
+    align-items: stretch !important;
+  }
+
+  .pool-players-toolbar > * {
+    min-width: 0 !important;
+    width: 100% !important;
+  }
+
+  .pool-players-toolbar .pool-filter-chip,
+  .pool-players-toolbar .pool-filter-select {
+    width: 100% !important;
+    justify-content: space-between !important;
+  }
+
+  .pool-players-toolbar .pool-filter-chip {
+    width: auto !important;
+    padding: 0.2rem 0.4rem !important;
+    gap: 0.35rem !important;
+  }
+
+  /* Players table: reclaim a bit of horizontal space inside the card on mobile. */
+  .pool-players-table-card {
+    padding-left: 0.2rem !important;
+    padding-right: 0.2rem !important;
+  }
+
+  /* Players mobile: ensure header band fully fills through the final TOT column. */
+  .pool-table.pool-players-stat-table thead tr {
+    background-color: rgb(var(--pool-stats-header-bg)) !important;
+  }
+
+  .pool-table.pool-players-stat-table thead th:last-child {
+    background-color: rgb(var(--pool-stats-header-bg)) !important;
+    padding-right: 0.18rem !important;
+  }
+
+  .pool-table.pool-players-stat-table thead th {
+    font-size: 0.70rem !important;
+  }
+
+  .pool-table.pool-players-stat-table thead th:last-child {
+    font-size: 0.66rem !important;
+  }
+
+  .pool-table thead tr,
+  .pool-table thead th {
+    vertical-align: middle !important;
+  }
+
+  .pool-players-toolbar .pool-filter-select-trigger {
+    min-width: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+  }
+
+  /* Draft results tables: mobile columns should fit to text (intrinsic). */
+  .pool-table.pool-draft-results-table {
+    table-layout: auto !important;
+    width: max-content !important;
+    min-width: 100% !important;
+    max-width: none !important;
+  }
+
+  .pool-table.pool-table-collapsed-summary {
+    width: 100% !important;
+    max-width: 100% !important;
     min-width: 0 !important;
   }
 
@@ -1041,31 +1370,232 @@ body {
     top: 0;
     z-index: 4;
     background-color: rgb(var(--pool-stats-header-bg));
-  }
-
-  .pool-table thead th,
-  .pool-table thead th button {
+    /* Match footer-row cell sizing on mobile. */
+    padding: 0.10rem 0.12rem !important;
+    min-height: 2rem !important;
     min-width: 0 !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    max-width: none !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    /* Match footer-row font sizing (footer `td` inherits from table). */
+    font-size: inherit !important;
+    line-height: inherit !important;
+    border-bottom: 1px solid rgb(var(--pool-stats-border) / 0.55) !important;
   }
 
-  /* Allow data cells to wrap instead of truncating so mobile looks like ESPN boxscore. */
+  /* Collapsed summary keeps explicit small typography; don't let the global `inherit` shrink/expand it. */
+  .pool-table.pool-table-collapsed-summary thead th {
+    font-size: 0.5625rem !important;
+    line-height: 1.1 !important;
+  }
+
+  .pool-table thead th button {
+    min-height: unset !important;
+    min-width: 0 !important;
+    padding: 0 !important;
+    white-space: nowrap !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
   .pool-table tbody td,
   .pool-table tfoot td,
   .pool-table tfoot th {
+    padding: 0.10rem 0.12rem !important;
     min-width: 0 !important;
-    white-space: normal;
-    overflow: visible;
-    text-overflow: clip;
-    overflow-wrap: anywhere;
-    word-break: break-word;
+    max-width: none !important;
+    height: auto !important;
+    min-height: 2rem !important;
+    vertical-align: middle !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    border-bottom: 1px solid rgb(var(--pool-stats-border) / 0.28) !important;
+  }
+
+  /* Tighter player column + less gap before the first stat column (e.g. PPG) on small screens */
+  .pool-table thead th.pool-table-player-col,
+  .pool-table tbody td.pool-table-player-col {
+    width: 7.35rem !important;
+    max-width: 7.35rem !important;
+    min-width: 0 !important;
+    padding-left: 0.10rem !important;
+    padding-right: 0.04rem !important;
+    box-sizing: border-box !important;
+  }
+
+  .pool-table tbody td.align-top {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    height: auto !important;
+    min-height: 2.25rem !important;
+  }
+
+  .pool-table tbody tr.pool-table-footer-row td.text-left,
+  .pool-table tfoot tr.pool-table-footer-row td.text-left {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+  }
+
+  /* Editable / form cells (e.g. commissioner roster): don’t clip inputs. */
+  .pool-table tbody td:has(input, textarea, select, .pool-field) {
+    height: auto !important;
+    min-height: 2.25rem !important;
+    overflow: visible !important;
+    white-space: normal !important;
+    text-overflow: clip !important;
+  }
+
+  .pool-table tbody tr.pool-table-row:last-child td,
+  .pool-table tbody tr.pool-table-empty:last-child td {
+    border-bottom: none !important;
+  }
+
+  .pool-table tbody tr.pool-table-empty td {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    height: auto !important;
+    min-height: 2.5rem !important;
+    border-bottom: none !important;
+  }
+
+  /* Collapsed summary strip: match non-wrapping mobile table cells */
+  .pool-table.pool-table-collapsed-summary tbody td {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    overflow-wrap: normal !important;
+    word-break: normal !important;
+    height: auto !important;
+    min-height: 1.5rem !important;
+  }
+
+  /* Allow horizontal scroll when nowrap columns exceed the viewport width. */
+  .pool-table-viewport {
+    overflow-x: auto !important;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+    padding-bottom: 2px;
+  }
+
+  .pool-collapsed-table-wrap {
+    overflow-x: hidden !important;
+  }
+
+  /* Drop light vertical rules and hover outlines on small screens */
+  .pool-table thead th.pool-table-col-group-end,
+  .pool-table tbody tr:not(.pool-table-footer-row) td.pool-table-col-group-end,
+  .pool-table tbody tr:not(.pool-table-footer-row) td.pool-table-col-total-divider {
+    border-right: none !important;
+  }
+
+  /* Hover outline strip: not on eliminated rows (keep faint red row edges) */
+  .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):hover td,
+  .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):hover td:first-child,
+  .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):hover td:last-child {
+    border-top: none !important;
+    border-bottom: none !important;
+    border-left: none !important;
+    border-right: none !important;
+  }
+
+  /* Mobile td rule uses !important on border-bottom — restore eliminated-row danger rules */
+  .pool-table tbody tr.pool-table-row.pool-table-row-eliminated td {
+    border-top: none !important;
+    border-bottom: 1px solid rgb(var(--theme-danger) / 0.3) !important;
+  }
+
+  .pool-table tbody > tr.pool-table-row.pool-table-row-eliminated:first-child td {
+    border-top: 1px solid rgb(var(--theme-danger) / 0.3) !important;
+  }
+
+  .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):has(+ tr.pool-table-row-eliminated) td {
+    border-bottom: 1px solid rgb(var(--theme-danger) / 0.3) !important;
+  }
+
+  .pool-table:not(.pool-table-flush) {
+    border: none !important;
+  }
+
+  /* Page chrome: tighter stack + smaller header strips on mobile */
+  .pool-page-stack {
+    gap: 0.4rem;
+  }
+
+  .pool-page-stack-tight {
+    gap: 0.28rem;
+  }
+
+  .pool-hero {
+    padding: 0.5rem 0.55rem;
+  }
+
+  .pool-hero-databallr {
+    padding: 0.32rem 0.45rem;
+  }
+
+  .pool-owner-header {
+    padding: 0.35rem 0.5rem !important;
+    border-radius: 0.35rem;
+  }
+
+  /* Leaderboard table header: extra-thin on mobile. */
+  .pool-owner-header.pool-owner-header--leaderboard {
+    padding: 0.16rem 0.4rem !important;
+    min-height: 30px !important;
+    font-size: 0.6875rem !important;
+    line-height: 1 !important;
+  }
+
+  .pool-owner-header.pool-owner-header--leaderboard .pool-owner-header-stat-meta button {
+    min-height: unset !important;
+    min-width: unset !important;
+  }
+
+  /* View tabs are spans with role=button; bypass global 44px role/button minimum. */
+  .pool-owner-header .pool-view-tab {
+    min-height: unset !important;
+    min-width: unset !important;
+  }
+
+  /* Explicit mobile hide helper for controls whose base classes force display. */
+  .pool-mobile-hidden {
+    display: none !important;
+  }
+
+  /* Owner/Team dropdown filters: match chip sizing (Active Only / Collapse All) on mobile. */
+  .pool-filter-select {
+    min-height: unset !important;
+  }
+
+  .pool-filter-select .pool-filter-label {
+    padding: 0.25rem 0.5rem !important;
+    line-height: 1.25 !important;
+    min-height: unset !important;
+  }
+
+  .pool-filter-select-trigger {
+    padding: 0.25rem 0.5rem !important;
+    line-height: 1.25 !important;
+    min-height: unset !important;
+    min-width: 0 !important;
   }
 }
 
 .pool-btn-ghost:disabled {
   opacity: 0.55;
+}
+
+@media (min-width: 640px) and (max-width: 768px) {
+  .pool-table.pool-table-collapsed-summary thead th {
+    font-size: 0.625rem !important;
+    line-height: 1.1 !important;
+  }
 }
 
 .pool-filter-chip {
@@ -1116,6 +1646,27 @@ body {
   line-height: 1.25;
   font-weight: 500;
   color: rgb(var(--pool-stats-body-text) / 0.88);
+}
+
+.pool-players-search-shell {
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.pool-players-search-shell .pool-players-search-input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: rgb(var(--pool-stats-body-text));
+  padding: 0.25rem 0.5rem;
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  outline: none;
+}
+
+.pool-players-search-shell:focus-within {
+  border-color: rgb(var(--pool-stats-accent) / 0.35);
 }
 
 .pool-filter-select-trigger {

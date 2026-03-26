@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PaintBucket } from "lucide-react";
 
-export type ThemeKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple";
+export type ThemeKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "mono" | "crazy_people";
 
 const THEME_KEYS = new Set<ThemeKey>([
   "red",
@@ -11,7 +11,9 @@ const THEME_KEYS = new Set<ThemeKey>([
   "yellow",
   "green",
   "blue",
-  "purple"
+  "purple",
+  "mono",
+  "crazy_people"
 ]);
 
 /** Red → purple spectrum; yellow is the default in layout + normalizeStoredTheme. */
@@ -21,7 +23,9 @@ const THEMES: Array<{ key: ThemeKey; label: string }> = [
   { key: "yellow", label: "Yellow" },
   { key: "green", label: "Green" },
   { key: "blue", label: "Blue" },
-  { key: "purple", label: "Purple" }
+  { key: "purple", label: "Purple" },
+  { key: "mono", label: "Black & White" },
+  { key: "crazy_people", label: "Crazy People" }
 ];
 
 /** Map removed theme keys so returning users land on a valid palette. */

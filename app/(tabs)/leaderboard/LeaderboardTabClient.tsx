@@ -6,8 +6,7 @@ import { IceBoxBadge } from "@/components/stats/IceBoxBadge";
 import { InMoneyBadge } from "@/components/stats/InMoneyBadge";
 import { LeaderboardOwnerBadgesLegend } from "@/components/stats/LeaderboardOwnerBadgesLegend";
 import { PoolResponsiveOwnerNameText } from "@/components/stats/PoolResponsiveDisplayNames";
-import { ChevronDown, ChevronUp, Trophy } from "lucide-react";
-import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
+import { ChevronDown, ChevronUp, Trophy, RefreshCcw, ShieldCheck } from "lucide-react";
 import {
   leaderboardSnapshotKey,
   readStoredSnapshot,
@@ -249,6 +248,28 @@ function remainAdvSortValues(
   };
 }
 
+function MRound({ r }: { r: 1 | 2 | 3 | 4 | 5 | 6 }) {
+  return (
+    <>
+      <span className="md:hidden">{r}</span>
+      <span className="hidden md:inline">R{r}</span>
+    </>
+  );
+}
+
+function MTot() {
+  return (
+    <>
+      <span className="md:hidden">TOT</span>
+      <span className="hidden md:inline">Total</span>
+    </>
+  );
+}
+
+function MAct() {
+  return <span>ACT</span>;
+}
+
 function SortableTh({
   columnKey,
   sortKey,
@@ -281,10 +302,10 @@ function SortableTh({
       <button
         type="button"
         onClick={() => onSort(columnKey)}
-        className={`inline-flex items-center ${justify} gap-0.5 w-full min-w-0 font-inherit text-inherit bg-transparent border-0 p-0 m-0 cursor-pointer select-none hover:text-[rgb(var(--pool-stats-accent))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[rgb(var(--pool-stats-accent)/0.55)]`}
+        className={`inline-flex items-center ${justify} gap-0.5 font-inherit text-inherit bg-transparent border-0 p-0 m-0 cursor-pointer select-none hover:text-[rgb(var(--pool-stats-accent))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[rgb(var(--pool-stats-accent)/0.55)]`}
         aria-label={`Sort by ${SORT_HEADER_ARIA[columnKey]}`}
       >
-        <span className="min-w-0">{children}</span>
+        <span className="whitespace-nowrap">{children}</span>
         {active ? (
           sortDir === "asc" ? (
             <ChevronUp className="h-3 w-3 shrink-0 opacity-80" strokeWidth={2.5} aria-hidden />
@@ -343,7 +364,7 @@ function InlineOwnerAggregateRank({
   if (rank == null || pool <= 0) return null;
   return (
     <span
-      className="pool-inline-rank block text-[9px] sm:text-[10px] font-bold tabular-nums leading-none mt-0.5 text-[rgb(var(--pool-stats-accent))]"
+      className="pool-inline-rank hidden md:block text-[9px] sm:text-[10px] font-bold tabular-nums leading-none mt-0.5 text-[rgb(var(--pool-stats-accent))]"
       title={`Owner rank ${rank} of ${pool} teams (1 = best)`}
     >
       {rank}
@@ -374,14 +395,16 @@ function StatCellWithOwnerRank({
 }
 
 export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
+  type LeaderboardViewMode = "base" | "proj" | "betting";
   const [data, setData] = useState<LeaderboardApiPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [sortKey, setSortKey] = useState<LeaderboardSortKey>("standingsRank");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [showTppgColumns, setShowTppgColumns] = useState(true);
-  const [showProbabilityOddsColumns, setShowProbabilityOddsColumns] = useState(true);
+  const [showTppgColumns, setShowTppgColumns] = useState(false);
+  const [showProbabilityOddsColumns, setShowProbabilityOddsColumns] = useState(false);
   const [showInlineRanks, setShowInlineRanks] = useState(true);
+  const [leaderboardViewMode, setLeaderboardViewMode] = useState<LeaderboardViewMode>("base");
   const [selectedLeagueTeamIds, setSelectedLeagueTeamIds] = useState<string[]>([]);
   const [leaderboardTableOpen, setLeaderboardTableOpen] = useState(true);
   const ownerButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -419,10 +442,70 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
   }, [leagueId]);
 
   useEffect(() => {
-    setShowTppgColumns(readStoredStatTrackerShowTppgColumns());
-    setShowProbabilityOddsColumns(readStoredLeaderboardShowProbabilityOddsColumns());
     setShowInlineRanks(readStoredStatTrackerShowInlineRanks());
   }, []);
+
+  useEffect(() => {
+    // Map view mode to the original toggles so other leaderboard sub-tables
+    // can reuse the same `showTppgColumns` behavior.
+    setShowTppgColumns(leaderboardViewMode !== "base");
+    setShowProbabilityOddsColumns(leaderboardViewMode === "betting");
+
+    // Default sort per view (like BASE sorting by #).
+    if (leaderboardViewMode === "proj") {
+      setSortKey("projRank");
+      setSortDir("asc");
+    } else {
+      setSortKey("standingsRank");
+      setSortDir("asc");
+    }
+  }, [leaderboardViewMode]);
+
+  useEffect(() => {
+    // When switching views, ensure the current sort key is visible.
+    const allowedKeys =
+      leaderboardViewMode === "base"
+        ? new Set<LeaderboardSortKey>([
+            "standingsRank",
+            "owner",
+            "remain",
+            "adv",
+            "r1",
+            "r2",
+            "r3",
+            "r4",
+            "r5",
+            "r6",
+            "total",
+            "behindLeader"
+          ])
+        : leaderboardViewMode === "proj"
+          ? new Set<LeaderboardSortKey>([
+              "standingsRank",
+              "owner",
+              "projRank",
+              "total",
+              "origProj",
+              "liveProj",
+              "plusMinus",
+              "tqsAdjustment",
+              "adjustedTotal"
+            ])
+          : new Set<LeaderboardSortKey>([
+              "standingsRank",
+              "owner",
+              "winPct",
+              "moneyPct",
+              "winOddsRatio",
+              "winAmericanLine",
+              "tournamentOu"
+            ]);
+
+    if (!allowedKeys.has(sortKey)) {
+      setSortKey("standingsRank");
+      setSortDir("asc");
+    }
+  }, [leaderboardViewMode, sortKey]);
 
   useEffect(() => {
     writeStoredStatTrackerShowTppgColumns(showTppgColumns);
@@ -569,8 +652,6 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
       setRefreshBusy(false);
     }
   }
-
-  useSubscribePullRefresh(() => void onManualRefresh(), Boolean(leagueId));
 
   const [heroPulse, setHeroPulse] = useState(false);
   const lastLbSyncRef = useRef<string | null>(null);
@@ -753,8 +834,10 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
     [displayTeams, selectedLeagueTeamIdSet]
   );
 
-  const tableColumnCount =
-    2 + 2 + 6 + 2 + (showTppgColumns ? 4 : 0) + 2 + (showProbabilityOddsColumns ? 5 : 0);
+  const isBaseView = leaderboardViewMode === "base";
+  const isProjView = leaderboardViewMode === "proj";
+  const isBettingView = leaderboardViewMode === "betting";
+  const tableColumnCount = isBaseView ? 12 : isProjView ? 9 : 7;
 
   const roundLiveLabel = data?.currentRound
     ? data.currentRound === 0
@@ -765,53 +848,55 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
   return (
     <div className="pool-page-stack pool-page-stack-tight">
       <div className="pool-hero pool-hero-databallr">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
-          <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
+        <div className="grid grid-cols-[5rem_1fr_5rem] items-center gap-2 md:grid-cols-[auto_1fr_auto]">
+          <div className="flex items-center justify-start md:justify-start">
             <div
               className="h-9 w-9 shrink-0 rounded-md bg-accent/15 border border-accent/40 flex items-center justify-center"
               aria-hidden
             >
               <Trophy className="h-4 w-4 text-accent" />
             </div>
-            <div className="min-w-0">
-              <h1 className="stat-tracker-page-title">Leaderboard</h1>
+          </div>
+          <div className="min-w-0 text-center md:text-left">
+            <h1 className="stat-tracker-page-title text-center md:text-left">Leaderboard</h1>
               {data?.lastSyncedAt ? (
-                <>
-                  <div className={`text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block ${heroPulse ? "motion-safe:animate-pulse" : ""}`}>
-                    Synced {new Date(data.lastSyncedAt).toLocaleString()}
-                    {data.anyLiveGames ? (
-                      <span className="ml-1.5 text-emerald-500 font-semibold">· Live ×{data.liveGamesCount}</span>
-                    ) : null}
-                  </div>
-                  <div
-                    className={`md:hidden mt-0.5 flex items-center gap-1 text-[9px] font-semibold text-emerald-500/90 ${heroPulse ? "motion-safe:animate-pulse" : ""}`}
-                  >
-                    {data.anyLiveGames ? (
-                      <>
-                        <span className="relative flex h-2 w-2">
-                          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-40" />
-                          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                        </span>
-                        <span>Live</span>
-                      </>
-                    ) : (
-                      <span className="text-foreground/40 font-normal">Pull down to refresh</span>
-                    )}
-                  </div>
-                </>
+                <div
+                  className={`text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block ${
+                    heroPulse ? "motion-safe:animate-pulse" : ""
+                  }`}
+                >
+                  Synced {new Date(data.lastSyncedAt).toLocaleString()}
+                  {data.anyLiveGames ? (
+                    <span className="ml-1.5 text-emerald-500 font-semibold">· Live ×{data.liveGamesCount}</span>
+                  ) : null}
+                </div>
               ) : (
                 <div className="text-[10px] text-foreground/45 mt-0.5 hidden md:block">Live leaderboard status</div>
               )}
-            </div>
           </div>
-          <div className="hidden md:flex flex-wrap items-center gap-1.5 shrink-0">
+          <div className="flex items-center justify-end gap-1">
             <button
               type="button"
-              className="pool-btn-outline-cta pool-btn-outline-cta--sm"
+              className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm shrink-0 !p-1 !w-9 !h-9 flex items-center justify-center"
               disabled={!leagueId || refreshBusy}
               onClick={() => void onManualRefresh()}
+              aria-label="Refresh Data"
+              aria-busy={refreshBusy}
             >
-              {refreshBusy ? "…" : "Refresh Data"}
+              <RefreshCcw className={`h-4 w-4 ${refreshBusy ? "animate-spin" : ""}`} aria-hidden />
+              <span className="sr-only">{refreshBusy ? "Refreshing…" : "Refresh Data"}</span>
+            </button>
+            <button
+              type="button"
+              className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm shrink-0 !p-1 !w-9 !h-9 flex items-center justify-center"
+              onClick={() => {
+                const href = leagueId ? `/commissioner?leagueId=${encodeURIComponent(leagueId)}` : "/commissioner";
+                window.location.assign(href);
+              }}
+              aria-label="Commissioner login"
+            >
+              <ShieldCheck className="h-4 w-4" aria-hidden />
+              <span className="sr-only">Commissioner login</span>
             </button>
           </div>
         </div>
@@ -827,7 +912,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
         <div className="rounded-md border border-warning/45 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning leading-snug">
           <strong>Stale sync</strong>{" "}
           <span className="md:hidden">
-            — scores may lag during live games. Pull down to refresh or ask your commissioner to run <strong>Sync games now</strong>.
+            — scores may lag during live games. Ask your commissioner to run <strong>Sync games now</strong>.
           </span>
           <span className="hidden md:inline">
             — scores may be behind while games are live. Ask your commissioner to run <strong>Sync games now</strong> (or use Refresh
@@ -838,7 +923,9 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
 
       {!leagueId && (
         <div className="pool-alert pool-alert-compact">
-          Add <code className="text-[10px]">?leagueId=…</code> from Draft or set your league in the top bar.
+          Add <code className="text-[10px]">?leagueId=…</code> from Draft
+          <span className="hidden md:inline"> or set your league in the top bar</span>
+          <span className="md:hidden"> or ask your commissioner for a league link</span>.
         </div>
       )}
 
@@ -852,21 +939,10 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
 
       {leagueId && teamsSorted.length > 0 && leaderboardDerived && (
         <>
-          <div className="pool-panel pool-panel-compact min-w-0">
+          <div className="pool-panel pool-panel-compact min-w-0 pool-mobile-hidden md:block">
             <div className="pool-filter-toolbar">
               <label
-                className="pool-filter-chip"
-                title="Checked: Leaderboard shows Rank, Orig, Live, and +/− projection columns; StatTracker shows TPPG and TPPG−PPG +/−. Same saved setting in both tabs."
-              >
-                <input
-                  type="checkbox"
-                  checked={showTppgColumns}
-                  onChange={(e) => setShowTppgColumns(e.target.checked)}
-                />
-                <span>{toBookTitleCase("show projections")}</span>
-              </label>
-              <label
-                className="pool-filter-chip"
+                className="pool-filter-chip pool-mobile-hidden md:inline-flex"
                 title="Checked: gold owner ranks under each stat (vs all teams in the league). Saved with StatTracker."
               >
                 <input
@@ -876,18 +952,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                 />
                 <span>{toBookTitleCase("show inline ranks")}</span>
               </label>
-              <label
-                className="pool-filter-chip"
-                title="Checked: Win %, Odds, Line, Money %, and O/U on Leaderboard. Saved on this device."
-              >
-                <input
-                  type="checkbox"
-                  checked={showProbabilityOddsColumns}
-                  onChange={(e) => setShowProbabilityOddsColumns(e.target.checked)}
-                />
-                <span>{toBookTitleCase("show probability & odds")}</span>
-              </label>
-              <div className="pool-filter-select">
+              <div className="pool-filter-select pool-mobile-hidden md:inline-flex">
                 <span className="pool-filter-label">Owner</span>
                 <button
                   ref={ownerButtonRef}
@@ -923,9 +988,9 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
               </div>
               {ownerPickerOpen && ownerPickerPos && (
                 <>
-                  <div className="pool-modal-overlay" onClick={closeOwnerPicker} />
+                  <div className="pool-modal-overlay hidden md:block" onClick={closeOwnerPicker} />
                   <div
-                    className="pool-modal-sheet max-h-[360px] overflow-y-auto"
+                    className="pool-modal-sheet hidden md:block max-h-[360px] overflow-y-auto"
                     style={{
                       top: ownerPickerPos.top,
                       left: ownerPickerPos.left,
@@ -974,7 +1039,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                   </div>
                 </>
               )}
-              <LeaderboardOwnerBadgesLegend className="ml-auto" />
+              <LeaderboardOwnerBadgesLegend className="ml-auto pool-mobile-hidden md:flex" />
             </div>
           </div>
 
@@ -982,19 +1047,87 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
             <button
               type="button"
               onClick={() => setLeaderboardTableOpen((v) => !v)}
-              className="w-full flex items-center justify-between gap-2 px-2 py-1.5 rounded-md pool-card-header pool-owner-header text-left"
+              className="w-full flex items-center justify-between gap-1 px-1.5 py-0 md:gap-2 md:px-2 md:py-1.5 rounded-md pool-card-header pool-owner-header pool-owner-header--leaderboard text-left"
               aria-expanded={leaderboardTableOpen}
             >
               <div className="flex min-w-0 items-center gap-1 shrink-0">
-                <span className="text-sm font-semibold pool-owner-name">Leaderboard</span>
+                <span className="text-sm font-semibold pool-owner-name leading-none">Leaderboard</span>
               </div>
-              <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
-                <span>
-                  {visibleTeams.length} of {teamsSorted.length}{" "}
-                  {teamsSorted.length === 1 ? "team" : "teams"}
+              <div className="pool-owner-header-stat-meta flex min-w-0 flex-1 flex-nowrap md:flex-wrap items-center justify-end gap-x-2 gap-y-0 text-right text-[10px] sm:text-[11px] font-normal tabular-nums md:gap-y-0.5 leading-none mr-2 md:mr-0">
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLeaderboardViewMode("base");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setLeaderboardViewMode("base");
+                    }
+                  }}
+                  className={[
+                    "pool-view-tab inline-flex items-center bg-transparent border-0 p-0 m-0 cursor-pointer select-none font-semibold whitespace-nowrap leading-none",
+                    leaderboardViewMode === "base"
+                      ? "text-white border-b border-white"
+                      : "text-white/55 hover:text-white"
+                  ].join(" ")}
+                  aria-pressed={leaderboardViewMode === "base"}
+                >
+                  ACT
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLeaderboardViewMode("proj");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setLeaderboardViewMode("proj");
+                    }
+                  }}
+                  className={[
+                    "pool-view-tab inline-flex items-center bg-transparent border-0 p-0 m-0 cursor-pointer select-none font-semibold whitespace-nowrap leading-none",
+                    leaderboardViewMode === "proj"
+                      ? "text-white border-b border-white"
+                      : "text-white/55 hover:text-white"
+                  ].join(" ")}
+                  aria-pressed={leaderboardViewMode === "proj"}
+                >
+                  PROJ
+                </span>
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLeaderboardViewMode("betting");
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      setLeaderboardViewMode("betting");
+                    }
+                  }}
+                  className={[
+                    "pool-view-tab inline-flex items-center bg-transparent border-0 p-0 m-0 cursor-pointer select-none font-semibold whitespace-nowrap leading-none",
+                    leaderboardViewMode === "betting"
+                      ? "text-white border-b border-white"
+                      : "text-white/55 hover:text-white"
+                  ].join(" ")}
+                  aria-pressed={leaderboardViewMode === "betting"}
+                >
+                  ODDS
                 </span>
               </div>
-              <div className="text-xs flex items-center gap-2 pool-owner-chevron shrink-0">
+              <div className="text-xs flex items-center gap-1 pool-owner-chevron shrink-0 md:gap-2">
                 {leaderboardTableOpen ? (
                   <ChevronUp className="h-4 w-4" aria-hidden />
                 ) : (
@@ -1004,8 +1137,8 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
             </button>
 
             {leaderboardTableOpen ? (
-            <div className="mt-1.5 min-w-0 overflow-x-auto md:overflow-x-auto">
-              <table className="pool-table w-full text-xs min-w-[58rem]">
+            <div className="pool-table-viewport mt-1.5 min-w-0 overflow-x-auto md:overflow-x-auto">
+              <table className="pool-table text-xs min-w-0">
                 <thead>
                   <tr>
                     <SortableTh
@@ -1014,7 +1147,8 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                       sortDir={sortDir}
                       onSort={handleSortClick}
                       align="left"
-                      className="text-left min-w-[2.25rem] tabular-nums"
+                      className="text-left tabular-nums"
+                      title="Player pool rank"
                     >
                       #
                     </SortableTh>
@@ -1024,107 +1158,70 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                       sortDir={sortDir}
                       onSort={handleSortClick}
                       align="left"
-                      className="text-left min-w-[5.5rem] max-w-[9rem] w-[9rem]"
+                      className="text-left whitespace-nowrap"
                       title="Pool owner"
                     >
-                      Owner
+                      OWNER
                     </SortableTh>
-                    <SortableTh
-                      columnKey="remain"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                      title="Roster players whose team is still in the tournament"
-                    >
-                      REM
-                    </SortableTh>
-                    <SortableTh
-                      columnKey="adv"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                      title="Players whose team advanced through the league’s current tournament round"
-                    >
-                      ADV
-                    </SortableTh>
-                    <SortableTh
-                      columnKey="r1"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                    >
-                      R1
-                    </SortableTh>
-                    <SortableTh
-                      columnKey="r2"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                    >
-                      R2
-                    </SortableTh>
-                    <SortableTh
-                      columnKey="r3"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                    >
-                      R3
-                    </SortableTh>
-                    <SortableTh
-                      columnKey="r4"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                    >
-                      R4
-                    </SortableTh>
-                    <SortableTh
-                      columnKey="r5"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                    >
-                      R5
-                    </SortableTh>
-                    <SortableTh
-                      columnKey="r6"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                    >
-                      R6
-                    </SortableTh>
-                    <SortableTh
-                      columnKey="total"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                      className="text-center pool-table-col-primary min-w-[2.75rem]"
-                    >
-                      Total
-                    </SortableTh>
-                    <SortableTh
-                      columnKey="behindLeader"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                      className="text-center w-11 tabular-nums"
-                      title="Points behind the league leader (highest actual total in the pool); 0 if tied for first"
-                    >
-                      -X
-                    </SortableTh>
-                    {showTppgColumns ? (
+                    {isBaseView ? (
+                      <>
+                        <SortableTh
+                          columnKey="remain"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          onSort={handleSortClick}
+                          align="center"
+                          title="Roster players whose team is still in the tournament"
+                        >
+                          REM
+                        </SortableTh>
+                        <SortableTh
+                          columnKey="adv"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          onSort={handleSortClick}
+                          align="center"
+                          title="Players whose team advanced through the league’s current tournament round"
+                        >
+                          ADV
+                        </SortableTh>
+                        {([1, 2, 3, 4, 5, 6] as const).map((r) => (
+                          <SortableTh
+                            key={r}
+                            columnKey={`r${r}` as LeaderboardSortKey}
+                            sortKey={sortKey}
+                            sortDir={sortDir}
+                            onSort={handleSortClick}
+                            align="center"
+                          >
+                            <MRound r={r} />
+                          </SortableTh>
+                        ))}
+                        <SortableTh
+                          columnKey="total"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          onSort={handleSortClick}
+                          align="center"
+                          className="text-center pool-table-col-primary"
+                        >
+                          <MTot />
+                        </SortableTh>
+                        <SortableTh
+                          columnKey="behindLeader"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          onSort={handleSortClick}
+                          align="center"
+                          className="text-center w-11 tabular-nums"
+                          title="Points behind the league leader (highest actual total in the pool); 0 if tied for first"
+                        >
+                          -X
+                        </SortableTh>
+                      </>
+                    ) : null}
+
+                    {isProjView ? (
                       <>
                         <SortableTh
                           columnKey="projRank"
@@ -1132,10 +1229,20 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           sortDir={sortDir}
                           onSort={handleSortClick}
                           align="center"
-                          className="text-center tabular-nums"
-                          title="Standings rank among owners by summed live projections when every roster player has a projection"
+                          title="Projected rank among owners"
                         >
-                          Rank
+                          RANK
+                        </SortableTh>
+                        <SortableTh
+                          columnKey="total"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          onSort={handleSortClick}
+                          align="center"
+                          className="text-center"
+                          title="Actual total points"
+                        >
+                          <MAct />
                         </SortableTh>
                         <SortableTh
                           columnKey="origProj"
@@ -1146,7 +1253,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           className="text-center"
                           title="Pre-tournament chalk projection"
                         >
-                          Orig
+                          ORIG
                         </SortableTh>
                         <SortableTh
                           columnKey="liveProj"
@@ -1154,10 +1261,10 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           sortDir={sortDir}
                           onSort={handleSortClick}
                           align="center"
-                          className="text-center"
+                          className="text-center pool-table-col-primary"
                           title="Live projection"
                         >
-                          Live
+                          LIVE
                         </SortableTh>
                         <SortableTh
                           columnKey="plusMinus"
@@ -1165,36 +1272,37 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           sortDir={sortDir}
                           onSort={handleSortClick}
                           align="center"
-                          className="text-center w-11"
+                          className="w-11 text-center"
                           title="Live projection − original projection"
                         >
-                          +/−
+                          +/-
+                        </SortableTh>
+                        <SortableTh
+                          columnKey="tqsAdjustment"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          onSort={handleSortClick}
+                          align="center"
+                          className="min-w-[2.5rem] text-center tabular-nums"
+                          title="Team quality adjustment"
+                        >
+                          TQS
+                        </SortableTh>
+                        <SortableTh
+                          columnKey="adjustedTotal"
+                          sortKey={sortKey}
+                          sortDir={sortDir}
+                          onSort={handleSortClick}
+                          align="center"
+                          className="min-w-[2.5rem] text-center tabular-nums"
+                          title="Total fantasy points after TQS adjustment"
+                        >
+                          ADJ
                         </SortableTh>
                       </>
                     ) : null}
-                    <SortableTh
-                      columnKey="tqsAdjustment"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                      className="text-center min-w-[2.5rem] tabular-nums"
-                      title="Team quality adjustment: k × (league average roster TQS − your roster TQS). Stronger drafted teams (better overall rank + seed) get fewer/negative points."
-                    >
-                      TQS
-                    </SortableTh>
-                    <SortableTh
-                      columnKey="adjustedTotal"
-                      sortKey={sortKey}
-                      sortDir={sortDir}
-                      onSort={handleSortClick}
-                      align="center"
-                      className="text-center min-w-[2.5rem] tabular-nums"
-                      title="Total fantasy points after TQS adjustment (raw total + TQS)"
-                    >
-                      ADJ
-                    </SortableTh>
-                    {showProbabilityOddsColumns ? (
+
+                    {isBettingView ? (
                       <>
                         <SortableTh
                           columnKey="winPct"
@@ -1202,9 +1310,10 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           sortDir={sortDir}
                           onSort={handleSortClick}
                           align="center"
-                          title="Model over all league owners: Plackett–Luce weights from live projection (or points fallback), roster share still alive, and share advanced through current round"
+                          className="text-center tabular-nums"
+                          title="Win %"
                         >
-                          Win %
+                          WIN%
                         </SortableTh>
                         <SortableTh
                           columnKey="moneyPct"
@@ -1212,9 +1321,11 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           sortDir={sortDir}
                           onSort={handleSortClick}
                           align="center"
-                          title="Estimated chance to finish in the top 3 among all league owners (top min(3,n) if fewer than 3 teams)"
+                          className="text-center tabular-nums"
+                          title="Money %"
                         >
-                          Money %
+                          <span className="md:hidden">TOP3%</span>
+                          <span className="hidden md:inline">MONEY%</span>
                         </SortableTh>
                         <SortableTh
                           columnKey="winOddsRatio"
@@ -1222,10 +1333,10 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           sortDir={sortDir}
                           onSort={handleSortClick}
                           align="center"
-                          className="text-center tabular-nums min-w-[2.75rem]"
-                          title="Approx. book-style win odds (e.g. 8:1), fair line implied by model win %"
+                          className="text-center tabular-nums"
+                          title="Odds"
                         >
-                          Odds
+                          ODDS
                         </SortableTh>
                         <SortableTh
                           columnKey="winAmericanLine"
@@ -1233,10 +1344,10 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           sortDir={sortDir}
                           onSort={handleSortClick}
                           align="center"
-                          className="text-center tabular-nums min-w-[2.5rem]"
-                          title="American moneyline for winning the pool (fair line from model win %; negative favorite, positive underdog)"
+                          className="text-center tabular-nums"
+                          title="American line"
                         >
-                          Line
+                          LINE
                         </SortableTh>
                         <SortableTh
                           columnKey="tournamentOu"
@@ -1244,8 +1355,8 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           sortDir={sortDir}
                           onSort={handleSortClick}
                           align="center"
-                          className="text-center min-w-[4.75rem] whitespace-nowrap"
-                          title="Tournament fantasy total O/U: live projected total to nearest ½ (whole numbers post as x.5), one decimal; typical −110 on Over and Under; hover for current score and lean vs opening"
+                          className="text-center"
+                          title="Tournament O/U"
                         >
                           O/U
                         </SortableTh>
@@ -1313,76 +1424,89 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           <td className="px-1 py-2 text-left tabular-nums text-foreground/80 align-middle">
                             {ordinalRankLabel(team.rank)}
                           </td>
-                          <td className="px-1 py-2 font-semibold text-left align-middle min-w-0 max-w-[9rem] pool-table-col-group-end">
-                            <span className="inline-flex items-baseline gap-1 min-w-0 max-w-full">
-                              <span className="truncate min-w-0" title={team.ownerName}>
+                          <td className="px-1 py-2 font-semibold text-left align-middle whitespace-nowrap min-w-0 pool-table-col-group-end">
+                            <span className="inline-flex items-baseline gap-1 whitespace-nowrap" title={team.ownerName}>
+                              <span className="whitespace-nowrap">
                                 <PoolResponsiveOwnerNameText full={team.ownerName} />
                               </span>
                               {inTheMoney ? (
                                 <InMoneyBadge
                                   kMoney={kMoney}
                                   leagueSize={teamsSorted.length}
-                                  className="shrink-0"
+                                  className="hidden shrink-0 md:inline-flex"
                                 />
                               ) : null}
                               {inLastPlace ? (
-                                <IceBoxBadge leagueSize={teamsSorted.length} className="shrink-0" />
+                                <IceBoxBadge
+                                  leagueSize={teamsSorted.length}
+                                  className="hidden shrink-0 md:inline-flex"
+                                />
                               ) : null}
                             </span>
                           </td>
-                          <td className="px-1 py-2 text-center font-semibold text-foreground align-middle">
-                            <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.remaining, bid)}>
-                              {remainCount != null ? remainCount : "—"}
-                            </StatCellWithOwnerRank>
-                          </td>
-                          <td className="px-1 py-2 text-center font-semibold text-foreground align-middle pool-table-col-group-end">
-                            <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.advanced, bid)}>
-                              {advCount != null ? advCount : "—"}
-                            </StatCellWithOwnerRank>
-                          </td>
-                          {([1, 2, 3, 4, 5, 6] as const).map((r) => (
-                            <td
-                              key={r}
-                              className="px-1 py-2 text-center font-semibold text-foreground sleeper-score-font align-middle"
-                              title={`R${r} pool fantasy points`}
-                            >
-                              <StatCellWithOwnerRank
-                                showRank={showInlineRanks}
-                                {...bundleRank(roundRankByR[r - 1], bid)}
-                              >
-                                {teamRoundCell(team.roundScores, r)}
-                              </StatCellWithOwnerRank>
-                            </td>
-                          ))}
-                          <td className="px-1 py-2 text-center font-semibold sleeper-score-font pool-table-col-primary align-middle">
-                            <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.total, bid)}>
-                              {String(Math.round(team.totalScore))}
-                            </StatCellWithOwnerRank>
-                          </td>
-                          <td className="px-1 py-2 text-center font-semibold sleeper-score-font align-middle tabular-nums pool-table-col-group-end">
-                            {(() => {
-                              const behind = pointsBehindLeaderValue(team, leagueMaxTotalPoints);
-                              if (behind == null) return "—";
-                              const cls = behind === 0 ? "text-success" : "text-danger";
-                              const text = behind === 0 ? "0" : `-${behind}`;
-                              return <span className={cls}>{text}</span>;
-                            })()}
-                          </td>
-                          {showTppgColumns ? (
+                          {isBaseView ? (
                             <>
-                              <td className="px-1 py-2 text-center font-semibold text-foreground tabular-nums align-middle">
+                              <td className="px-1 py-2 text-center font-semibold text-foreground align-middle">
+                                <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.remaining, bid)}>
+                                  {remainCount != null ? remainCount : "—"}
+                                </StatCellWithOwnerRank>
+                              </td>
+                              <td className="px-1 py-2 text-center font-semibold text-foreground align-middle pool-table-col-group-end">
+                                <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.advanced, bid)}>
+                                  {advCount != null ? advCount : "—"}
+                                </StatCellWithOwnerRank>
+                              </td>
+                              {([1, 2, 3, 4, 5, 6] as const).map((r) => (
+                                <td
+                                  key={r}
+                                  className="px-1 py-2 text-center font-semibold text-foreground sleeper-score-font align-middle"
+                                  title={`R${r} pool fantasy points`}
+                                >
+                                  <StatCellWithOwnerRank
+                                    showRank={showInlineRanks}
+                                    {...bundleRank(roundRankByR[r - 1], bid)}
+                                  >
+                                    {teamRoundCell(team.roundScores, r)}
+                                  </StatCellWithOwnerRank>
+                                </td>
+                              ))}
+                              <td className="px-1 py-2 text-center font-semibold sleeper-score-font pool-table-col-primary align-middle">
+                                <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.total, bid)}>
+                                  {String(Math.round(team.totalScore))}
+                                </StatCellWithOwnerRank>
+                              </td>
+                              <td className="px-1 py-2 text-center font-semibold sleeper-score-font align-middle tabular-nums pool-table-col-group-end">
+                                {(() => {
+                                  const behind = pointsBehindLeaderValue(team, leagueMaxTotalPoints);
+                                  if (behind == null) return "—";
+                                  const cls = behind === 0 ? "text-success" : "text-danger";
+                                  const text = behind === 0 ? "0" : `-${behind}`;
+                                  return <span className={cls}>{text}</span>;
+                                })()}
+                              </td>
+                            </>
+                          ) : null}
+
+                          {isProjView ? (
+                            <>
+                              <td className="px-1 py-2 text-center font-semibold text-foreground align-middle tabular-nums">
                                 {projectedRank != null ? ordinalRankLabel(projectedRank) : "—"}
                               </td>
                               <td className="px-1 py-2 text-center font-semibold sleeper-score-font align-middle">
-                                <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.origProj, bid)}>
-                                  {origR != null ? String(origR) : "—"}
+                                <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.total, bid)}>
+                                  {String(Math.round(team.totalScore))}
                                 </StatCellWithOwnerRank>
                               </td>
-                              <td className="px-1 py-2 text-center font-semibold sleeper-score-font align-middle">
-                                <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.liveProj, bid)}>
-                                  {liveR != null ? String(liveR) : "—"}
-                                </StatCellWithOwnerRank>
-                              </td>
+                        <td className="px-1 py-2 text-center font-semibold sleeper-score-font align-middle">
+                          <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.origProj, bid)}>
+                            {origR != null ? String(origR) : "—"}
+                          </StatCellWithOwnerRank>
+                        </td>
+                              <td className="px-1 py-2 text-center font-semibold sleeper-score-font align-middle pool-table-col-primary">
+                          <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.liveProj, bid)}>
+                            {liveR != null ? String(liveR) : "—"}
+                          </StatCellWithOwnerRank>
+                        </td>
                               <td className="px-1 py-2 text-center font-semibold sleeper-score-font align-middle">
                                 <StatCellWithOwnerRank
                                   showRank={showInlineRanks}
@@ -1395,23 +1519,24 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                                   )}
                                 </StatCellWithOwnerRank>
                               </td>
+                              <td className="px-1 py-2 text-center font-semibold text-foreground sleeper-score-font align-middle tabular-nums">
+                                <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.tqsAdjustment, bid)}>
+                                  {formatTqsAdjustmentCell(team)}
+                                </StatCellWithOwnerRank>
+                              </td>
+                              <td className="px-1 py-2 text-center font-semibold text-foreground sleeper-score-font align-middle tabular-nums pool-table-col-group-end">
+                                <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.adjustedTotal, bid)}>
+                                  {typeof team.adjustedTotalScore === "number" && Number.isFinite(team.adjustedTotalScore) ? (
+                                    String(Math.round(team.adjustedTotalScore))
+                                  ) : (
+                                    "—"
+                                  )}
+                                </StatCellWithOwnerRank>
+                              </td>
                             </>
                           ) : null}
-                          <td className="px-1 py-2 text-center font-semibold text-foreground sleeper-score-font align-middle tabular-nums">
-                            <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.tqsAdjustment, bid)}>
-                              {formatTqsAdjustmentCell(team)}
-                            </StatCellWithOwnerRank>
-                          </td>
-                          <td className="px-1 py-2 text-center font-semibold text-foreground sleeper-score-font align-middle tabular-nums pool-table-col-group-end">
-                            <StatCellWithOwnerRank showRank={showInlineRanks} {...bundleRank(fo.adjustedTotal, bid)}>
-                              {typeof team.adjustedTotalScore === "number" && Number.isFinite(team.adjustedTotalScore) ? (
-                                String(Math.round(team.adjustedTotalScore))
-                              ) : (
-                                "—"
-                              )}
-                            </StatCellWithOwnerRank>
-                          </td>
-                          {showProbabilityOddsColumns ? (
+
+                          {isBettingView ? (
                             <>
                               <td className="px-1 py-2 text-center font-semibold text-foreground tabular-nums align-middle">
                                 <StatCellWithOwnerRank showRank={false} {...bundleRank(fo.winPct, bid)}>
@@ -1441,7 +1566,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                                   })()}
                                 </StatCellWithOwnerRank>
                               </td>
-                              <td className="px-1 py-2 text-center font-semibold text-foreground align-middle min-w-[4.75rem]">
+                              <td className="px-1 py-2 text-center font-semibold text-foreground align-middle">
                                 <StatCellWithOwnerRank
                                   showRank={false}
                                   {...bundleRank(fo.tournamentOu, bid)}
@@ -1469,11 +1594,11 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                                         className="flex flex-col items-center shrink-0 leading-none"
                                         title={tip}
                                       >
-                                        <span className="block whitespace-nowrap tabular-nums sleeper-score-font text-xs font-semibold">
+                                        <span className="inline-flex items-baseline whitespace-nowrap tabular-nums sleeper-score-font text-xs font-semibold leading-none">
                                           {formatTournamentOuLine(ou.line)}
-                                        </span>
-                                        <span className="block whitespace-nowrap text-[9px] sm:text-[10px] text-foreground/70 tabular-nums font-medium mt-0.5">
-                                          {`O ${ou.overAmerican} · U ${ou.underAmerican}`}
+                                          <span className="ml-0.5 text-[9px] md:text-[10px] font-medium text-foreground/70 leading-none">
+                                            ({ou.overAmerican})
+                                          </span>
                                         </span>
                                       </div>
                                     );

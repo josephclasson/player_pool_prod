@@ -1,7 +1,7 @@
 import type { RefObject } from "react";
 
 /**
- * Shared type for the main app scroll container ref (pull-to-refresh + identity bar scroll).
+ * Shared type for the main app scroll container ref.
  *
  * Use **`RefObject<HTMLDivElement>`** only — not `RefObject<HTMLDivElement | null>`.
  * In `@types/react`, `RefObject<T>` already models `current` as `T | null`. Putting

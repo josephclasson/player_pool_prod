@@ -732,8 +732,8 @@ export function PreseasonSetupFlow({
                   count, use <strong>Draft reset</strong> afterward to avoid pick attribution issues.
                 </p>
               )}
-              <div className="overflow-x-auto rounded-lg border border-border/50">
-                <table className="pool-table w-full text-left text-[11px]">
+              <div className="pool-table-viewport overflow-x-auto rounded-lg border border-border/50">
+                <table className="pool-table pool-table-fixed w-full text-left text-[11px]">
                   <thead className="border-b border-border/40 bg-muted/30">
                     <tr>
                       <th className="px-2 py-1.5 font-semibold">Pick #</th>

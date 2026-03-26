@@ -16,7 +16,7 @@ const LEGEND_ROWS: { tier: HeatBadgeTier; label: string }[] = [
 export function HeatBadgeLegend({ className }: { className?: string }) {
   return (
     <div
-      className={`flex flex-nowrap items-center gap-x-3 text-[10px] leading-tight text-foreground/75 ${className ?? ""}`}
+      className={`flex flex-nowrap items-center gap-x-2.5 text-[10px] leading-tight text-foreground/75 ${className ?? ""}`}
     >
       <span className="font-semibold uppercase tracking-wide text-foreground/55 shrink-0">Heat Streak</span>
       {LEGEND_ROWS.map(({ tier, label }) => (

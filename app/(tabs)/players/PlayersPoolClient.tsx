@@ -3,8 +3,7 @@
 import type { ReactNode } from "react";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronUp, UsersRound } from "lucide-react";
-import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
+import { ChevronDown, ChevronUp, UsersRound, RefreshCcw, ShieldCheck } from "lucide-react";
 import {
   playerStatsSnapshotKey,
   readStoredActiveLeagueId,
@@ -12,6 +11,7 @@ import {
   writeStoredActiveLeagueId,
   writeStoredSnapshot
 } from "@/lib/player-pool-storage";
+import { PoolPlayerSublineTeamSeedOwner } from "@/components/stats/PoolPlayerSublineTeamSeedOwner";
 import { PoolResponsiveOwnerNameText } from "@/components/stats/PoolResponsiveDisplayNames";
 import { PoolTablePlayerPhotoCell, PoolTableTeamLogoCell } from "@/components/stats/PoolTableMediaCells";
 import { HeatBadgeLegend } from "@/components/stats/HeatBadgeLegend";
@@ -21,7 +21,6 @@ import { resolveEspnTeamLogoForPoolRow } from "@/lib/espn-ncaam-assets";
 import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-directory";
 import { displayCollegeTeamNameForUi } from "@/lib/college-team-display";
 import { resolvePlayerHeadshotUrlCandidates } from "@/lib/player-media";
-import { abbreviatePlayerNameForMobile } from "@/lib/pool-mobile-display-names";
 
 type TeamInfo = {
   id: number;
@@ -83,25 +82,22 @@ type PlayersSnapshot = {
   etag: string | null;
 };
 
-function displayRegionName(region: unknown): string {
-  const r = region != null ? String(region).trim() : "";
-  if (!r) return "—";
-  switch (r) {
-    case "W":
-    case "West":
-      return "West";
-    case "E":
-    case "East":
-      return "East";
-    case "MW":
-    case "Midwest":
-      return "Midwest";
-    case "S":
-    case "South":
-      return "South";
-    default:
-      return r;
-  }
+function MRoundPl({ r }: { r: 1 | 2 | 3 | 4 | 5 | 6 }) {
+  return (
+    <>
+      <span className="md:hidden">{r}</span>
+      <span className="hidden md:inline">R{r}</span>
+    </>
+  );
+}
+
+function MTotPl() {
+  return (
+    <>
+      <span className="md:hidden">TOT</span>
+      <span className="hidden md:inline">Total</span>
+    </>
+  );
 }
 
 function displayCollegeTeam(t: TeamInfo): string {
@@ -222,7 +218,6 @@ function ownerFilterKey(p: PoolPlayer): string {
 
 type SortColumn =
   | "player"
-  | "owner"
   | "seed"
   | "overall"
   | "ppg"
@@ -238,11 +233,10 @@ type SortColumn =
   | "origProj"
   | "plusMinus";
 
-type NumericSortColumn = Exclude<SortColumn, "player" | "owner" | "seed" | "overall">;
+type NumericSortColumn = Exclude<SortColumn, "player" | "seed" | "overall">;
 
 const PLAYERS_SORT_ARIA: Record<SortColumn, string> = {
   player: "player name",
-  owner: "fantasy owner",
   seed: "regional seed",
   overall: "NCAA overall seed",
   ppg: "season points per game",
@@ -472,11 +466,6 @@ function comparePoolPlayers(a: PoolPlayer, b: PoolPlayer, col: SortColumn, dir: 
       if (c !== 0) return c;
       return a.id - b.id;
     }
-    case "owner": {
-      const c = ownerLabel(a).localeCompare(ownerLabel(b)) * mult;
-      if (c !== 0) return c;
-      return a.name.localeCompare(b.name);
-    }
     case "seed": {
       const sa = seedNumeric(a);
       const sb = seedNumeric(b);
@@ -514,7 +503,7 @@ function comparePoolPlayers(a: PoolPlayer, b: PoolPlayer, col: SortColumn, dir: 
 }
 
 function defaultSortDirForColumn(col: SortColumn): "asc" | "desc" {
-  if (col === "player" || col === "owner" || col === "overall" || col === "seed") return "asc";
+  if (col === "player" || col === "overall" || col === "seed") return "asc";
   return "desc";
 }
 
@@ -532,18 +521,16 @@ function PlayersPoolPlayerNameLink({
         href={espnMensCollegeBasketballPlayerProfileUrl({ espnAthleteId: idNum, playerName })}
         target="_blank"
         rel="noopener noreferrer"
-        className="pool-table-player-link"
+        className="pool-table-player-link block min-w-0 max-w-full truncate"
         title={playerName}
       >
-        <span className="hidden lg:inline">{playerName}</span>
-        <span className="lg:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
+        {playerName}
       </a>
     );
   }
   return (
-    <span className="font-semibold" title={playerName}>
-      <span className="hidden lg:inline">{playerName}</span>
-      <span className="lg:hidden">{abbreviatePlayerNameForMobile(playerName)}</span>
+    <span className="font-semibold block min-w-0 max-w-full truncate" title={playerName}>
+      {playerName}
     </span>
   );
 }
@@ -553,7 +540,7 @@ function InlinePoolStatRank({ rank, poolSize }: { rank: number | undefined; pool
   if (rank == null || poolSize <= 0) return null;
   return (
     <span
-      className="pool-inline-rank block text-[9px] sm:text-[10px] font-bold tabular-nums leading-none mt-0.5 text-[rgb(var(--pool-stats-accent))]"
+      className="pool-inline-rank hidden md:block text-[9px] sm:text-[10px] font-bold tabular-nums leading-none mt-0.5 text-[rgb(var(--pool-stats-accent))]"
       title={`Pool rank ${rank} of ${poolSize} players (1 = best)`}
     >
       {rank}
@@ -613,10 +600,10 @@ function SortableTh({
       <button
         type="button"
         onClick={() => onSort(column)}
-        className={`inline-flex items-center ${justify} gap-0.5 w-full min-w-0 font-inherit text-inherit bg-transparent border-0 p-0 m-0 cursor-pointer select-none hover:text-[rgb(var(--pool-stats-accent))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[rgb(var(--pool-stats-accent)/0.55)]`}
+        className={`inline-flex items-center ${justify} gap-0.5 font-inherit text-inherit bg-transparent border-0 p-0 m-0 cursor-pointer select-none hover:text-[rgb(var(--pool-stats-accent))] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[rgb(var(--pool-stats-accent)/0.55)]`}
         aria-label={`Sort by ${PLAYERS_SORT_ARIA[column]}`}
       >
-        <span className="min-w-0 truncate">{children}</span>
+        <span className="whitespace-nowrap">{children}</span>
         {active ? (
           sortDir === "asc" ? (
             <ChevronUp className="h-3 w-3 shrink-0 opacity-80" strokeWidth={2.5} aria-hidden />
@@ -741,8 +728,6 @@ export function PlayersPoolClient({
       if (showBusy) setBusy(false);
     }
   }, [seasonYear, qDeferred, effectiveLeagueId, rows.length, meta, snapshotKey]);
-
-  useSubscribePullRefresh(() => void load({ manual: true, force: true }), true);
 
   useEffect(() => {
     void load();
@@ -932,16 +917,20 @@ export function PlayersPoolClient({
   return (
     <div className="pool-page-stack pool-page-stack-tight">
       <div className="pool-hero pool-hero-databallr">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
-          <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
+        <div className="grid grid-cols-[5rem_1fr_5rem] items-center gap-2 md:grid-cols-[auto_1fr_auto]">
+          <div className="flex items-center justify-start">
             <div
               className="h-9 w-9 shrink-0 rounded-md bg-accent/15 border border-accent/40 flex items-center justify-center"
               aria-hidden
             >
               <UsersRound className="h-4 w-4 text-accent" />
             </div>
-            <div className="min-w-0">
-              <h1 className="stat-tracker-page-title">Player Statistics</h1>
+          </div>
+          <div className="min-w-0 text-center md:text-left">
+            <h1 className="stat-tracker-page-title text-center md:text-left">
+              <span className="md:hidden">Players</span>
+              <span className="hidden md:inline">Player Statistics</span>
+            </h1>
               <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block">
                 {meta ? (
                   <>
@@ -958,17 +947,30 @@ export function PlayersPoolClient({
                   <span className="text-foreground/45">Live player stats status</span>
                 )}
               </div>
-              <div className="md:hidden mt-0.5 text-[9px] text-foreground/40">Pull down to refresh</div>
-            </div>
           </div>
-          <div className="hidden md:flex flex-wrap items-center gap-1.5 shrink-0">
+          <div className="flex items-center justify-end gap-1">
             <button
               type="button"
-              className="pool-btn-outline-cta pool-btn-outline-cta--sm"
+              className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm shrink-0 !p-1 !w-9 !h-9 flex items-center justify-center"
               disabled={busy}
               onClick={() => void load({ manual: true, force: true })}
+              aria-label="Refresh Data"
+              aria-busy={busy}
             >
-              {busy ? "…" : "Refresh Data"}
+              <RefreshCcw className={`h-4 w-4 ${busy ? "animate-spin" : ""}`} aria-hidden />
+              <span className="sr-only">{busy ? "Refreshing…" : "Refresh Data"}</span>
+            </button>
+            <button
+              type="button"
+              className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm shrink-0 !p-1 !w-9 !h-9 flex items-center justify-center"
+              onClick={() => {
+                const href = effectiveLeagueId ? `/commissioner?leagueId=${encodeURIComponent(effectiveLeagueId)}` : "/commissioner";
+                window.location.assign(href);
+              }}
+              aria-label="Commissioner login"
+            >
+              <ShieldCheck className="h-4 w-4" aria-hidden />
+              <span className="sr-only">Commissioner login</span>
             </button>
           </div>
         </div>
@@ -978,20 +980,11 @@ export function PlayersPoolClient({
       </div>
 
       <div className="pool-panel pool-panel-compact min-w-0">
-        <div className="flex flex-wrap items-end gap-2 sm:gap-3 mb-3">
-          <label className="flex flex-col gap-0.5 min-w-0">
-            <span className="pool-filter-label">Season</span>
+        <div className="pool-players-filters flex items-center gap-2 sm:gap-3 mb-3">
+          <label className="pool-filter-select pool-players-search-shell min-w-0 flex-1">
+            <span className="pool-filter-label shrink-0">Search</span>
             <input
-              className="pool-field w-[4.5rem] text-xs py-1.5"
-              type="number"
-              value={seasonYear}
-              onChange={(e) => setSeasonYear(Number(e.target.value))}
-            />
-          </label>
-          <label className="flex flex-col gap-0.5 min-w-[10rem] flex-1">
-            <span className="pool-filter-label">Search</span>
-            <input
-              className="pool-field text-xs py-1.5 min-w-0"
+              className="pool-players-search-input min-w-0 flex-1"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Name…"
@@ -999,14 +992,15 @@ export function PlayersPoolClient({
           </label>
         </div>
 
-        <div className="pool-filter-toolbar">
+        <div className="pool-filter-toolbar pool-players-toolbar">
           <label className="pool-filter-chip">
             <input
               type="checkbox"
               checked={showOnlyActivePlayers}
               onChange={() => setShowOnlyActivePlayers((v) => !v)}
             />
-            <span>Active Only</span>
+            <span className="md:hidden">Live</span>
+            <span className="hidden md:inline">Live Only</span>
           </label>
           <div className="pool-filter-select">
             <span className="pool-filter-label">Owner</span>
@@ -1165,7 +1159,7 @@ export function PlayersPoolClient({
               </div>
             </>
           )}
-          <HeatBadgeLegend className="ml-auto" />
+          <HeatBadgeLegend className="ml-auto pool-mobile-hidden md:flex md:items-center md:pl-2" />
         </div>
 
         <div className="pool-text-muted-sm mb-2 hidden md:block">
@@ -1174,7 +1168,7 @@ export function PlayersPoolClient({
               Showing {displayedRows.length}
               {displayedRows.length !== meta.count ? ` of ${meta.count}` : ""} after filters.
               {leagueContext ? (
-                <span className="ml-1">Owner column uses your active league.</span>
+                <span className="ml-1">Fantasy owner under each player uses your active league.</span>
               ) : (
                 <span className="ml-1">
                   Set league via Draft or <code className="pool-code text-[10px]">?leagueId=</code>.
@@ -1185,15 +1179,15 @@ export function PlayersPoolClient({
         </div>
         {error && <div className="pool-alert-danger pool-alert-compact text-sm mb-2">{error}</div>}
 
-        <div className="pool-card pool-card-compact min-w-0">
-          <div className="min-w-0 overflow-x-auto md:overflow-x-auto">
-            <table className="pool-table pool-players-stat-table w-full text-xs min-w-[1040px]">
+        <div className="pool-card pool-card-compact pool-players-table-card min-w-0">
+          <div className="pool-table-viewport min-w-0 overflow-x-auto md:overflow-x-auto">
+            <table className="pool-table pool-players-stat-table text-xs min-w-0">
               <thead>
                 <tr>
-                  <th className="w-10 p-1 text-center" scope="col">
+                  <th className="hidden w-10 p-1 text-center md:table-cell" scope="col">
                     <span className="sr-only">Team logo</span>
                   </th>
-                  <th className="w-10 p-1 text-center" scope="col">
+                  <th className="w-9 p-0.5 text-center md:w-10 md:p-1" scope="col">
                     <span className="sr-only">Player photo</span>
                   </th>
                   <SortableTh
@@ -1201,43 +1195,22 @@ export function PlayersPoolClient({
                     sortKey={sortState.column}
                     sortDir={sortState.dir}
                     onSort={handleSortClick}
-                    align="left"
-                    className="min-w-[140px]"
-                    title="Player name"
+                    align="center"
+                    className="pool-table-player-col"
+                    title="Player name; below — college team, regional pod seed, and fantasy owner (active league)"
                   >
                     Player
                   </SortableTh>
                   <SortableTh
-                    column="owner"
-                    sortKey={sortState.column}
-                    sortDir={sortState.dir}
-                    onSort={handleSortClick}
-                    align="left"
-                    className="min-w-[100px]"
-                    title="Fantasy team in your active league"
-                  >
-                    Owner
-                  </SortableTh>
-                  <SortableTh
-                    column="seed"
+                    column="tppg"
                     sortKey={sortState.column}
                     sortDir={sortState.dir}
                     onSort={handleSortClick}
                     align="center"
-                    title="Regional pod seed"
+                    className="md:hidden w-7 px-[1px]"
+                    title="Tournament Points per Game — average fantasy points per R1–R6 round that has box score data"
                   >
-                    Seed
-                  </SortableTh>
-                  <SortableTh
-                    column="overall"
-                    sortKey={sortState.column}
-                    sortDir={sortState.dir}
-                    onSort={handleSortClick}
-                    align="center"
-                    className="min-w-[2.5rem]"
-                    title="NCAA committee overall seed (1–68)"
-                  >
-                    Overall
+                    PPG
                   </SortableTh>
                   <SortableTh
                     column="ppg"
@@ -1245,6 +1218,7 @@ export function PlayersPoolClient({
                     sortDir={sortState.dir}
                     onSort={handleSortClick}
                     align="center"
+                    className="hidden md:table-cell"
                     title="Season points per game"
                   >
                     PPG
@@ -1255,6 +1229,7 @@ export function PlayersPoolClient({
                     sortDir={sortState.dir}
                     onSort={handleSortClick}
                     align="center"
+                    className="hidden md:table-cell"
                     title="Tournament Points per Game — average fantasy points per R1–R6 round that has box score data"
                   >
                     TPPG
@@ -1267,14 +1242,14 @@ export function PlayersPoolClient({
                       sortDir={sortState.dir}
                       onSort={handleSortClick}
                       align="center"
-                      className="w-9 px-0.5"
+                      className="w-5 px-[1px] md:w-9"
                       title={
                         r === 1
                           ? "Round 1 — round of 64 (First Four excluded)"
                           : `Round ${r} tournament fantasy points (live + final box scores)`
                       }
                     >
-                      R{r}
+                      <MRoundPl r={r} />
                     </SortableTh>
                   ))}
                   <SortableTh
@@ -1283,10 +1258,10 @@ export function PlayersPoolClient({
                     sortDir={sortState.dir}
                     onSort={handleSortClick}
                     align="center"
-                    className="pool-table-col-primary min-w-[2.75rem] px-0.5"
+                    className="pool-table-col-primary px-[1px] w-6 md:w-auto"
                     title="Sum of R1–R6 tournament fantasy points (actual only)"
                   >
-                    Total
+                    <MTotPl />
                   </SortableTh>
                   <SortableTh
                     column="origProj"
@@ -1294,6 +1269,7 @@ export function PlayersPoolClient({
                     sortDir={sortState.dir}
                     onSort={handleSortClick}
                     align="center"
+                    className="hidden md:table-cell"
                     title="Pre-tournament: season PPG × full chalk expected games for this team (NCAA bracket, all favorites win)"
                   >
                     Orig
@@ -1304,6 +1280,7 @@ export function PlayersPoolClient({
                     sortDir={sortState.dir}
                     onSort={handleSortClick}
                     align="center"
+                    className="hidden md:table-cell"
                     title="Actual R1–R6 fantasy points + season PPG × remaining chalk games (full expected − games played: decisive finals or live; 0 remaining if eliminated)"
                   >
                     Live
@@ -1314,7 +1291,7 @@ export function PlayersPoolClient({
                     sortDir={sortState.dir}
                     onSort={handleSortClick}
                     align="center"
-                    className="w-11"
+                    className="hidden w-11 md:table-cell"
                     title="Live projection − original projection (green if ahead, red if behind)"
                   >
                     +/-
@@ -1338,7 +1315,6 @@ export function PlayersPoolClient({
                       headshot_url: p.headshot_url,
                       espn_athlete_id: p.espn_athlete_id
                     });
-                const seedDisplay = t?.seed != null && t.seed !== "" ? String(t.seed) : "—";
                 const ppg =
                   p.season_ppg != null && String(p.season_ppg).trim() !== ""
                     ? Number(p.season_ppg).toFixed(1)
@@ -1379,6 +1355,7 @@ export function PlayersPoolClient({
                     : null;
 
                 const roundRanks = [ps.r1, ps.r2, ps.r3, ps.r4, ps.r5, ps.r6] as const;
+                const regionalSeedSubline = seedNumeric(p);
 
                 return (
                   <tr
@@ -1387,42 +1364,53 @@ export function PlayersPoolClient({
                       eliminatedRoundForPlayer(p) != null ? "pool-table-row-eliminated" : ""
                     }`}
                   >
-                    <PoolTableTeamLogoCell url={teamLogoUrl} teamName={teamLabel} />
+                    <PoolTableTeamLogoCell
+                      url={teamLogoUrl}
+                      teamName={teamLabel}
+                      cellClassName="hidden md:table-cell"
+                    />
                     <PoolTablePlayerPhotoCell urls={headshotUrls} playerName={p.name} />
-                    <td className="px-1 py-2 transition-colors text-left align-top">
-                      <span className="inline-flex items-baseline gap-1 flex-wrap min-w-0">
-                        <PlayersPoolPlayerNameLink playerName={p.name} espnAthleteId={p.espn_athlete_id} />
-                        {posTrim ? (
-                          <span className="hidden text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0 md:inline">
-                            {posTrim}
+                    <td className="px-1 py-2 transition-colors text-left align-top pool-table-player-col min-w-0">
+                      <div className="min-w-0 max-w-full overflow-hidden">
+                        <div className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-0.5 gap-y-0.5 md:flex-nowrap">
+                          <span className="min-w-0 shrink grow-0 truncate">
+                            <PlayersPoolPlayerNameLink playerName={p.name} espnAthleteId={p.espn_athlete_id} />
                           </span>
-                        ) : null}
-                        {heatInfo && seasonPpgN != null ? (
-                          <PlayerHeatBadge info={heatInfo} seasonPpg={seasonPpgN} className="shrink-0" />
-                        ) : null}
-                      </span>
-                      <div className="text-[10px] sm:text-[11px] text-foreground/65 mt-1 leading-snug font-normal flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                        <span className="text-foreground/75 font-medium line-clamp-2 min-w-0">{teamLabel}</span>
-                        <span className="text-foreground/35" aria-hidden>
-                          ·
-                        </span>
-                        <span className="text-foreground/80">{displayRegionName(t?.region)}</span>
+                          {posTrim ? (
+                            <span className="hidden text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0 md:inline">
+                              {posTrim}
+                            </span>
+                          ) : null}
+                          {heatInfo && seasonPpgN != null ? (
+                            <PlayerHeatBadge
+                              info={heatInfo}
+                              seasonPpg={seasonPpgN}
+                              className="hidden shrink-0 md:inline-flex"
+                            />
+                          ) : null}
+                        </div>
+                        <PoolPlayerSublineTeamSeedOwner
+                          teamName={teamLabel}
+                          seed={regionalSeedSubline}
+                          ownerName={ownerLabel(p)}
+                          uniformMuted
+                        />
                       </div>
                     </td>
-                    <td className="px-1 py-2 text-left text-foreground/85 transition-colors align-top pool-table-col-group-end">
-                      <PoolResponsiveOwnerNameText full={ownerLabel(p)} />
-                    </td>
-                    <td className="px-1 py-2 text-center transition-colors">{seedDisplay}</td>
-                    <td className="px-1 py-2 text-center transition-colors pool-table-col-group-end">
-                      {overallDisplay(p)}
-                    </td>
-                    <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                      <StatPoolCellWithRank rank={ps.ppg.get(p.id)} poolSize={ps.poolSize}>
-                        {ppg}
-                      </StatPoolCellWithRank>
+                    <td className="w-7 px-[1px] py-2 text-center transition-colors sleeper-score-font md:w-auto md:px-1">
+                      <span className="md:hidden">
+                        <StatPoolCellWithRank rank={ps.tppg.get(p.id)} poolSize={ps.poolSize}>
+                          {tournamentPpgDisplay(p)}
+                        </StatPoolCellWithRank>
+                      </span>
+                      <span className="hidden md:inline">
+                        <StatPoolCellWithRank rank={ps.ppg.get(p.id)} poolSize={ps.poolSize}>
+                          {ppg}
+                        </StatPoolCellWithRank>
+                      </span>
                     </td>
                     <td
-                      className="px-1 py-2 text-center transition-colors sleeper-score-font"
+                      className="hidden px-1 py-2 text-center transition-colors sleeper-score-font md:table-cell"
                       title="Tournament Points per Game (R1–R6 rounds with box scores)"
                     >
                       <StatPoolCellWithRank rank={ps.tppg.get(p.id)} poolSize={ps.poolSize}>
@@ -1432,7 +1420,7 @@ export function PlayersPoolClient({
                     {([1, 2, 3, 4, 5, 6] as const).map((r) => (
                       <td
                         key={r}
-                        className="px-0.5 py-2 text-center transition-colors sleeper-score-font"
+                        className="w-5 px-[1px] py-2 text-center transition-colors sleeper-score-font md:w-auto"
                         title={`R${r} tournament fantasy points`}
                       >
                         <StatPoolCellWithRank rank={roundRanks[r - 1].get(p.id)} poolSize={ps.poolSize}>
@@ -1441,7 +1429,7 @@ export function PlayersPoolClient({
                       </td>
                     ))}
                     <td
-                      className="px-0.5 py-2 text-center transition-colors sleeper-score-font pool-table-col-primary pool-table-col-group-end"
+                      className="w-6 px-[1px] py-2 text-center transition-colors sleeper-score-font pool-table-col-primary pool-table-col-group-end md:w-auto"
                       title="R1 + R2 + R3 + R4 + R5 + R6 tournament fantasy points"
                     >
                       <StatPoolCellWithRank rank={ps.total.get(p.id)} poolSize={ps.poolSize}>
@@ -1449,7 +1437,7 @@ export function PlayersPoolClient({
                       </StatPoolCellWithRank>
                     </td>
                     <td
-                      className="px-1 py-2 text-center transition-colors sleeper-score-font"
+                      className="hidden px-1 py-2 text-center transition-colors sleeper-score-font md:table-cell"
                       title={origProjTitle}
                     >
                       <StatPoolCellWithRank rank={ps.origProj.get(p.id)} poolSize={ps.poolSize}>
@@ -1457,7 +1445,7 @@ export function PlayersPoolClient({
                       </StatPoolCellWithRank>
                     </td>
                     <td
-                      className="px-1 py-2 text-center transition-colors sleeper-score-font"
+                      className="hidden px-1 py-2 text-center transition-colors sleeper-score-font md:table-cell"
                       title={liveProjTitle}
                     >
                       <StatPoolCellWithRank rank={ps.liveProj.get(p.id)} poolSize={ps.poolSize}>
@@ -1465,7 +1453,7 @@ export function PlayersPoolClient({
                       </StatPoolCellWithRank>
                     </td>
                     <td
-                      className="px-1 py-2 text-center transition-colors sleeper-score-font"
+                      className="hidden px-1 py-2 text-center transition-colors sleeper-score-font md:table-cell"
                       title={
                         liveRounded != null && origRounded != null
                           ? `Live projection (${liveRounded}) − original projection (${origRounded})`
@@ -1489,9 +1477,16 @@ export function PlayersPoolClient({
                   </tr>
                 );
               })}
-              {rows.length === 0 && !busy && (
+              {rows.length === 0 && (busy || meta == null) && (
                 <tr className="pool-table-empty">
-                  <td colSpan={18} className="py-8 text-center pool-text-faint text-[11px]">
+                  <td colSpan={15} className="py-8 text-center pool-text-faint text-[11px]">
+                    Loading player stats…
+                  </td>
+                </tr>
+              )}
+              {rows.length === 0 && !busy && meta != null && (
+                <tr className="pool-table-empty">
+                  <td colSpan={15} className="py-8 text-center pool-text-faint text-[11px]">
                     No players with <strong>season PPG &gt; 0</strong> for this season (blank or zero PPG are
                     hidden). In Commissioner, use <strong>Easy commissioner actions</strong> →{" "}
                     <strong>Run full tournament setup</strong> (with roster import) or step{" "}
@@ -1501,7 +1496,7 @@ export function PlayersPoolClient({
               )}
               {rows.length > 0 && !busy && displayedRows.length === 0 && (
                 <tr className="pool-table-empty">
-                  <td colSpan={18} className="py-8 text-center pool-text-faint text-[11px]">
+                  <td colSpan={15} className="py-8 text-center pool-text-faint text-[11px]">
                     No players match current filters.
                   </td>
                 </tr>

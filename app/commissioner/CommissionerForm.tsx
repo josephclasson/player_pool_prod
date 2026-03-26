@@ -16,8 +16,6 @@ import {
   utcDateISOsFromStart,
   utcTodayISO
 } from "@/lib/ncaa-tournament-calendar";
-import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
-
 function formatApiError(json: unknown, fallback: string): string {
   const err = (json as { error?: unknown })?.error;
   if (typeof err === "string") return err;

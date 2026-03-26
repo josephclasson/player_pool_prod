@@ -2,8 +2,7 @@
 
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, ChevronUp, GraduationCap } from "lucide-react";
-import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
+import { ChevronDown, ChevronUp, GraduationCap, RefreshCcw, ShieldCheck } from "lucide-react";
 import { readStoredActiveLeagueId, writeStoredActiveLeagueId } from "@/lib/player-pool-storage";
 import {
   PLAYER_POOL_IDENTITY_CHANGE_EVENT,
@@ -11,6 +10,7 @@ import {
   type PlayerPoolSession
 } from "@/lib/player-pool-session";
 import { PoolResponsiveOwnerNameText } from "@/components/stats/PoolResponsiveDisplayNames";
+import { PoolPlayerSublineTeamSeedOwner } from "@/components/stats/PoolPlayerSublineTeamSeedOwner";
 import { PoolTablePlayerPhotoCell, PoolTableTeamLogoCell } from "@/components/stats/PoolTableMediaCells";
 import { resolveEspnTeamLogoForPoolRow } from "@/lib/espn-ncaam-assets";
 import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-directory";
@@ -169,7 +169,7 @@ function DraftPlayerNameLink({
         href={espnMensCollegeBasketballPlayerProfileUrl({ espnAthleteId: idNum, playerName })}
         target="_blank"
         rel="noopener noreferrer"
-        className="pool-table-player-link"
+        className="pool-table-player-link block min-w-0 truncate"
         title={playerName}
       >
         <span className="hidden lg:inline">{playerName}</span>
@@ -446,6 +446,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   const [draftCellInput, setDraftCellInput] = useState("");
   const [commissionerSecret, setCommissionerSecret] = useState("");
   const [poolSession, setPoolSession] = useState<PlayerPoolSession | null>(null);
+  const [storedActiveLeagueId, setStoredActiveLeagueId] = useState("");
+  const [timerNowMs, setTimerNowMs] = useState<number | null>(null);
   const [commissionerProxyMode, setCommissionerProxyMode] = useState(true);
   const [draftLoadError, setDraftLoadError] = useState<string | null>(null);
   const [refreshBusy, setRefreshBusy] = useState(false);
@@ -556,9 +558,9 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   const activeLeagueId = useMemo(() => {
     const fromQuery = leagueIdFromQuery?.trim();
     const fromPool = poolSession?.leagueId?.trim();
-    const fromLocal = readStoredActiveLeagueId().trim();
+    const fromLocal = storedActiveLeagueId.trim();
     return fromQuery || fromPool || fromLocal || null;
-  }, [leagueIdFromQuery, poolSession?.leagueId]);
+  }, [leagueIdFromQuery, poolSession?.leagueId, storedActiveLeagueId]);
 
   useEffect(() => {
     if (poolSession?.teamName?.trim()) setUsername(poolSession.teamName.trim());
@@ -575,6 +577,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   useEffect(() => {
     const syncPool = () => {
       setPoolSession(readPlayerPoolSession());
+      setStoredActiveLeagueId(readStoredActiveLeagueId().trim());
       try {
         setCommissionerSecret(sessionStorage.getItem("player_pool_commissioner_secret") ?? "");
       } catch {
@@ -601,14 +604,30 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
     [commissionerSecret]
   );
 
+  useEffect(() => {
+    if (!state?.draftRoom.startedAt || !state?.draftRoom.pickTimerSeconds) {
+      setTimerNowMs(null);
+      return;
+    }
+    const tick = () => setTimerNowMs(Date.now());
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, [
+    state?.draftRoom?.startedAt,
+    state?.draftRoom?.pickTimerSeconds,
+    state?.draftRoom?.currentPickOverall
+  ]);
+
   const timerRemaining = useMemo(() => {
+    if (timerNowMs == null) return null;
     if (!state?.draftRoom.startedAt || !state?.draftRoom.pickTimerSeconds) return null;
     const startedAt = new Date(state.draftRoom.startedAt).getTime();
     const pickIndex = (state.draftRoom.currentPickOverall ?? 1) - 1;
     const pickStart = startedAt + pickIndex * state.draftRoom.pickTimerSeconds * 1000;
     const endsAt = pickStart + state.draftRoom.pickTimerSeconds * 1000;
-    return Math.max(0, (endsAt - Date.now()) / 1000);
-  }, [state]);
+    return Math.max(0, (endsAt - timerNowMs) / 1000);
+  }, [state, timerNowMs]);
 
   async function loadState() {
     if (!activeLeagueId) return;
@@ -712,8 +731,6 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
       setRefreshBusy(false);
     }
   }
-
-  useSubscribePullRefresh(() => void onManualRefresh(), Boolean(activeLeagueId));
 
   useEffect(() => {
     let cancelled = false;
@@ -1233,30 +1250,44 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
   })();
 
   return (
-    <div className="pool-page-stack pool-page-stack-tight flex min-h-0 flex-1 flex-col">
+    <div className="pool-page-stack pool-page-stack-tight flex flex-col pb-8 md:pb-0">
       <div className="pool-hero pool-hero-databallr shrink-0">
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between md:gap-3">
-          <div className="flex items-center gap-2.5 md:gap-3 min-w-0">
+        <div className="grid grid-cols-[5rem_1fr_5rem] items-center gap-2 md:grid-cols-[auto_1fr_auto]">
+          <div className="flex items-center justify-start">
             <div
               className="h-9 w-9 shrink-0 rounded-md bg-accent/15 border border-accent/40 flex items-center justify-center"
               aria-hidden
             >
               <GraduationCap className="h-4 w-4 text-accent" />
             </div>
-            <div className="min-w-0">
-              <h1 className="stat-tracker-page-title">Draft</h1>
-              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block">{draftStatusLine}</div>
-              <div className="md:hidden mt-0.5 text-[9px] text-foreground/40">Pull down to refresh</div>
-            </div>
           </div>
-          <div className="hidden md:flex flex-wrap items-center gap-1.5 shrink-0">
+          <div className="min-w-0 text-center md:text-left">
+            <h1 className="stat-tracker-page-title text-center md:text-left">Draft</h1>
+              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block">{draftStatusLine}</div>
+          </div>
+          <div className="flex items-center justify-end gap-1">
             <button
               type="button"
-              className="pool-btn-outline-cta pool-btn-outline-cta--sm"
+              className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm !p-1 !w-9 !h-9 flex items-center justify-center"
               disabled={!activeLeagueId || refreshBusy}
               onClick={() => void onManualRefresh()}
+              aria-label="Refresh Data"
+              aria-busy={refreshBusy}
             >
-              {refreshBusy ? "…" : "Refresh Data"}
+              <RefreshCcw className={`h-4 w-4 ${refreshBusy ? "animate-spin" : ""}`} aria-hidden />
+              <span className="sr-only">{refreshBusy ? "Refreshing…" : "Refresh Data"}</span>
+            </button>
+            <button
+              type="button"
+              className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm !p-1 !w-9 !h-9 flex items-center justify-center"
+              onClick={() => {
+                const href = activeLeagueId ? `/commissioner?leagueId=${encodeURIComponent(activeLeagueId)}` : "/commissioner";
+                window.location.assign(href);
+              }}
+              aria-label="Commissioner login"
+            >
+              <ShieldCheck className="h-4 w-4" aria-hidden />
+              <span className="sr-only">Commissioner login</span>
             </button>
           </div>
         </div>
@@ -1290,19 +1321,19 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
               </div>
             </button>
             {draftBoardOpen ? (
-            <div className="mt-1 shrink-0 overflow-x-auto md:overflow-x-auto">
+            <div className="pool-table-viewport mt-1 shrink-0 overflow-x-auto md:overflow-x-auto">
               <table
-                className="pool-table w-full min-w-[520px] text-[10px] sm:text-[11px]"
+                className="pool-table pool-table-fixed w-full min-w-0 text-[10px] sm:text-[11px] md:min-w-[520px]"
                 aria-label="Draft board by round"
               >
               <thead>
                 <tr>
-                  <th className="sticky left-0 z-[1] w-24 min-w-[5.5rem] max-w-[6rem] bg-[rgb(var(--pool-stats-bg-odd)/0.92)] px-1 py-1.5 text-left text-[10px] font-semibold leading-tight backdrop-blur-sm sm:text-[11px]">
+                  <th className="sticky left-0 z-[1] w-[4.5rem] min-w-[4.5rem] max-w-[5.75rem] md:w-24 md:min-w-[5.5rem] md:max-w-[7.25rem] bg-[rgb(var(--pool-stats-bg-odd)/0.92)] px-1 py-1.5 text-left text-[10px] font-semibold leading-tight backdrop-blur-sm sm:text-[11px]">
                     Owner
                   </th>
                   {Array.from({ length: DRAFT_BOARD_ROUND_COUNT }, (_, i) => i + 1).map((r) => (
                     <th key={r} className="w-24 min-w-[5.5rem] px-1 py-1.5 text-center font-semibold" scope="col">
-                      {r}
+                      Round {r}
                     </th>
                   ))}
                 </tr>
@@ -1312,10 +1343,10 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                   <tr key={row.leagueTeamId} className="pool-table-row">
                     <th
                       scope="row"
-                      className="sticky left-0 z-[1] w-24 min-w-[5.5rem] max-w-[6rem] bg-[rgb(var(--pool-stats-bg-even)/0.92)] px-1 py-1.5 text-left text-[10px] font-medium leading-tight text-foreground backdrop-blur-sm align-top sm:text-[11px]"
+                      className="sticky left-0 z-[1] w-[4.5rem] min-w-[4.5rem] max-w-[5.75rem] md:w-24 md:min-w-[5.5rem] md:max-w-[7.25rem] bg-[rgb(var(--pool-stats-bg-even)/0.92)] px-1 py-1.5 text-left text-[10px] font-medium leading-tight text-foreground backdrop-blur-sm align-top sm:text-[11px]"
                       title={row.ownerName}
                     >
-                      <span className="line-clamp-2 leading-snug">
+                      <span className="block truncate leading-snug">
                         <PoolResponsiveOwnerNameText full={row.ownerName} />
                       </span>
                     </th>
@@ -1341,11 +1372,6 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                   playerName={pick.player.name}
                                   espnAthleteId={pick.player.espnAthleteId}
                                 />
-                                {pick.player.position ? (
-                                  <span className="ml-1 text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums">
-                                    {pick.player.position}
-                                  </span>
-                                ) : null}
                               </div>
                               <div
                                 className="mt-0.5 break-words whitespace-normal text-foreground/55"
@@ -1524,7 +1550,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
             <p className="mt-1.5 text-[11px] text-amber-500/90">Select your team in the header bar to pick.</p>
           )}
 
-        <div className="mt-3 flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+        <div className="mt-3 flex min-w-0 flex-col gap-3">
           {!isFinal ? (
             activeLeagueId && !state?.draftRoom && !draftLoadError ? (
               <p className="text-center text-[11px] text-muted-foreground py-6 px-2">Loading draft room…</p>
@@ -1626,15 +1652,15 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                     </div>
                   </div>
                 </div>
-                <div className="min-h-[min(640px,calc(100dvh-9.5rem))] flex-1 overflow-auto pr-1">
-                  <div className="min-w-0 overflow-x-auto md:overflow-x-auto">
-                    <table className="pool-table w-full text-xs min-w-[720px]">
+                <div className="min-h-[min(640px,calc(100dvh-9.5rem))] flex-1 overflow-visible pr-1 md:overflow-auto md:pr-1 pb-2 md:pb-0">
+                  <div className="pool-table-viewport min-w-0 overflow-x-auto md:overflow-x-auto">
+                    <table className="pool-table pool-table-fixed w-full text-xs min-w-0 md:min-w-[720px]">
                       <thead>
                         <tr>
                           <th className="w-6 p-0.5 text-center" scope="col">
                             <span className="sr-only">Draft player</span>
                           </th>
-                          <th className="w-10 p-1 text-center" scope="col">
+                          <th className="hidden w-10 p-1 text-center md:table-cell" scope="col">
                             <span className="sr-only">Team logo</span>
                           </th>
                           <th className="w-10 p-1 text-center" scope="col">
@@ -1671,16 +1697,6 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                             Pos
                           </SortableTh>
                           <SortableTh
-                            column="seed"
-                            sortKey={draftSort.column}
-                            sortDir={draftSort.dir}
-                            onSort={cycleDraftSort}
-                            className="text-center"
-                            title="Tournament seed"
-                          >
-                            Seed
-                          </SortableTh>
-                          <SortableTh
                             column="region"
                             sortKey={draftSort.column}
                             sortDir={draftSort.dir}
@@ -1708,7 +1724,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                             className="text-center"
                             title="Draft projection: season PPG × full chalk expected games (same as Player Statistics Orig Proj)"
                           >
-                            Draft Projection
+                            <span className="md:hidden">PROJ</span>
+                            <span className="hidden md:inline">Projection</span>
                           </SortableTh>
                         </tr>
                       </thead>
@@ -1727,7 +1744,6 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                             : p.displayHeadshotUrl ?
                               [p.displayHeadshotUrl]
                             : [];
-                          const seedDisplay = t?.seed != null ? String(t.seed) : "—";
                           const ppg =
                             p.seasonPpg != null && String(p.seasonPpg).trim() !== ""
                               ? Number(p.seasonPpg).toFixed(1)
@@ -1766,7 +1782,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                   )}
                                 </button>
                               </td>
-                              <PoolTableTeamLogoCell url={teamLogoUrl} teamName={teamLabel} />
+                              <PoolTableTeamLogoCell url={teamLogoUrl} teamName={teamLabel} cellClassName="hidden md:table-cell" />
                               <PoolTablePlayerPhotoCell urls={headshotUrls} playerName={p.name} />
                               <td className="px-1 py-2 transition-colors text-left align-top">
                                 <span className="inline-flex items-baseline gap-1 flex-wrap min-w-0">
@@ -1789,7 +1805,6 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                               <td className="px-1 py-2 align-top text-center text-foreground/80">
                                 {posTrim || "—"}
                               </td>
-                              <td className="px-1 py-2 text-center">{seedDisplay}</td>
                               <td className="px-1 py-2 text-center text-foreground/80">
                                 {abbrRegion(t?.region)}
                               </td>
@@ -1805,7 +1820,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                         })}
                         {state && state.availablePlayers.length === 0 && (
                           <tr className="pool-table-empty">
-                            <td colSpan={10} className="py-8 text-center pool-text-faint text-[11px]">
+                            <td colSpan={9} className="py-8 text-center pool-text-faint text-[11px]">
                               Pool empty or draft almost done.
                               {state.draftRoom.status === "in_progress" && (
                                 <span className="mt-1 block text-amber-200/75">
@@ -1824,7 +1839,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
               <div className="pool-subpanel max-h-36 shrink-0 overflow-hidden py-2">
                 <div className="mb-1 px-1 text-[11px] font-medium text-muted-foreground">Recent picks</div>
                 <div className="max-h-28 overflow-x-hidden overflow-y-auto md:overflow-x-auto">
-                  <table className="pool-table w-full text-xs">
+                  <table className="pool-table pool-table-fixed w-full text-xs">
                     <thead>
                       <tr>
                         <th className="text-left">#</th>
@@ -1881,7 +1896,8 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                       checked={allResultsCollapsed}
                       onChange={(e) => setAllResultsCollapsed(e.target.checked)}
                     />
-                    <span>Collapse all</span>
+                    <span className="md:hidden">Collapse</span>
+                    <span className="hidden md:inline">Collapse all</span>
                   </label>
                   <div className="pool-filter-select relative">
                     <span className="pool-filter-label">Owner</span>
@@ -1979,7 +1995,7 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                 </div>
               </div>
 
-              <div className="mt-4 space-y-3">
+              <div className="mt-4 space-y-3 pb-6 md:pb-0">
                 {(filteredResultsByOwner ?? []).map((bucket) => {
                   const sortedPicks = bucket.picks.slice().sort((a, b) => a.pickOverall - b.pickOverall);
                   const pickRows = sortedPicks.map((p) => {
@@ -2015,6 +2031,13 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                         <div className="text-sm font-semibold pool-owner-name min-w-0 truncate max-w-[min(100%,14rem)] sm:max-w-[18rem]">
                           <PoolResponsiveOwnerNameText full={bucket.ownerName} />
                         </div>
+                        <div className="pool-owner-header-stat-meta flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-x-1.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums leading-none text-white/55 md:hidden">
+                          <span className="whitespace-nowrap">Report Card: {rc.grade}</span>
+                          <span className="pool-owner-header-stat-meta-sep select-none" aria-hidden>
+                            ·
+                          </span>
+                          <span className="whitespace-nowrap">Draft Projection: {Math.round(rc.projSum)}</span>
+                        </div>
                         <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-wrap items-baseline justify-end gap-x-1.5 gap-y-0.5 text-right text-[10px] sm:text-[11px] font-normal tabular-nums">
                           <span>Report Card: {rc.grade}</span>
                           <span className="pool-owner-header-stat-meta-sep select-none" aria-hidden>·</span>
@@ -2043,28 +2066,33 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                       <div className="mt-1 px-2 text-[11px] text-foreground/80">{rc.blurb}</div>
                       {(resultsOpenByOwnerId[bucket.leagueTeamId] ?? true) ? (
                         <>
-                      <div className="mt-2 overflow-x-auto md:overflow-x-auto">
-                        <table className="pool-table w-full text-xs">
+                      <div className="pool-table-viewport mt-2 overflow-x-auto md:overflow-x-auto">
+                        <table className="pool-table pool-table-fixed pool-draft-results-table w-full text-xs">
                           <thead>
                             <tr>
-                              <th className="w-10 p-1 text-center">
+                              <th className="hidden w-10 p-1 text-center md:table-cell">
                                 <span className="sr-only">Team logo</span>
                               </th>
-                              <th className="w-10 p-1 text-center">
+                              <th className="w-9 p-0.5 text-center md:w-10 md:p-1">
                                 <span className="sr-only">Player photo</span>
                               </th>
-                              <th className="text-left">Player</th>
-                              <th className="text-center">Seed</th>
-                              <th className="text-center">PPG</th>
-                              <th className="text-center">Overall Pick</th>
-                              <th className="text-center" title="Average Draft Position from Draft Projection rank across all loaded players">
+                              <th className="text-center whitespace-nowrap pool-table-player-col">Player</th>
+                              <th className="hidden text-center">Seed</th>
+                              <th className="w-7 px-[1px] text-center">PPG</th>
+                              <th className="w-7 px-[1px] text-center" title="Pre-tournament draft projection">
+                                <span className="md:hidden">PROJ</span>
+                                <span className="hidden md:inline">Projection</span>
+                              </th>
+                              <th className="w-7 px-[1px] text-center">
+                                <span className="md:hidden">OVR</span>
+                                <span className="hidden md:inline">Overall Pick</span>
+                              </th>
+                              <th className="w-7 px-[1px] text-center" title="Average Draft Position from Draft Projection rank across all loaded players">
                                 ADP
                               </th>
-                              <th className="text-center" title="ADP minus actual pick overall (green = value, red = reach)">
-                                ADP +/-
-                              </th>
-                              <th className="text-center" title="Pre-tournament draft projection">
-                                Draft Projection
+                              <th className="w-7 px-[1px] text-center" title="ADP minus actual pick overall (green = value, red = reach)">
+                                <span className="md:hidden">+/−</span>
+                                <span className="hidden md:inline">ADP +/−</span>
                               </th>
                             </tr>
                           </thead>
@@ -2080,42 +2108,46 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                     fullName: p.player.team?.name != null ? String(p.player.team.name) : null
                                   })}
                                   teamName={p.player.team?.name ?? "—"}
+                                  cellClassName="hidden md:table-cell"
                                 />
                                 <PoolTablePlayerPhotoCell
                                   urls={p.player.headshotUrls ?? []}
                                   playerName={p.player.name}
                                 />
-                                <td className="px-1 py-2 transition-colors text-left align-top">
-                                  <span className="inline-flex items-baseline gap-1 flex-wrap min-w-0">
+                                <td className="px-1 py-2 transition-colors text-left align-top whitespace-nowrap min-w-0">
+                                  <span className="inline-flex items-baseline gap-1 flex-nowrap min-w-0 max-w-full overflow-hidden">
                                     <DraftPlayerNameLink
                                       playerName={p.player.name}
                                       espnAthleteId={p.player.espnAthleteId}
                                     />
                                     {p.player.position ? (
-                                      <span className="text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0">
+                                      <span className="hidden md:inline text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0 whitespace-nowrap">
                                         {p.player.position}
                                       </span>
                                     ) : null}
                                   </span>
-                                  <div className="text-[10px] sm:text-[11px] text-foreground/65 mt-1 leading-snug font-normal flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                                    <span className="text-foreground/75 font-medium line-clamp-2 min-w-0">
-                                      {displayCollegeTeam(p.player.team)}
-                                    </span>
-                                    <span className="text-foreground/35" aria-hidden>
-                                      ·
-                                    </span>
-                                    <span className="text-foreground/80">{displayRegionName(p.player.team?.region)}</span>
-                                  </div>
+                                  <PoolPlayerSublineTeamSeedOwner
+                                    teamName={displayCollegeTeam(p.player.team)}
+                                    seed={
+                                      p.player.team?.seed != null && Number.isFinite(Number(p.player.team.seed))
+                                        ? Number(p.player.team.seed)
+                                        : null
+                                    }
+                                    regionName={displayRegionName(p.player.team?.region)}
+                                  />
                                 </td>
-                                <td className="text-center">{p.player.team?.seed ?? "—"}</td>
-                                <td className="text-center sleeper-score-font">
+                                <td className="hidden text-center">{p.player.team?.seed ?? "—"}</td>
+                                <td className="w-9 px-0.5 text-center sleeper-score-font">
                                   {p.player.seasonPpg != null && Number.isFinite(Number(p.player.seasonPpg))
                                     ? Number(p.player.seasonPpg).toFixed(1)
                                     : "—"}
                                 </td>
+                                <td className="w-9 px-0.5 text-center sleeper-score-font">
+                                  {origProj == null ? "—" : String(Math.round(origProj))}
+                                </td>
                                 <td className="text-center font-semibold">{p.pickOverall}</td>
-                                <td className="text-center sleeper-score-font">{adpText(adp)}</td>
-                                <td className="text-center sleeper-score-font">
+                                <td className="w-9 px-0.5 text-center sleeper-score-font">{adpText(adp)}</td>
+                                <td className="w-9 px-0.5 text-center sleeper-score-font">
                                   {adpDelta == null ? (
                                     "—"
                                   ) : (
@@ -2124,14 +2156,11 @@ export function DraftTabClient({ initialLeagueId }: { initialLeagueId?: string }
                                     </span>
                                   )}
                                 </td>
-                                <td className="text-center sleeper-score-font">
-                                  {origProj == null ? "—" : String(Math.round(origProj))}
-                                </td>
                               </tr>
                             ))}
                             {bucket.picks.length === 0 && (
                               <tr className="pool-table-empty">
-                                <td className="py-4 text-[11px]" colSpan={9}>
+                                <td className="py-4 text-[11px]" colSpan={8}>
                                   No players drafted.
                                 </td>
                               </tr>

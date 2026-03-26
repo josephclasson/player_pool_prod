@@ -31,3 +31,15 @@ export function abbreviateOwnerNameForMobile(name: string): string {
   const first = t.split(/\s+/).filter(Boolean)[0];
   return first ?? t;
 }
+
+/** Mobile bracket column: full region name or API token → W / E / MW / S. */
+export function abbreviateRegionForMobile(region: string): string {
+  const r = region?.trim() || "";
+  if (!r) return "—";
+  const u = r.toUpperCase();
+  if (u === "W" || /^WEST$/i.test(r)) return "W";
+  if (u === "E" || /^EAST$/i.test(r)) return "E";
+  if (u === "MW" || /^MIDWEST$/i.test(r)) return "MW";
+  if (u === "S" || /^SOUTH$/i.test(r)) return "S";
+  return r.length <= 3 ? r : r.slice(0, 3);
+}

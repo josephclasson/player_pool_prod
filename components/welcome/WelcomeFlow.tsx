@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { clearStoredActiveLeagueId, writeStoredActiveLeagueId } from "@/lib/player-pool-storage";
-import { useSubscribePullRefresh } from "@/hooks/useSubscribePullRefresh";
 import {
   clearPlayerPoolSession,
   PLAYER_POOL_IDENTITY_CHANGE_EVENT,
@@ -16,9 +15,13 @@ import {
 
 type TeamRow = { id: string; teamName: string };
 
+function subscribePlayerPoolSession(onStoreChange: () => void) {
+  window.addEventListener(PLAYER_POOL_IDENTITY_CHANGE_EVENT, onStoreChange);
+  return () => window.removeEventListener(PLAYER_POOL_IDENTITY_CHANGE_EVENT, onStoreChange);
+}
+
 export function WelcomeFlow() {
   const router = useRouter();
-  useSubscribePullRefresh(() => void router.refresh(), true);
   const sp = useSearchParams();
   const prefillLeague = useMemo(() => sp.get("league")?.trim() ?? sp.get("code")?.trim() ?? "", [sp]);
 
@@ -30,8 +33,15 @@ export function WelcomeFlow() {
   const [resolvedSeasonYear, setResolvedSeasonYear] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  /** null only before mount — matches SSR so we don't branch on sessionStorage during hydration. */
+  const [existing, setExisting] = useState<PlayerPoolSession | null>(null);
 
-  const existing = readPlayerPoolSession();
+  useEffect(() => {
+    const sync = () => setExisting(readPlayerPoolSession());
+    sync();
+    window.addEventListener(PLAYER_POOL_IDENTITY_CHANGE_EVENT, sync);
+    return () => window.removeEventListener(PLAYER_POOL_IDENTITY_CHANGE_EVENT, sync);
+  }, []);
 
   useEffect(() => {
     if (prefillLeague) setLeagueField((prev) => prev || prefillLeague);

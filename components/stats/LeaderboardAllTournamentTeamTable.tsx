@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
-import { PoolResponsiveOwnerNameText } from "@/components/stats/PoolResponsiveDisplayNames";
+import { PoolPlayerSublineTeamSeedOwner } from "@/components/stats/PoolPlayerSublineTeamSeedOwner";
 import { PoolTablePlayerPhotoCell, PoolTableTeamLogoCell } from "@/components/stats/PoolTableMediaCells";
 import { PlayerHeatBadge } from "@/components/stats/PlayerHeatBadge";
 import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-directory";
@@ -16,7 +16,6 @@ import {
 } from "@/lib/all-tournament-team";
 import { computeHeatBadgeInfo } from "@/lib/player-heat-badge";
 import type { LeaderboardRosterPlayerApi } from "@/lib/scoring/persist-league-scoreboard";
-import { abbreviatePlayerNameForMobile } from "@/lib/pool-mobile-display-names";
 
 type RoundScores = Record<number, number | null | undefined>;
 
@@ -85,26 +84,22 @@ function rosterRowToTablePlayer(p: LeaderboardRosterPlayerApi): TablePlayer {
   };
 }
 
-/** Full bracket region for display (matches StatTracker under team name). */
-function displayRegionName(region: string): string {
-  const r = region?.trim() || "";
-  if (!r) return "—";
-  switch (r) {
-    case "W":
-    case "West":
-      return "West";
-    case "E":
-    case "East":
-      return "East";
-    case "MW":
-    case "Midwest":
-      return "Midwest";
-    case "S":
-    case "South":
-      return "South";
-    default:
-      return r;
-  }
+function MRoundLb({ r }: { r: 1 | 2 | 3 | 4 | 5 | 6 }) {
+  return (
+    <>
+      <span className="md:hidden">{r}</span>
+      <span className="hidden md:inline">R{r}</span>
+    </>
+  );
+}
+
+function MTotLb() {
+  return (
+    <>
+      <span className="md:hidden">TOT</span>
+      <span className="hidden md:inline">Total</span>
+    </>
+  );
 }
 
 function formatMaybeNumber(v: number | null | undefined) {
@@ -390,7 +385,7 @@ function InlineLeagueStatRank({
       : `League rank ${rank} of ${draftedCount} drafted players (1 = best)`;
   return (
     <span
-      className="pool-inline-rank block text-[9px] sm:text-[10px] font-bold tabular-nums leading-none mt-0.5 text-[rgb(var(--pool-stats-accent))]"
+      className="pool-inline-rank hidden md:block text-[9px] sm:text-[10px] font-bold tabular-nums leading-none mt-0.5 text-[rgb(var(--pool-stats-accent))]"
       title={title}
     >
       {rank}
@@ -436,13 +431,18 @@ function StatTrackerPlayerNameLink({
         href={espnMensCollegeBasketballPlayerProfileUrl({ espnAthleteId, playerName })}
         target="_blank"
         rel="noopener noreferrer"
-        className="pool-table-player-link"
+        className="pool-table-player-link block min-w-0 max-w-full truncate"
+        title={playerName}
       >
         {playerName}
       </a>
     );
   }
-  return <span className="font-semibold">{playerName}</span>;
+  return (
+    <span className="font-semibold block min-w-0 max-w-full truncate" title={playerName}>
+      {playerName}
+    </span>
+  );
 }
 
 function EmptyHighlightTableRow({ showTppgColumns }: { showTppgColumns: boolean }) {
@@ -451,17 +451,15 @@ function EmptyHighlightTableRow({ showTppgColumns }: { showTppgColumns: boolean 
   const dLeft = "px-1 py-2 text-left text-foreground/45 align-middle";
   return (
     <tr className="pool-table-row">
-      <PoolTableTeamLogoCell url={null} teamName="" />
+      <PoolTableTeamLogoCell url={null} teamName="" cellClassName="hidden md:table-cell" />
       <PoolTablePlayerPhotoCell urls={[]} playerName="" />
-      <td className={`${dLeft} align-top`}>—</td>
-      <td className={`${dLeft} pool-table-col-group-end min-w-0 max-w-[9rem]`}>—</td>
-      <td className={d}>—</td>
-      <td className={`${d} tabular-nums pool-table-col-group-end`}>—</td>
+      <td className={`${dLeft} align-top pool-table-player-col`}>—</td>
+      <td className={`${d} hidden tabular-nums pool-table-col-group-end md:table-cell`}>—</td>
       <td className={d}>—</td>
       {showTppgColumns ? (
         <>
-          <td className={`${d} text-foreground/80`}>—</td>
-          <td className={d}>—</td>
+          <td className={`${d} hidden text-foreground/80 md:table-cell`}>—</td>
+          <td className={`${d} hidden md:table-cell`}>—</td>
         </>
       ) : null}
       <td className={`${d} sleeper-score-font`}>—</td>
@@ -471,9 +469,9 @@ function EmptyHighlightTableRow({ showTppgColumns }: { showTppgColumns: boolean 
       <td className={`${d} sleeper-score-font`}>—</td>
       <td className={`${d} sleeper-score-font`}>—</td>
       <td className={`${d} sleeper-score-font pool-table-col-primary${projBlockDivider}`}>—</td>
-      <td className={`${d} sleeper-score-font`}>—</td>
-      <td className={`${d} sleeper-score-font`}>—</td>
-      <td className={`${d} sleeper-score-font`}>—</td>
+      <td className={`${d} hidden sleeper-score-font md:table-cell`}>—</td>
+      <td className={`${d} hidden sleeper-score-font md:table-cell`}>—</td>
+      <td className={`${d} hidden sleeper-score-font md:table-cell`}>—</td>
     </tr>
   );
 }
@@ -503,12 +501,8 @@ function LeaderboardPlayersHighlightTable({
   const leagueStatRanks = buildLeagueStatRanks(allTablePlayers);
   const filledRows = bodyRows.filter((p): p is TablePlayer => p != null);
   const footer = computeFooterTotals(filledRows, currentRound);
-  const seedSum = filledRows.reduce((sum, p) => sum + (p.seed ?? 0), 0);
   const overallSum = filledRows.reduce((sum, p) => sum + (p.overallSeed ?? 0), 0);
-  const hasAnySeed = filledRows.some((p) => p.seed != null);
   const hasAnyOverall = filledRows.some((p) => p.overallSeed != null);
-  const seedFooterDisplay: ReactNode =
-    filledRows.length === 0 || !hasAnySeed ? "—" : <span className="tabular-nums font-semibold">{seedSum}</span>;
   const overallFooterDisplay: ReactNode =
     filledRows.length === 0 || !hasAnyOverall ? "—" : <span className="tabular-nums font-semibold">{overallSum}</span>;
 
@@ -538,7 +532,7 @@ function LeaderboardPlayersHighlightTable({
   const projBlockDivider = showTppgColumns ? " pool-table-col-total-divider" : "";
 
   return (
-    <div className="pool-card pool-card-compact mt-4 min-w-0">
+    <div className="pool-card pool-card-compact mt-2.5 md:mt-4 min-w-0">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -557,27 +551,24 @@ function LeaderboardPlayersHighlightTable({
       </button>
 
       {open ? (
-      <div className="mt-1.5 overflow-x-auto md:overflow-x-auto">
-        <table className="pool-table w-full text-xs">
+      <div className="pool-table-viewport mt-1.5 overflow-x-auto md:overflow-x-auto">
+        <table className="pool-table text-xs">
           <thead>
             <tr>
-              <th className="w-10 p-1 text-center" scope="col">
+              <th className="hidden w-10 p-1 text-center md:table-cell" scope="col">
                 <span className="sr-only">Team logo</span>
               </th>
               <th className="w-10 p-1 text-center" scope="col">
                 <span className="sr-only">Player photo</span>
               </th>
-              <th className="text-left min-w-[9rem]" title="Player name, position, and college team">
+              <th
+                className="text-center pool-table-player-col"
+                title="Player name and position; below — college team, regional pod seed, and drafting fantasy owner"
+              >
                 Player
               </th>
-              <th className="text-left min-w-[5.5rem]" title="Pool owner who drafted this player">
-                Owner
-              </th>
-              <th className="text-center" title="Regional pod seed (1–16 within the bracket)">
-                SEED
-              </th>
               <th
-                className="text-center pool-table-col-group-end"
+                className="hidden text-center pool-table-col-group-end md:table-cell"
                 title="NCAA tournament overall seed (S-curve) 1–68 from the selection committee"
               >
                 Overall
@@ -587,34 +578,57 @@ function LeaderboardPlayersHighlightTable({
               </th>
               {showTppgColumns ? (
                 <th
-                  className="text-center"
+                  className="hidden text-center md:table-cell"
                   title="Tournament Points per Game — average fantasy points per R1–R6 round that has box score data"
                 >
                   TPPG
                 </th>
               ) : null}
               {showTppgColumns ? (
-                <th className="text-center" title="Tournament PPG minus season PPG (TPPG − PPG)">
+                <th
+                  className="hidden text-center md:table-cell"
+                  title="Tournament PPG minus season PPG (TPPG − PPG)"
+                >
                   +/−
                 </th>
               ) : null}
-              <th className="text-center">R1</th>
-              <th className="text-center">R2</th>
-              <th className="text-center">R3</th>
-              <th className="text-center">R4</th>
-              <th className="text-center">R5</th>
-              <th className="text-center">R6</th>
-              <th className="text-center pool-table-col-primary">Total</th>
-              <th className="text-center" title="Pre-tournament: season PPG × full chalk expected games">
+              <th className="text-center">
+                <MRoundLb r={1} />
+              </th>
+              <th className="text-center">
+                <MRoundLb r={2} />
+              </th>
+              <th className="text-center">
+                <MRoundLb r={3} />
+              </th>
+              <th className="text-center">
+                <MRoundLb r={4} />
+              </th>
+              <th className="text-center">
+                <MRoundLb r={5} />
+              </th>
+              <th className="text-center">
+                <MRoundLb r={6} />
+              </th>
+              <th className="text-center pool-table-col-primary">
+                <MTotLb />
+              </th>
+              <th
+                className="hidden text-center md:table-cell"
+                title="Pre-tournament: season PPG × full chalk expected games"
+              >
                 Orig
               </th>
               <th
-                className="text-center"
+                className="hidden text-center md:table-cell"
                 title="Actual tournament points + season PPG × remaining expected chalk games"
               >
                 Live
               </th>
-              <th className="text-center w-11" title="Live projection − original projection">
+              <th
+                className="hidden w-11 text-center md:table-cell"
+                title="Live projection − original projection"
+              >
                 +/−
               </th>
             </tr>
@@ -638,41 +652,40 @@ function LeaderboardPlayersHighlightTable({
                   key={p.rosterSlotId || p.playerId}
                   className={`pool-table-row ${p.eliminated ? "pool-table-row-eliminated" : ""}`}
                 >
-                  <PoolTableTeamLogoCell url={p.teamLogoUrl} teamName={p.teamName} />
+                  <PoolTableTeamLogoCell
+                    url={p.teamLogoUrl}
+                    teamName={p.teamName}
+                    cellClassName="hidden md:table-cell"
+                  />
                   <PoolTablePlayerPhotoCell urls={p.headshotUrls} playerName={p.playerName} />
-                  <td className="px-1 py-2 transition-colors text-left align-top">
-                    <span className="inline-flex items-baseline gap-1 flex-wrap min-w-0">
-                      <StatTrackerPlayerNameLink playerName={p.playerName} espnAthleteId={p.espnAthleteId} />
-                      {p.position ? (
-                        <span className="hidden text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0 md:inline">
-                          {p.position}
+                  <td className="px-1 py-2 transition-colors text-left align-top pool-table-player-col min-w-0">
+                    <div className="min-w-0 max-w-full overflow-hidden">
+                      <div className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-0.5 gap-y-0.5 md:flex-nowrap">
+                        <span className="min-w-0 shrink grow-0 truncate">
+                          <StatTrackerPlayerNameLink playerName={p.playerName} espnAthleteId={p.espnAthleteId} />
                         </span>
-                      ) : null}
-                      {heatInfo ? (
-                        <PlayerHeatBadge info={heatInfo} seasonPpg={p.seasonPpg} className="shrink-0" />
-                      ) : null}
-                    </span>
-                    <div className="text-[10px] sm:text-[11px] text-foreground/65 mt-1 leading-snug font-normal flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                      <span className="text-foreground/75 font-medium line-clamp-2 min-w-0">{p.teamName}</span>
-                      <span className="text-foreground/35" aria-hidden>
-                        ·
-                      </span>
-                      <span className="text-foreground/80">{displayRegionName(p.regionLabel)}</span>
+                        {p.position ? (
+                          <span className="hidden text-[10px] sm:text-[11px] text-foreground/65 font-normal tabular-nums shrink-0 md:inline">
+                            {p.position}
+                          </span>
+                        ) : null}
+                        {heatInfo ? (
+                          <PlayerHeatBadge
+                            info={heatInfo}
+                            seasonPpg={p.seasonPpg}
+                            className="hidden shrink-0 md:inline-flex"
+                          />
+                        ) : null}
+                      </div>
+                      <PoolPlayerSublineTeamSeedOwner
+                        teamName={p.teamName}
+                        seed={p.seed}
+                        ownerName={p.ownerName}
+                      />
                     </div>
                   </td>
-                  <td className="px-1 py-2 text-left text-foreground/85 transition-colors align-top pool-table-col-group-end min-w-0 max-w-[9rem]">
-                    <span className="truncate block" title={p.ownerName}>
-                      <PoolResponsiveOwnerNameText full={p.ownerName} />
-                    </span>
-                  </td>
                   <td
-                    className="px-1 py-2 text-center transition-colors"
-                    title={p.seed != null ? `Regional seed ${p.seed}` : undefined}
-                  >
-                    {p.seed != null ? <span className="tabular-nums">{p.seed}</span> : "—"}
-                  </td>
-                  <td
-                    className="px-1 py-2 text-center transition-colors tabular-nums pool-table-col-group-end"
+                    className="hidden px-1 py-2 text-center transition-colors tabular-nums pool-table-col-group-end md:table-cell"
                     title={
                       p.overallSeed != null
                         ? `NCAA overall seed ${p.overallSeed} of 68 (selection committee S-curve)`
@@ -693,14 +706,14 @@ function LeaderboardPlayersHighlightTable({
                     </StatCellWithRank>
                   </td>
                   {showTppgColumns ? (
-                    <td className="px-1 py-2 text-center text-foreground/80 transition-colors">
+                    <td className="hidden px-1 py-2 text-center text-foreground/80 transition-colors md:table-cell">
                       <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.tppg.get(rowKey)} draftedCount={dc}>
                         {computeDisplayTournamentPpg(p).toFixed(1)}
                       </StatCellWithRank>
                     </td>
                   ) : null}
                   {showTppgColumns ? (
-                    <td className="px-1 py-2 text-center transition-colors">
+                    <td className="hidden px-1 py-2 text-center transition-colors md:table-cell">
                       <StatCellWithRank
                         showRank={showInlineRanks}
                         rank={leagueStatRanks.tppgDelta.get(rowKey)}
@@ -751,17 +764,17 @@ function LeaderboardPlayersHighlightTable({
                       {p.total}
                     </StatCellWithRank>
                   </td>
-                  <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
+                  <td className="hidden px-1 py-2 text-center transition-colors sleeper-score-font md:table-cell">
                     <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.origProj.get(rowKey)} draftedCount={dc}>
                       {origR != null ? String(origR) : "—"}
                     </StatCellWithRank>
                   </td>
-                  <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
+                  <td className="hidden px-1 py-2 text-center transition-colors sleeper-score-font md:table-cell">
                     <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.liveProj.get(rowKey)} draftedCount={dc}>
                       {String(liveR)}
                     </StatCellWithRank>
                   </td>
-                  <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
+                  <td className="hidden px-1 py-2 text-center transition-colors sleeper-score-font md:table-cell">
                     <StatCellWithRank
                       showRank={showInlineRanks}
                       rank={leagueStatRanks.projPlusMinus.get(rowKey)}
@@ -778,21 +791,18 @@ function LeaderboardPlayersHighlightTable({
               );
             })}
             <tr className="pool-table-footer-row">
-              <td colSpan={2} className="w-10 p-1 px-1 py-2 text-center text-[11px] font-semibold align-middle">
-                TOTALS
-              </td>
               <td
-                colSpan={2}
-                className="px-1 py-2 text-left text-[11px] font-normal tabular-nums opacity-90 align-middle leading-tight pool-table-col-group-end"
-              >
-                {footer.remainingPlayers} remaining {footer.remainingPlayers === 1 ? "player" : "players"}
+                className="hidden w-10 max-w-[2.5rem] p-1 align-middle md:table-cell"
+                aria-hidden
+              />
+              <td className="w-10 p-1 px-1 py-2 text-center text-[11px] font-semibold align-middle">
+                <span className="md:hidden">TOT</span>
+                <span className="hidden md:inline">TOTALS</span>
               </td>
-              <td className="px-1 py-2 text-center font-semibold">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
-                  {seedFooterDisplay}
-                </StatCellWithRank>
+              <td className="px-1 py-2 text-center text-[11px] font-normal tabular-nums opacity-90 align-middle leading-tight pool-table-col-group-end pool-table-player-col min-w-0">
+                {footer.remainingPlayers} remaining
               </td>
-              <td className="px-1 py-2 text-center font-semibold tabular-nums pool-table-col-group-end">
+              <td className="hidden px-1 py-2 text-center font-semibold tabular-nums pool-table-col-group-end md:table-cell">
                 <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
                   {overallFooterDisplay}
                 </StatCellWithRank>
@@ -803,14 +813,14 @@ function LeaderboardPlayersHighlightTable({
                 </StatCellWithRank>
               </td>
               {showTppgColumns ? (
-                <td className="px-1 py-2 text-center font-semibold">
+                <td className="hidden px-1 py-2 text-center font-semibold md:table-cell">
                   <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
                     {footer.tppgAvg}
                   </StatCellWithRank>
                 </td>
               ) : null}
               {showTppgColumns ? (
-                <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
+                <td className="hidden px-1 py-2 text-center font-semibold sleeper-score-font md:table-cell">
                   <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
                     <span className={tppgFooterClass}>{tppgFooterText}</span>
                   </StatCellWithRank>
@@ -853,17 +863,17 @@ function LeaderboardPlayersHighlightTable({
                   {footer.totalPts}
                 </StatCellWithRank>
               </td>
-              <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
+              <td className="hidden px-1 py-2 text-center font-semibold sleeper-score-font md:table-cell">
                 <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
                   {footer.origProjSum}
                 </StatCellWithRank>
               </td>
-              <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
+              <td className="hidden px-1 py-2 text-center font-semibold sleeper-score-font md:table-cell">
                 <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
                   {footer.liveProjSum != null ? String(footer.liveProjSum) : "—"}
                 </StatCellWithRank>
               </td>
-              <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
+              <td className="hidden px-1 py-2 text-center font-semibold sleeper-score-font md:table-cell">
                 <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
                   <span className={projFooterClass}>{projFooterText}</span>
                 </StatCellWithRank>
