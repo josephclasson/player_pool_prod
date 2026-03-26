@@ -1203,8 +1203,8 @@ body {
     border-color: rgb(var(--pool-stats-accent) / 0.35);
   }
 
-  /* Convert modal sheets into bottom sheets on mobile. */
-  .pool-modal-sheet {
+  /* Convert modal sheets into bottom sheets on mobile (except anchored filter dropdowns). */
+  .pool-modal-sheet:not(.pool-modal-sheet--anchored) {
     left: 0 !important;
     right: 0 !important;
     top: auto !important;
@@ -1212,6 +1212,18 @@ body {
     bottom: env(safe-area-inset-bottom);
     max-height: 90vh;
     border-radius: 16px 16px 0 0;
+  }
+
+  /* Owner/Team filter pickers: centered popout multi-select on mobile. */
+  .pool-modal-sheet.pool-modal-sheet--anchored {
+    left: 50% !important;
+    top: 50% !important;
+    right: auto !important;
+    bottom: auto !important;
+    width: min(92vw, 24rem) !important;
+    max-height: 72vh !important;
+    transform: translate(-50%, -50%);
+    border-radius: 0.75rem;
   }
 
   .pool-modal-overlay {
@@ -1561,6 +1573,25 @@ body {
   .pool-owner-header .pool-view-tab {
     min-height: unset !important;
     min-width: unset !important;
+  }
+
+  /* Scores mobile filters: keep Owner/Team dropdowns visible without side-scroll. */
+  .pool-stattracker-toolbar {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 0.35rem;
+    overflow-x: visible;
+  }
+
+  .pool-stattracker-toolbar .pool-filter-select {
+    min-width: 0;
+  }
+
+  .pool-stattracker-toolbar .pool-filter-select .pool-filter-select-trigger {
+    min-width: 0;
+    max-width: none;
+    width: 100%;
   }
 
   /* Explicit mobile hide helper for controls whose base classes force display. */

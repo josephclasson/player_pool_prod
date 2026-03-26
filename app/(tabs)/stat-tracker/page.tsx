@@ -1512,7 +1512,7 @@ function StatTrackerTabPageInner() {
       )}
 
       <div className="pool-panel pool-panel-compact min-w-0">
-        <div className="pool-filter-toolbar">
+        <div className="pool-filter-toolbar pool-stattracker-toolbar">
           <label className="pool-filter-chip">
             <input
               type="checkbox"
@@ -1603,7 +1603,7 @@ function StatTrackerTabPageInner() {
               <>
                 <div className="pool-modal-overlay" onClick={closeTeamPicker} />
                 <div
-                  className="pool-modal-sheet max-h-[360px] overflow-y-auto"
+                  className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
                   style={{
                     top: teamPickerPos.top,
                     left: teamPickerPos.left,
@@ -1655,7 +1655,7 @@ function StatTrackerTabPageInner() {
             <>
               <div className="pool-modal-overlay" onClick={closeOwnerPicker} />
               <div
-                className="pool-modal-sheet max-h-[360px] overflow-y-auto"
+                className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
                 style={{
                   top: ownerPickerPos.top,
                   left: ownerPickerPos.left,

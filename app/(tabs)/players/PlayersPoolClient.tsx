@@ -1058,7 +1058,7 @@ export function PlayersPoolClient({
               <>
                 <div className="pool-modal-overlay" onClick={closeTeamPicker} />
                 <div
-                  className="pool-modal-sheet max-h-[360px] overflow-y-auto"
+                  className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
                   style={{
                     top: teamPickerPos.top,
                     left: teamPickerPos.left,
@@ -1110,7 +1110,7 @@ export function PlayersPoolClient({
             <>
               <div className="pool-modal-overlay" onClick={closeOwnerPicker} />
               <div
-                className="pool-modal-sheet max-h-[360px] overflow-y-auto"
+                className="pool-modal-sheet pool-modal-sheet--anchored max-h-[360px] overflow-y-auto"
                 style={{
                   top: ownerPickerPos.top,
                   left: ownerPickerPos.left,
