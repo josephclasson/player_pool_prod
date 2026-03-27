@@ -357,11 +357,11 @@ export async function loadSeasonProjectionBundle(
     gameTeamByGameId.set(g.id, { a: g.team_a_id, b: g.team_b_id });
   }
 
-  /** Team played in display round (final/live) keyed by canonical team slug to survive team-id drift. */
+  /** Display rounds eligible for DNP `0` fill: *final* games only (not live — avoids R3=0 before stats during tip). */
   const participatedDisplayRoundsByCanonical = new Map<string, Set<number>>();
   for (const g of dbGameRows) {
     const status = String((g as { status?: unknown }).status ?? "");
-    if (!isFinalStatus(status) && !isLiveStatus(status)) continue;
+    if (!isFinalStatus(status)) continue;
     const r = fantasyRoundBucketFromDbRound(safeNum((g as { round?: unknown }).round));
     if (r == null) continue;
     const a = safeNum((g as { team_a_id?: unknown }).team_a_id);

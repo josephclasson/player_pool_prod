@@ -391,31 +391,22 @@ export async function loadLeagueScoringEngineState(
     canonRowById
   );
 
-  const participatedDisplayRoundsByCanonical = new Map<string, Set<number>>();
-  const nowMsForParticipation = Date.now();
+  /** Rounds where we may show DNP `0`: team has a *final* game in that display bucket only.
+   * Do not key off `live` or scheduled heuristics — that produced R3=0 before tip for upcoming games. */
+  const finalDisplayRoundsByCanonical = new Map<string, Set<number>>();
   for (const g of gameRows) {
+    if (!isFinalStatus(g.status)) continue;
     const gameRound = safeNum(g.round);
-    const startMs = new Date(String(g.start_time ?? "")).getTime();
-    const tipHasPassed = Number.isFinite(startMs) && startMs <= nowMsForParticipation;
-    const countsAsParticipated =
-      isFinalStatus(g.status) ||
-      isLiveStatus(g.status) ||
-      // Stale status only when tip has passed: avoid R3=0 before tip when max round elsewhere is higher.
-      (currentRound > 0 &&
-        gameRound > 0 &&
-        gameRound < currentRound &&
-        tipHasPassed);
-    if (!countsAsParticipated) continue;
     const bucket = participationBucketFromDbRound(gameRound);
     if (bucket == null) continue;
     for (const tid of [g.team_a_id, g.team_b_id]) {
       if (tid <= 0) continue;
       const canon = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
       if (!canon) continue;
-      if (!participatedDisplayRoundsByCanonical.has(canon)) {
-        participatedDisplayRoundsByCanonical.set(canon, new Set());
+      if (!finalDisplayRoundsByCanonical.has(canon)) {
+        finalDisplayRoundsByCanonical.set(canon, new Set());
       }
-      participatedDisplayRoundsByCanonical.get(canon)!.add(bucket);
+      finalDisplayRoundsByCanonical.get(canon)!.add(bucket);
     }
   }
 
@@ -454,12 +445,12 @@ export async function loadLeagueScoringEngineState(
     const roundsToFill = new Set<number>();
     const canonPlayer = stablePoolSlugForTeamContext(effectiveTeamId, canonicalByInternalTeamId, canonRowById);
     if (canonPlayer) {
-      const s = participatedDisplayRoundsByCanonical.get(canonPlayer);
+      const s = finalDisplayRoundsByCanonical.get(canonPlayer);
       if (s) for (const r of s) roundsToFill.add(r);
     }
     const canonSlot = stablePoolSlugForTeamContext(teamId, canonicalByInternalTeamId, canonRowById);
     if (canonSlot && canonSlot !== canonPlayer) {
-      const s = participatedDisplayRoundsByCanonical.get(canonSlot);
+      const s = finalDisplayRoundsByCanonical.get(canonSlot);
       if (s) for (const r of s) roundsToFill.add(r);
     }
     for (const r of roundsToFill) {
