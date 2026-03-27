@@ -25,13 +25,15 @@ async function readOptionalSupabaseAccessToken(): Promise<string | null> {
  */
 export async function postStatTrackerLiveSync(
   leagueId: string,
-  opts?: { force?: boolean }
+  opts?: { force?: boolean; fallbackLeagueTeamId?: string | null }
 ): Promise<unknown> {
   const headers: Record<string, string> = { Accept: "application/json" };
   const token = await readOptionalSupabaseAccessToken();
   if (token) headers.Authorization = `Bearer ${token}`;
   const pool = readPlayerPoolSession();
-  if (pool?.leagueTeamId) headers[PLAYER_POOL_LEAGUE_TEAM_ID_HEADER] = pool.leagueTeamId.trim();
+  const fallbackTeamId = opts?.fallbackLeagueTeamId != null ? String(opts.fallbackLeagueTeamId).trim() : "";
+  const leagueTeamId = pool?.leagueTeamId?.trim() || fallbackTeamId;
+  if (leagueTeamId) headers[PLAYER_POOL_LEAGUE_TEAM_ID_HEADER] = leagueTeamId;
   const comm = readCommissionerSecretFromSession();
   if (comm) headers["x-player-pool-commissioner-secret"] = comm;
   const qs = opts?.force === true ? "?force=1" : "";
