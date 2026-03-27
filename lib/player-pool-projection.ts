@@ -319,8 +319,24 @@ export async function loadSeasonProjectionBundle(
             nowMs
           )
         );
+  const liveGameRowsFinal =
+    liveGameRowsEffective.length > 0
+      ? liveGameRowsEffective
+      : (() => {
+          const nonFinalStarted = gameRowsWithTimeForLiveUi.filter((g) => {
+            if (isFinalStatus(g.status)) return false;
+            const r = safeNum(g.round);
+            if (r < 1 || r > 6) return false;
+            const startMs = new Date(g.start_time).getTime();
+            if (!Number.isFinite(startMs)) return false;
+            return startMs <= nowMs + 2 * 60 * 60 * 1000;
+          });
+          if (nonFinalStarted.length === 0) return [];
+          const maxRound = Math.max(...nonFinalStarted.map((g) => safeNum(g.round)));
+          return nonFinalStarted.filter((g) => safeNum(g.round) === maxRound);
+        })();
   const teamIdsInLiveGame = new Set<number>();
-  for (const g of liveGameRowsEffective) {
+  for (const g of liveGameRowsFinal) {
     if (g.team_a_id > 0) teamIdsInLiveGame.add(g.team_a_id);
     if (g.team_b_id > 0) teamIdsInLiveGame.add(g.team_b_id);
   }
@@ -574,7 +590,7 @@ export async function loadSeasonProjectionBundle(
     }
   }
 
-  const hasLiveGames = liveGameRowsEffective.length > 0;
+  const hasLiveGames = liveGameRowsFinal.length > 0;
 
   let expectedChalkGamesTotalByTeamId = new Map<number, number>();
   try {

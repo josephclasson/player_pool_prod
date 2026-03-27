@@ -313,12 +313,27 @@ export async function loadLeagueScoringEngineState(
             nowMs
           )
         );
-  const anyLiveGames = liveGamesEffective.length > 0;
-  const liveGamesCount = liveGamesEffective.length;
+  const liveGamesFinal =
+    liveGamesEffective.length > 0
+      ? liveGamesEffective
+      : (() => {
+          const nonFinalStarted = allGameRowsForLive.filter((g) => {
+            if (isFinalStatus(g.status)) return false;
+            if (safeNum(g.round) < 1 || safeNum(g.round) > 6) return false;
+            const startMs = new Date(g.start_time).getTime();
+            if (!Number.isFinite(startMs)) return false;
+            return startMs <= nowMs + 2 * 60 * 60 * 1000;
+          });
+          if (nonFinalStarted.length === 0) return [];
+          const maxRound = Math.max(...nonFinalStarted.map((g) => safeNum(g.round)));
+          return nonFinalStarted.filter((g) => safeNum(g.round) === maxRound);
+        })();
+  const anyLiveGames = liveGamesFinal.length > 0;
+  const liveGamesCount = liveGamesFinal.length;
 
   const partialDataWarning = (() => {
-    if (liveGamesEffective.length === 0) return false;
-    const latestSync = liveGamesEffective
+    if (liveGamesFinal.length === 0) return false;
+    const latestSync = liveGamesFinal
       .map((g) => g.last_synced_at ? new Date(g.last_synced_at).getTime() : 0)
       .reduce((a, b) => Math.max(a, b), 0);
     if (!latestSync) return true;
@@ -326,7 +341,7 @@ export async function loadLeagueScoringEngineState(
   })();
 
   const teamIdsInLiveGame = new Set<number>();
-  for (const g of liveGamesEffective) {
+  for (const g of liveGamesFinal) {
     if (g.team_a_id > 0) teamIdsInLiveGame.add(g.team_a_id);
     if (g.team_b_id > 0) teamIdsInLiveGame.add(g.team_b_id);
   }
