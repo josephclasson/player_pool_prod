@@ -382,7 +382,6 @@ export async function loadLeagueScoringEngineState(
   );
 
   const participatedDisplayRoundsByCanonical = new Map<string, Set<number>>();
-  const hasAnyGameByCanonicalRound = new Map<string, Set<number>>();
   for (const g of gameRows) {
     const gameRound = safeNum(g.round);
     const countsAsParticipated =
@@ -397,10 +396,6 @@ export async function loadLeagueScoringEngineState(
       if (tid <= 0) continue;
       const canon = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
       if (!canon) continue;
-      if (!hasAnyGameByCanonicalRound.has(canon)) {
-        hasAnyGameByCanonicalRound.set(canon, new Set());
-      }
-      hasAnyGameByCanonicalRound.get(canon)!.add(bucket);
       if (!participatedDisplayRoundsByCanonical.has(canon)) {
         participatedDisplayRoundsByCanonical.set(canon, new Set());
       }
@@ -408,25 +403,9 @@ export async function loadLeagueScoringEngineState(
     }
   }
 
-  // Fallback: when provider marks finals but score fields are missing/incomplete, elimination-from-loss
-  // can be absent. Infer elimination if a team has participated through round N, tournament has advanced
-  // beyond N, and there is no game row at N+1 for that team.
-  //
-  // Troubleshooting notes (Mar 2026):
-  // - Several teams showed R1 points but no R2 "E" despite being out.
-  // - In those cases, participation rows existed but final score resolution was incomplete.
-  // - This inference keeps UI behavior stable: once eliminated, rounds after loss show "E".
-  for (const [canon, rounds] of participatedDisplayRoundsByCanonical) {
-    if (eliminationRoundByCanonical.has(canon)) continue;
-    const maxParticipated = Math.max(...Array.from(rounds));
-    if (!Number.isFinite(maxParticipated) || maxParticipated < 1) continue;
-    if (currentRound <= maxParticipated) continue;
-    const hasRounds = hasAnyGameByCanonicalRound.get(canon);
-    const hasNextRoundGame = hasRounds?.has(maxParticipated + 1) ?? false;
-    if (!hasNextRoundGame) {
-      eliminationRoundByCanonical.set(canon, maxParticipated);
-    }
-  }
+  // Important: only mark elimination from explicit final losses.
+  // Do not infer elimination from participation gaps; that can false-positive when provider
+  // statuses/scores lag and incorrectly show players as "E".
 
   for (const slot of slots as any[]) {
     const slotId = slot.id as string;
