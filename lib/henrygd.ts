@@ -85,6 +85,12 @@ export function normalizeHenrygdGameStateToDbStatus(gameState: unknown): "live" 
   return "scheduled";
 }
 
+/** Bracket API row is far enough along to upsert from the contestId path (live or final). */
+export function bracketRowIsLiveOrFinal(gameState: unknown): boolean {
+  const st = normalizeHenrygdGameStateToDbStatus(gameState);
+  return st === "live" || st === "final";
+}
+
 /**
  * Assign `henrygd_boxscore_player_id` to the canonical pool row. Clears the same id from any other
  * row on the team (legacy henrygd-only duplicates), merging `player_game_stats` onto the canonical id.
@@ -253,8 +259,6 @@ export type HenrygdSyncResult = {
   teamGameStatsUpserted: number;
   playersUpserted: number;
   playerGameStatsUpserted: number;
-  /** Increment when changing bracket/game filtering logic, to confirm deployed backend version. */
-  henrygdSyncLogicVersion: number;
   /** Optional debug when using the Henrygd bracket endpoint as a source of truth for `games` round bucketing. */
   bracketDebug?: {
     bracketAllCount: number;
@@ -268,8 +272,12 @@ export type HenrygdSyncResult = {
 };
 
 /**
- * Syncs bracket games/scores from the **daily scoreboard** feed (games playing on `date`).
- * Updates regional `seed` (1–16 pod) from that feed; it does **not** set committee `overall_seed` (1–68).
+ * Two-phase NCAA sync for `date` (UTC y/m/d):
+ * 1) Bracket API — upsert live/final rows (contestId, round from bracketPositionId).
+ * 2) Daily scoreboard — **always** runs after (1) so every tournament game on that calendar day gets
+ *    fresh `status`/scores/gameID keys; never return early after (1) or in-progress games can stay stale.
+ *
+ * Updates regional `seed` (1–16 pod) from the scoreboard feed; it does **not** set committee `overall_seed` (1–68).
  * For 1–68 and the full published field, use `applyHenrygdBracketOfficialSeeds` / commissioner official-seeds
  * (`lib/henrygd-bracket-seeds.ts`, `lib/official-seeds.ts`).
  */
@@ -294,8 +302,6 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
     bracketGamesUpserted: 0,
     bracketTeamsUpserted: 0
   };
-  const henrygdSyncLogicVersion = 3;
-
   // Henrygd’s daily scoreboard endpoint does not reliably include bracket metadata
   // (e.g. `championshipGame.round.roundNumber`). When that happens, our previous
   // filter results in zero bracket games → zero `public.games` rows for R1–R6.
@@ -310,8 +316,7 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
     const bracketPlayed = (bracketAll as any[]).filter((g) => {
       const epochSec = safeNum(g?.startTimeEpoch);
       if (epochSec == null) return false;
-      const st = normalizeHenrygdGameStateToDbStatus(g?.gameState);
-      return st === "live" || st === "final";
+      return bracketRowIsLiveOrFinal(g?.gameState);
     });
 
     // Default bracket debug values are already set; if we have no played games, keep zeros but still
@@ -442,8 +447,7 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
         bracketGamesUpserted: gameUpserts.length,
         bracketTeamsUpserted: teamsUpserted
       };
-      // Do not return: daily scoreboard below refreshes all bracket games (contestId vs gameID)
-      // and picks up live games whose bracket `gameState` string did not match.
+      // Fall through: scoreboard phase below must run so games not in this subset still update.
     }
   } catch (e) {
     // Important: don't silently swallow bracket failures; they cause 0-team/0-game sync.
@@ -955,8 +959,7 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
       playersUpserted,
       playerGameStatsUpserted,
       bracketError,
-      bracketDebug,
-      henrygdSyncLogicVersion
+      bracketDebug
     };
   }
 
@@ -967,8 +970,7 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
     playersUpserted: 0,
     playerGameStatsUpserted: 0,
     bracketError,
-    bracketDebug,
-    henrygdSyncLogicVersion
+    bracketDebug
   };
 }
 
