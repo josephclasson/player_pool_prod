@@ -256,24 +256,8 @@ export async function loadSeasonProjectionBundle(
     (g) => seasonTeamIdSet.has(g.team_a_id) || seasonTeamIdSet.has(g.team_b_id)
   );
 
-  /* Match `lib/scoring.ts` season scope for *live UI*: team membership OR calendar window, with fallback
-   * when the scoped set is too small — `gameRowsWithTimeSeason` alone drops live games when `games.team_*_id`
-   * rows do not overlap merged `teams` ids (duplicate-school drift). */
-  const gameRowsWithTimeForLiveUi = (() => {
-    const seasonStartMs = Date.UTC(seasonYear, 0, 1, 0, 0, 0, 0);
-    const seasonEndMs = Date.UTC(seasonYear + 1, 0, 1, 0, 0, 0, 0);
-    const scoped = gameRowsWithTime.filter((g) => {
-      const inSeasonTeams =
-        seasonTeamIdSet.has(g.team_a_id) || seasonTeamIdSet.has(g.team_b_id);
-      const atMs = new Date(g.start_time).getTime();
-      const inSeasonWindow =
-        seasonYear > 0 && Number.isFinite(atMs)
-          ? atMs >= seasonStartMs && atMs < seasonEndMs
-          : false;
-      return inSeasonTeams || inSeasonWindow;
-    });
-    return scoped.length >= 8 ? scoped : gameRowsWithTime;
-  })();
+  // Live UI should consider all synced tournament rows; season/team linkage can drift in production.
+  const gameRowsWithTimeForLiveUi = gameRowsWithTime;
 
   let bracketState: BracketState = { seasonYear, games: [] };
   try {
