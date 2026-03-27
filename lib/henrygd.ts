@@ -47,15 +47,41 @@ export function normalizeHenrygdGameStateToDbStatus(gameState: unknown): "live" 
   const raw = String(gameState ?? "").trim();
   if (!raw) return "scheduled";
   const u = raw.toUpperCase();
-  if (u === "L" || u === "LIVE" || raw.toLowerCase() === "live") return "live";
+  const lower = raw.toLowerCase().replace(/\s+/g, " ").trim();
+  const compact = lower.replace(/\s+/g, "");
+
+  if (u === "L" || u === "LIVE" || lower === "live" || compact === "inprogress" || lower === "in progress") {
+    return "live";
+  }
   if (
     u === "F" ||
     u === "FINAL" ||
-    raw.toLowerCase() === "final" ||
-    raw.toLowerCase().startsWith("final")
+    lower === "final" ||
+    lower.startsWith("final ") ||
+    lower.startsWith("final/")
   ) {
     return "final";
   }
+
+  /* Henrygd / NCAA widgets sometimes send descriptive in-progress labels instead of L/LIVE. */
+  if (
+    lower.includes("halftime") ||
+    lower === "half" ||
+    lower.endsWith(" half") ||
+    lower.includes("in progress") ||
+    lower.includes("in-progress") ||
+    lower === "in_progress" ||
+    lower.includes("end of period") ||
+    lower.includes("end of the") ||
+    lower.includes("intermission") ||
+    lower.includes("overtime") ||
+    /^[1-4](st|nd|rd|th)\s*(half|period)/i.test(raw)
+  ) {
+    if (!lower.includes("final")) return "live";
+  }
+
+  if (u === "IP" || u === "INGAME" || u === "ACTIVE" || raw === "2") return "live";
+
   return "scheduled";
 }
 
@@ -268,7 +294,7 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
     bracketGamesUpserted: 0,
     bracketTeamsUpserted: 0
   };
-  const henrygdSyncLogicVersion = 2;
+  const henrygdSyncLogicVersion = 3;
 
   // Henrygd’s daily scoreboard endpoint does not reliably include bracket metadata
   // (e.g. `championshipGame.round.roundNumber`). When that happens, our previous
@@ -281,15 +307,11 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
   // - and gameState (final/live).
   try {
     const bracketAll = await fetchHenrygdBracketGames(seasonYear);
-    const dateMs = date.getTime();
     const bracketPlayed = (bracketAll as any[]).filter((g) => {
       const epochSec = safeNum(g?.startTimeEpoch);
       if (epochSec == null) return false;
-      const startMs = epochSec * 1000;
-      const stateRaw = String(g?.gameState ?? "");
-      const state = stateRaw.trim().toUpperCase();
-      // Henrygd uses inconsistent gameState labels depending on endpoint/version.
-      return state === "F" || state === "L" || state === "FINAL" || state === "LIVE";
+      const st = normalizeHenrygdGameStateToDbStatus(g?.gameState);
+      return st === "live" || st === "final";
     });
 
     // Default bracket debug values are already set; if we have no played games, keep zeros but still
@@ -365,9 +387,7 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
         const homeScore = safeNum(home?.score) ?? 0;
         const awayScore = safeNum(away?.score) ?? 0;
 
-        const stateRaw = String(g?.gameState ?? "");
-        const state = stateRaw.trim().toUpperCase();
-        const status = state === "L" || state === "LIVE" ? "live" : "final";
+        const status = normalizeHenrygdGameStateToDbStatus(g?.gameState);
 
         gameUpserts.push({
           external_game_id: contestId,
@@ -422,16 +442,8 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
         bracketGamesUpserted: gameUpserts.length,
         bracketTeamsUpserted: teamsUpserted
       };
-      return {
-        teamsUpserted: teamsUpserted,
-        gamesUpserted: gameUpserts.length,
-        teamGameStatsUpserted: 0,
-        playersUpserted: 0,
-        playerGameStatsUpserted: 0,
-        bracketDebug,
-        bracketError,
-        henrygdSyncLogicVersion
-      };
+      // Do not return: daily scoreboard below refreshes all bracket games (contestId vs gameID)
+      // and picks up live games whose bracket `gameState` string did not match.
     }
   } catch (e) {
     // Important: don't silently swallow bracket failures; they cause 0-team/0-game sync.

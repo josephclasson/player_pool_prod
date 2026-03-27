@@ -32,8 +32,8 @@ export function isLiveStatus(status: string): boolean {
 export const MAX_TOURNAMENT_LIVE_GAME_AGE_MS = 8 * 60 * 60 * 1000;
 
 /**
- * True when a row should drive “playing live” UI: explicit live (or synonym) status, or a plausible
- * in-progress game while still `scheduled/pre` (bounded tipoff window; score updates can lag in prod).
+ * True when a row should drive “playing live” UI: explicit live (or synonym) status, or `scheduled/pre`
+ * with a positive combined score after tip (status often lags the scoreboard in prod).
  */
 export function isPlausiblyLiveGameForUi(
   g: {
@@ -51,7 +51,25 @@ export function isPlausiblyLiveGameForUi(
   const tipGraceMs = 10 * 60 * 1000;
   if (Number.isFinite(startMs) && nowMs < startMs - tipGraceMs) return false;
 
-  // Important: "live" should only be true for explicit in-progress statuses.
-  // Do not infer live-ness from scheduled/pre tipoff windows.
-  return isLiveStatus(g.status);
+  if (isLiveStatus(g.status)) return true;
+
+  /* DB row can lag `scheduled` while scores already update (esp. when sync writes 0–0 before tip). */
+  const sa = g.team_a_score;
+  const sb = g.team_b_score;
+  const a = typeof sa === "number" ? sa : sa != null ? Number(sa) : NaN;
+  const b = typeof sb === "number" ? sb : sb != null ? Number(sb) : NaN;
+  const sum = (Number.isFinite(a) ? a : 0) + (Number.isFinite(b) ? b : 0);
+  const s = String(g.status ?? "").trim().toLowerCase();
+  const preLike = s === "scheduled" || s === "pre" || s === "pre_game" || s === "pregame";
+  const maxScheduledButScoringMs = 6 * 60 * 60 * 1000;
+  if (
+    preLike &&
+    sum > 0 &&
+    Number.isFinite(startMs) &&
+    nowMs - startMs <= maxScheduledButScoringMs
+  ) {
+    return true;
+  }
+
+  return false;
 }
