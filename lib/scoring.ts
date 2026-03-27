@@ -277,8 +277,19 @@ export async function loadLeagueScoringEngineState(
     return new Date(Math.max(...syn.map((d) => new Date(d).getTime()))).toISOString();
   })();
 
+  const allGameRowsForLive: GameRow[] = gamesAll.map((g: any) => ({
+    id: safeNum(g.id),
+    round: safeNum(g.round),
+    status: String(g.status ?? ""),
+    start_time: String(g.start_time ?? ""),
+    last_synced_at: g.last_synced_at ?? null,
+    team_a_id: safeNum(g.team_a_id),
+    team_b_id: safeNum(g.team_b_id),
+    team_a_score: g.team_a_score != null ? safeNum(g.team_a_score) : null,
+    team_b_score: g.team_b_score != null ? safeNum(g.team_b_score) : null
+  }));
   const nowMs = Date.now();
-  const liveGames = gameRows.filter((g) =>
+  const liveGames = allGameRowsForLive.filter((g) =>
     isPlausiblyLiveGameForUi(
       {
         status: g.status,
@@ -330,6 +341,9 @@ export async function loadLeagueScoringEngineState(
   for (const g of gameRows) {
     if (g.team_a_id > 0) gameSideTeamIds.add(g.team_a_id);
     if (g.team_b_id > 0) gameSideTeamIds.add(g.team_b_id);
+  }
+  for (const tid of teamIdsInLiveGame) {
+    if (tid > 0) gameSideTeamIds.add(tid);
   }
   const rosterSideTeamIds = new Set<number>(rosterTeamIds);
   for (const slot of slots as any[]) {
