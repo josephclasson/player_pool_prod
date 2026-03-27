@@ -312,8 +312,9 @@ export async function buildStatTrackerApiResponse(
       liveProjectionInt = Math.round(liveProjectionInt);
     }
 
-    const playingCollegeTeamId = playerTeamId > 0 ? playerTeamId : rosterTeamId;
-    const playingInLiveGame = playingCollegeTeamId > 0 && liveTeamIds.has(playingCollegeTeamId);
+    const playingInLiveGame =
+      (playerTeamId > 0 && liveTeamIds.has(playerTeamId)) ||
+      (rosterTeamId > 0 && liveTeamIds.has(rosterTeamId));
 
     const row: StatTrackerPlayerRow = {
       rosterSlotId: slotId,
