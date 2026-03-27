@@ -42,8 +42,10 @@ export function slugifySchoolKey(s: string) {
 export function bracketSeoKeyVariants(seoKey: string): string[] {
   const k = seoKey.trim().toLowerCase().replace(/^-|-$/g, "");
   if (!k) return [];
-  const expanded = k.replace(/-st-/g, "-state-");
-  return uniqueStrings([k, expanded]);
+  /* Henrygd uses `-st` as a token (e.g. `iowa-st`, `michigan-st`), not only `-st-`. */
+  const expandedMid = k.replace(/-st-/g, "-state-");
+  const expandedEnd = expandedMid.replace(/-st$/g, "-state");
+  return uniqueStrings([k, expandedMid, expandedEnd]);
 }
 
 export function slugifySchoolNameKey(s: string) {

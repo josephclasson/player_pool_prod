@@ -307,11 +307,12 @@ export async function fetchEspnMbbTeamRosterAthletes(teamEspnId: number): Promis
   return out;
 }
 
-/** Bracket `iowa-st-*` must match ESPN `iowa-state-*`; try expanded SEO before raw so longest-prefix does not latch onto `iowa`. */
+/** Bracket `iowa-st-*` must match ESPN `iowa-state-*`; expand `-st` / `-st-` so longest-prefix does not latch onto `iowa`. */
 function bracketSeoCandidatesForResolution(seo: string): string[] {
   const raw = seo.trim().toLowerCase().replace(/_/g, "-");
-  const expanded = raw.replace(/-st-/g, "-state-");
-  return raw === expanded ? [raw] : [expanded, raw];
+  const mid = raw.replace(/-st-/g, "-state-");
+  const end = mid.replace(/-st$/g, "-state");
+  return [...new Set([end, mid, raw].filter(Boolean))];
 }
 
 function resolveEspnMbbTeamFromSeoSingle(index: EspnMbbTeamIndex, s: string): EspnMbbTeamEntry | null {

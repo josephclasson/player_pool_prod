@@ -49,9 +49,19 @@ const EXTERNAL_SLUG_ALIASES: Record<string, string> = {
   "saint-mary-s-college": "saint-mary-s"
 };
 
-/** Reference `bracketSeoToCbbSchool` mislabels this; henrygd uses it for NC State, not UNC. */
+/**
+ * `bracketSeoToCbbSchool` / directory matching can map `-st` abbreviations to the wrong flagship
+ * (e.g. `iowa-st` → Iowa Hawkeyes instead of Iowa State). Force correct `cbbSchoolBySlug` keys.
+ */
 const BRACKET_SEO_TO_POOL_SLUG_OVERRIDE: Record<string, string> = {
-  "north-carolina-st": "nc-state"
+  "north-carolina-st": "nc-state",
+  "iowa-st": "iowa-state",
+  "michigan-st": "michigan-state",
+  "north-dakota-st": "north-dakota-state",
+  "ohio-st": "ohio-state",
+  "tennessee-st": "tennessee-state",
+  "texas-am": "texas-aandm",
+  "utah-st": "utah-state"
 };
 
 /** When `name`/`short_name` embed a school but don’t match cbbSchoolBySlug exactly. */
