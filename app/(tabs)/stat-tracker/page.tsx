@@ -966,10 +966,6 @@ function StatTrackerTabPageInner() {
   const [error, setError] = useState<string | null>(null);
   const [refreshBusy, setRefreshBusy] = useState(false);
   const [authHint, setAuthHint] = useState<string | null>(null);
-  const fallbackLeagueTeamId = useMemo(
-    () => api?.owners?.[0]?.leagueTeamId ?? null,
-    [api?.owners]
-  );
   const loadInFlightRef = useRef(false);
   const lastLoadedAtRef = useRef(0);
 
@@ -1011,8 +1007,7 @@ function StatTrackerTabPageInner() {
     if (!leagueId) return false;
     try {
       const json = (await postStatTrackerLiveSync(leagueId, {
-        force: opts?.force === true,
-        fallbackLeagueTeamId
+        force: opts?.force === true
       })) as StatTrackerApiResponse & { error?: string };
       setApi(json);
       setAuthHint(null);
@@ -1020,7 +1015,7 @@ function StatTrackerTabPageInner() {
     } catch {
       return false;
     }
-  }, [fallbackLeagueTeamId, leagueId]);
+  }, [leagueId]);
 
   const tick = useCallback(async () => {
     if (!leagueId) return;
