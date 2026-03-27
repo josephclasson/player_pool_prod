@@ -5,7 +5,7 @@ import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, use
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ChevronDown, ChevronUp, Circle, Radio, RefreshCcw, ShieldCheck } from "lucide-react";
+import { ChevronDown, ChevronUp, Radio, RefreshCcw, ShieldCheck } from "lucide-react";
 import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
 import {
   readStoredSnapshot,
@@ -17,6 +17,7 @@ import {
 } from "@/lib/player-pool-storage";
 import type { StatTrackerApiResponse } from "@/lib/stat-tracker/build-stat-tracker-response";
 import { readJsonResponse } from "@/lib/read-json-response";
+import { postStatTrackerLiveSync } from "@/lib/pool-tournament-live-sync-client";
 import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-directory";
 import { PoolPlayerSublineTeamSeedOwner } from "@/components/stats/PoolPlayerSublineTeamSeedOwner";
 import { PoolResponsiveOwnerNameText } from "@/components/stats/PoolResponsiveDisplayNames";
@@ -67,6 +68,19 @@ type TrackerOwnerCard = {
 function formatMaybeNumber(v: number | null | undefined) {
   if (v === null || v === undefined) return "";
   return v;
+}
+
+/** Hero subtitle: 2-digit year (e.g. 3/26/26) + compact time. */
+function formatLastSyncedShort(iso: string): string {
+  const d = new Date(iso);
+  if (!Number.isFinite(d.getTime())) return iso;
+  return d.toLocaleString(undefined, {
+    month: "numeric",
+    day: "numeric",
+    year: "2-digit",
+    hour: "numeric",
+    minute: "2-digit"
+  });
 }
 
 function StatTrackerPlayerNameLink({
@@ -954,10 +968,6 @@ function StatTrackerTabPageInner() {
   const [authHint, setAuthHint] = useState<string | null>(null);
   const loadInFlightRef = useRef(false);
   const lastLoadedAtRef = useRef(0);
-  const authTokenCacheRef = useRef<{ token: string | null; checkedAt: number }>({
-    token: null,
-    checkedAt: 0
-  });
 
   useEffect(() => {
     if (!snapshotKey) return;
@@ -993,46 +1003,30 @@ function StatTrackerTabPageInner() {
     }
   }, [leagueId]);
 
-  const readAuthedToken = useCallback(async (): Promise<string | null> => {
-    const now = Date.now();
-    if (now - authTokenCacheRef.current.checkedAt < 60_000) {
-      return authTokenCacheRef.current.token;
-    }
-    const sb = createBrowserSupabaseClient();
-    const { data: sess } =
-      sb != null ? await sb.auth.getSession() : { data: { session: null as null } };
-    const token = sess?.session?.access_token ?? null;
-    authTokenCacheRef.current = { token, checkedAt: now };
-    return token;
-  }, []);
-
-  const pullLiveIfAuthed = useCallback(async (): Promise<boolean> => {
+  const tryPullLiveSync = useCallback(async (opts?: { force?: boolean }): Promise<boolean> => {
     if (!leagueId) return false;
-    const token = await readAuthedToken();
-    if (!token) return false;
-
-    const res = await fetch(`/api/stat-tracker/${encodeURIComponent(leagueId)}/live-sync`, {
-      method: "POST",
-      cache: "no-store",
-      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" }
-    });
-    const json = await readJsonResponse<StatTrackerApiResponse & { error?: string }>(res, "StatTracker live-sync");
-    if (!res.ok) throw new Error(json.error ?? `Refresh failed: ${res.status}`);
-    setApi(json);
-    setAuthHint(null);
-    return true;
-  }, [leagueId, readAuthedToken]);
+    try {
+      const json = (await postStatTrackerLiveSync(leagueId, {
+        force: opts?.force === true
+      })) as StatTrackerApiResponse & { error?: string };
+      setApi(json);
+      setAuthHint(null);
+      return true;
+    } catch {
+      return false;
+    }
+  }, [leagueId]);
 
   const tick = useCallback(async () => {
     if (!leagueId) return;
     if (loadInFlightRef.current) return;
     try {
-      const pulled = await pullLiveIfAuthed();
+      const pulled = await tryPullLiveSync();
       if (!pulled) await loadData();
     } catch {
       await loadData();
     }
-  }, [leagueId, loadData, pullLiveIfAuthed]);
+  }, [leagueId, loadData, tryPullLiveSync]);
 
   useEffect(() => {
     void loadData();
@@ -1415,9 +1409,11 @@ function StatTrackerTabPageInner() {
     setRefreshBusy(true);
     setError(null);
     try {
-      const pulled = await pullLiveIfAuthed();
+      const pulled = await tryPullLiveSync({ force: true });
       if (!pulled) {
-        setAuthHint("Sign in to pull live NCAA scores. Showing cached pool data.");
+        setAuthHint(
+          "Could not sync live NCAA data. Re-open the pool from Home so your team is saved, sign in, or use Commissioner auth. Showing cached data."
+        );
         await loadData({ force: true });
       }
     } catch (e: unknown) {
@@ -1472,27 +1468,27 @@ function StatTrackerTabPageInner() {
               <span className="md:hidden">Scores</span>
               <span className="hidden md:inline">Scores</span>
             </h1>
-              {api?.lastSyncedAt ? (
-                <>
-                  <div
-                    className={[
-                      "text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block text-center",
-                      heroPulse ? "motion-safe:animate-pulse" : ""
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                  >
-                    Synced {new Date(api.lastSyncedAt).toLocaleString()}
-                    {api.anyLiveGames ? (
-                      <span className="ml-1.5 text-emerald-500 font-semibold">· Live ×{api.liveGamesCount}</span>
-                    ) : null}
-                  </div>
-                </>
-              ) : (
-                <div className="text-[10px] text-foreground/45 mt-0.5 hidden md:block text-center">
-                  Live R1–R6 scoring &amp; projections
-                </div>
-              )}
+            {api?.lastSyncedAt ? (
+              <div
+                className={[
+                  "mt-0.5 text-center text-[9px] tabular-nums text-foreground/50 sm:text-[10px] overflow-x-auto overflow-y-hidden",
+                  heroPulse ? "motion-safe:animate-pulse" : ""
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
+                <span className="inline-block whitespace-nowrap px-0.5">
+                  Last synced {formatLastSyncedShort(api.lastSyncedAt)}
+                  {api.anyLiveGames ? (
+                    <span className="text-emerald-500 font-semibold"> · Live ×{api.liveGamesCount}</span>
+                  ) : null}
+                </span>
+              </div>
+            ) : (
+              <div className="text-[10px] text-foreground/45 mt-0.5 text-center">
+                Live R1–R6 scoring &amp; projections
+              </div>
+            )}
           </div>
           <div className="flex items-center justify-end gap-1">
             <button
@@ -1540,14 +1536,6 @@ function StatTrackerTabPageInner() {
       {error && <div className="pool-alert-danger pool-alert-compact">{error}</div>}
 
       {authHint && <div className="pool-alert pool-alert-compact">{authHint}</div>}
-
-      {api?.partialDataWarning && (
-        <div className="rounded-md border border-warning/45 bg-warning/10 px-2.5 py-1.5 text-[11px] text-warning leading-snug">
-          <strong>Stale sync</strong>{" "}
-          <span className="md:hidden">— wait for auto-refresh or sign in for live pulls.</span>
-          <span className="hidden md:inline">— use Refresh Data (signed in) or wait for auto-refresh.</span>
-        </div>
-      )}
 
       {leagueId && api && owners.length === 0 && (
         <div className="pool-alert pool-alert-compact">
@@ -2253,7 +2241,13 @@ function StatTrackerTabPageInner() {
                       return (
                         <tr
                           key={p.rosterSlotId ?? p.playerId}
-                          className={`cursor-pointer group pool-table-row ${p.eliminated ? "pool-table-row-eliminated" : ""}`}
+                          className={`cursor-pointer group pool-table-row ${
+                            p.eliminated
+                              ? "pool-table-row-eliminated"
+                              : p.playingInLiveGame
+                                ? "pool-table-row-live"
+                                : ""
+                          }`}
                         >
                           <PoolTableTeamLogoCell
                             url={p.teamLogoUrl}
@@ -2264,12 +2258,6 @@ function StatTrackerTabPageInner() {
                           <td className="px-1 py-2 transition-colors text-left align-top pool-table-player-col min-w-0">
                             <div className="min-w-0 max-w-full overflow-hidden">
                               <div className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-0.5 gap-y-0.5 md:flex-nowrap">
-                                {p.playingInLiveGame ? (
-                                  <Circle
-                                    className="h-2 w-2 shrink-0 fill-emerald-500 text-emerald-500 self-center"
-                                    aria-label="Playing live"
-                                  />
-                                ) : null}
                                 <span className="min-w-0 shrink grow-0 truncate">
                                   <StatTrackerPlayerNameLink
                                     playerName={p.playerName}

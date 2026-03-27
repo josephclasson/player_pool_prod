@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { PLAYER_POOL_LEAGUE_TEAM_ID_HEADER } from "@/lib/player-pool-session";
 
 export type LeagueParticipantResult =
   | { ok: true; userId: string | null; bypass: boolean }
@@ -23,6 +24,23 @@ export async function requireLeagueParticipant(
     return { ok: true, userId: null, bypass: true };
   }
 
+  const poolTeamId = req.headers.get(PLAYER_POOL_LEAGUE_TEAM_ID_HEADER)?.trim() ?? "";
+  if (poolTeamId) {
+    const { data: ltRow, error: poolLtErr } = await supabase
+      .from("league_teams")
+      .select("id")
+      .eq("id", poolTeamId)
+      .eq("league_id", leagueIdUuid)
+      .maybeSingle();
+
+    if (poolLtErr) {
+      return { ok: false, status: 503, error: `Team lookup failed: ${poolLtErr.message}` };
+    }
+    if (ltRow?.id) {
+      return { ok: true, userId: null, bypass: false };
+    }
+  }
+
   const authz = req.headers.get("authorization");
   const token =
     authz?.startsWith("Bearer ") ? authz.slice("Bearer ".length).trim() : null;
@@ -30,7 +48,8 @@ export async function requireLeagueParticipant(
     return {
       ok: false,
       status: 401,
-      error: "Sign in required. Use Refresh after logging in, or open the pool in a signed-in browser tab."
+      error:
+        "Open this league from the pool home flow so your team is saved (session), sign in with Supabase, or use the commissioner secret. Then use Refresh to pull live NCAA data."
     };
   }
 

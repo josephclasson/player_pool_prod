@@ -115,15 +115,30 @@ function resolveTeamInternalIdFromSeo(
   return null;
 }
 
+function gamesStatusesNeedsDeltaSync(statusRaw: unknown): "live" | "scheduled" | "final" | "other" {
+  const s = String(statusRaw ?? "")
+    .trim()
+    .toLowerCase();
+  if (s === "live") return "live";
+  if (s === "scheduled") return "scheduled";
+  if (s === "final") return "final";
+  return "other";
+}
+
 /**
  * Fetches henrygd box scores for every R1–R6 row already in `games` and upserts `player_game_stats`.
  * Use when daily scoreboard sync created `games` but never filled per-player stats (empty table).
+ *
+ * @param deltaOnly When true, only hits **live** / **scheduled** games plus **final** games that still
+ * have no `player_game_stats` rows (incremental refresh). When false, processes all R1–R6 games (heavy).
  */
 export async function syncPlayerBoxscoresForSeasonGamesInDb(opts: {
   supabase: SupabaseClient;
   seasonYear: number;
+  deltaOnly?: boolean;
 }): Promise<PlayerBoxscoreBackfillResult> {
   const { supabase, seasonYear } = opts;
+  const deltaOnly = opts.deltaOnly === true;
 
   const { data: teamRows } = await supabase
     .from("teams")
@@ -146,12 +161,14 @@ export async function syncPlayerBoxscoresForSeasonGamesInDb(opts: {
     }
   }
 
-  const gameRows: { id: number; external_game_id: string }[] = [];
+  const allRounds: { id: number; external_game_id: string; statusBucket: ReturnType<
+    typeof gamesStatusesNeedsDeltaSync
+  > }[] = [];
   const pageSize = 500;
   for (let from = 0; ; from += pageSize) {
     const { data: chunk, error } = await supabase
       .from("games")
-      .select("id, external_game_id, round")
+      .select("id, external_game_id, round, status")
       .not("external_game_id", "is", null)
       .order("id", { ascending: true })
       .range(from, from + pageSize - 1);
@@ -163,9 +180,49 @@ export async function syncPlayerBoxscoresForSeasonGamesInDb(opts: {
       const bucket = normalizeGamesRoundForR1ToR6((g as { round?: unknown }).round);
       if (bucket == null) continue;
       if (bucket < 1 || bucket > 6) continue;
-      if (id != null && id > 0 && ext) gameRows.push({ id, external_game_id: ext });
+      if (id != null && id > 0 && ext) {
+        allRounds.push({
+          id,
+          external_game_id: ext,
+          statusBucket: gamesStatusesNeedsDeltaSync((g as { status?: unknown }).status)
+        });
+      }
     }
     if (rows.length < pageSize) break;
+  }
+
+  let gameRows: { id: number; external_game_id: string }[];
+
+  if (!deltaOnly) {
+    gameRows = allRounds.map((r) => ({ id: r.id, external_game_id: r.external_game_id }));
+  } else {
+    const liveSched = allRounds.filter(
+      (r) => r.statusBucket === "live" || r.statusBucket === "scheduled"
+    );
+    const finalCandidates = allRounds.filter((r) => r.statusBucket === "final");
+    let missingFinals: typeof allRounds = [];
+    if (finalCandidates.length > 0) {
+      const withStats = new Set<number>();
+      const ids = finalCandidates.map((c) => c.id);
+      const statPage = 300;
+      for (let i = 0; i < ids.length; i += statPage) {
+        const slice = ids.slice(i, i + statPage);
+        const { data: statRows } = await supabase.from("player_game_stats").select("game_id").in("game_id", slice);
+        for (const row of statRows ?? []) {
+          const gid = safeNum((row as { game_id: unknown }).game_id);
+          if (gid != null && gid > 0) withStats.add(gid);
+        }
+      }
+      missingFinals = finalCandidates.filter((c) => !withStats.has(c.id));
+    }
+    const merged = [...liveSched, ...missingFinals];
+    const seen = new Set<number>();
+    gameRows = [];
+    for (const r of merged) {
+      if (seen.has(r.id)) continue;
+      seen.add(r.id);
+      gameRows.push({ id: r.id, external_game_id: r.external_game_id });
+    }
   }
 
   let playersTouched = 0;
@@ -174,21 +231,31 @@ export async function syncPlayerBoxscoresForSeasonGamesInDb(opts: {
   const errors: string[] = [];
   const maxErrors = 25;
 
-  for (const g of gameRows) {
-    const one = await ingestHenrygdBoxscoreForOneGame({
-      supabase,
-      seasonYear,
-      gameInternalId: g.id,
-      externalGameId: g.external_game_id,
-      teamIdByExternal,
-      teamIdBySeo
-    });
-    playersTouched += one.playersTouched;
-    playerGameStatsRowsUpserted += one.playerGameStatsRowsUpserted;
-    if (one.playerGameStatsRowsUpserted > 0) gamesWithPlayerStatsRows += 1;
-    if (one.error && errors.length < maxErrors) errors.push(`${g.external_game_id}: ${one.error}`);
-
-    await new Promise((r) => setTimeout(r, 60));
+  const parallelGames = 3;
+  const pauseBetweenBatchesMs = 20;
+  for (let i = 0; i < gameRows.length; i += parallelGames) {
+    const batch = gameRows.slice(i, i + parallelGames);
+    const results = await Promise.all(
+      batch.map((g) =>
+        ingestHenrygdBoxscoreForOneGame({
+          supabase,
+          seasonYear,
+          gameInternalId: g.id,
+          externalGameId: g.external_game_id,
+          teamIdByExternal,
+          teamIdBySeo
+        }).then((one) => ({ g, one }))
+      )
+    );
+    for (const { g, one } of results) {
+      playersTouched += one.playersTouched;
+      playerGameStatsRowsUpserted += one.playerGameStatsRowsUpserted;
+      if (one.playerGameStatsRowsUpserted > 0) gamesWithPlayerStatsRows += 1;
+      if (one.error && errors.length < maxErrors) errors.push(`${g.external_game_id}: ${one.error}`);
+    }
+    if (i + parallelGames < gameRows.length) {
+      await new Promise((r) => setTimeout(r, pauseBetweenBatchesMs));
+    }
   }
 
   return {

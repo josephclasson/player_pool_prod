@@ -8,6 +8,9 @@ export const PLAYER_POOL_SESSION_SEASON_YEAR_KEY = "player_pool_league_season_ye
 /** Same value sent as `x-player-pool-commissioner-secret` (matches `COMMISSIONER_API_SECRET` on the server). */
 export const PLAYER_POOL_COMMISSIONER_SECRET_KEY = "player_pool_commissioner_secret";
 
+/** HTTP header for `readPlayerPoolSession().leagueTeamId` — verified server-side against `league_teams`. */
+export const PLAYER_POOL_LEAGUE_TEAM_ID_HEADER = "x-player-pool-league-team-id";
+
 export const PLAYER_POOL_IDENTITY_CHANGE_EVENT = "player-pool-identity-changed";
 
 export type PlayerPoolSession = {

@@ -35,6 +35,11 @@ export async function runTournamentLiveSyncForLeague(opts: {
   /** Minimum ms since last successful sync for this league (default 25_000). */
   minIntervalMs?: number;
   excludeFirstFour?: boolean;
+  /**
+   * When true, re-fetch henrygd box scores for every R1–R6 game in DB (slow).
+   * Default false: only **live** / **scheduled** games and **final** games missing `player_game_stats`.
+   */
+  boxscoresFullBackfill?: boolean;
 }): Promise<TournamentLiveSyncResult> {
   const minInterval = opts.minIntervalMs ?? 25_000;
   const map = lastSyncMap();
@@ -54,12 +59,15 @@ export async function runTournamentLiveSyncForLeague(opts: {
     supabase: opts.supabase,
     seasonYear: opts.seasonYear,
     date,
-    excludeFirstFour: opts.excludeFirstFour !== false
+    excludeFirstFour: opts.excludeFirstFour !== false,
+    /* Backfill runs next; skip duplicate per-game box fetches on the scoreboard-only path. */
+    syncPlayerBoxscores: false
   });
 
   const backfill = await syncPlayerBoxscoresForSeasonGamesInDb({
     supabase: opts.supabase,
-    seasonYear: opts.seasonYear
+    seasonYear: opts.seasonYear,
+    deltaOnly: opts.boxscoresFullBackfill !== true
   });
 
   const projections = await computeLeagueProjections(opts.supabase, opts.leagueId);

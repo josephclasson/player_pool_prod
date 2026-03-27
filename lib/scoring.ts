@@ -1,5 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isFinalStatus, isLiveStatus } from "@/lib/chalk-remaining-games";
+import {
+  isFinalStatus,
+  isLiveStatus,
+  isPlausiblyLiveGameForUi
+} from "@/lib/chalk-remaining-games";
 import {
   buildEliminationRoundByCanonicalFromGames,
   fetchTeamRowsForCanonicalKeys,
@@ -53,16 +57,6 @@ export function resolveLeagueOwnerDisplayName(opts: {
   const dn = opts.profileDisplayName != null ? String(opts.profileDisplayName).trim() : "";
   if (dn) return dn;
   return "Team";
-}
-
-// Treat stale "live" rows as non-live (some feeds can leave games stuck in live status).
-const MAX_LIVE_GAME_AGE_MS = 8 * 60 * 60 * 1000; // 8h
-
-function isPlausiblyLiveGame(g: Pick<GameRow, "status" | "start_time">, nowMs: number): boolean {
-  if (!isLiveStatus(g.status)) return false;
-  const startMs = new Date(g.start_time).getTime();
-  if (!Number.isFinite(startMs)) return true;
-  return nowMs - startMs <= MAX_LIVE_GAME_AGE_MS;
 }
 
 const GAMES_PAGE = 1000;
@@ -284,7 +278,17 @@ export async function loadLeagueScoringEngineState(
   })();
 
   const nowMs = Date.now();
-  const liveGames = gameRows.filter((g) => isPlausiblyLiveGame(g, nowMs));
+  const liveGames = gameRows.filter((g) =>
+    isPlausiblyLiveGameForUi(
+      {
+        status: g.status,
+        start_time: g.start_time,
+        team_a_score: g.team_a_score,
+        team_b_score: g.team_b_score
+      },
+      nowMs
+    )
+  );
   const anyLiveGames = liveGames.length > 0;
   const liveGamesCount = liveGames.length;
 
@@ -348,6 +352,20 @@ export async function loadLeagueScoringEngineState(
     canonicalByInternalTeamId.set(id, row ? resolveCanonicalTeamKeyFromRow(row) : `__id_${id}`);
   }
   reconcileCanonicalTeamIdsFromRows(teamRowsForCanon, canonicalByInternalTeamId);
+
+  /* Live highlight / "Live only": roster `team_id` and `players.team_id` may reference a different
+   * `teams.id` than `games.team_*_id` for the same school — mirror participation logic. */
+  if (teamIdsInLiveGame.size > 0) {
+    const liveCanonKeys = new Set<string>();
+    for (const tid of teamIdsInLiveGame) {
+      const k = canonicalByInternalTeamId.get(tid);
+      if (k) liveCanonKeys.add(k);
+    }
+    for (const id of allTeamIdsForCanonical) {
+      const k = canonicalByInternalTeamId.get(id);
+      if (k && liveCanonKeys.has(k)) teamIdsInLiveGame.add(id);
+    }
+  }
 
   const eliminationRoundByCanonical = buildEliminationRoundByCanonicalFromGames(
     gameRows.map((g) => ({

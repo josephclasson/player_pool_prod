@@ -47,11 +47,18 @@ export async function POST(
     return NextResponse.json({ error: who.error }, { status: who.status });
   }
 
+  const url = new URL(req.url);
+  const force = url.searchParams.get("force") === "1";
+  /** Full R1–R6 box-score sweep (heavy); default is incremental (live/scheduled + finals missing stats). */
+  const full = url.searchParams.get("full") === "1";
+
   try {
     const syncResult = await runTournamentLiveSyncForLeague({
       supabase,
       leagueId: canonicalId,
-      seasonYear
+      seasonYear,
+      minIntervalMs: force ? 0 : undefined,
+      boxscoresFullBackfill: full
     });
     const body = await buildStatTrackerApiResponse(supabase, canonicalId);
     return NextResponse.json({

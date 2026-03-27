@@ -39,6 +39,7 @@ import {
   tournamentOuFromProjections,
   tournamentOuTooltip
 } from "@/lib/tournament-total-ou";
+import { postStatTrackerLiveSync } from "@/lib/pool-tournament-live-sync-client";
 
 const LeaderboardAllTournamentTeamTable = dynamic(
   () =>
@@ -654,6 +655,11 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
     setRefreshBusy(true);
     setError(null);
     try {
+      try {
+        await postStatTrackerLiveSync(leagueId, { force: true });
+      } catch {
+        /* henrygd sync is best-effort; leaderboard GET still recomputes from DB */
+      }
       await load({ manual: true, force: true });
     } finally {
       setRefreshBusy(false);

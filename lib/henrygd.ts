@@ -41,6 +41,25 @@ function resolveCanonicalPlayerForBoxscore(opts: {
 }
 
 /**
+ * Map henrygd `gameState` to `games.status`. Endpoints vary: `live`, `L`, `LIVE`, `final`, `F`, etc.
+ */
+export function normalizeHenrygdGameStateToDbStatus(gameState: unknown): "live" | "final" | "scheduled" {
+  const raw = String(gameState ?? "").trim();
+  if (!raw) return "scheduled";
+  const u = raw.toUpperCase();
+  if (u === "L" || u === "LIVE" || raw.toLowerCase() === "live") return "live";
+  if (
+    u === "F" ||
+    u === "FINAL" ||
+    raw.toLowerCase() === "final" ||
+    raw.toLowerCase().startsWith("final")
+  ) {
+    return "final";
+  }
+  return "scheduled";
+}
+
+/**
  * Assign `henrygd_boxscore_player_id` to the canonical pool row. Clears the same id from any other
  * row on the team (legacy henrygd-only duplicates), merging `player_game_stats` onto the canonical id.
  */
@@ -614,8 +633,7 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
       homeSeo ? resolveTeamInternalIdFromSeo(homeSeo, seasonYear, teamIdByExternal, teamIdBySeo) : undefined;
     if (!awayTeamInternal || !homeTeamInternal) continue;
 
-    const statusRaw = String(g?.gameState ?? "");
-    const status = statusRaw === "live" ? "live" : statusRaw === "final" ? "final" : "scheduled";
+    const status = normalizeHenrygdGameStateToDbStatus(g?.gameState);
 
     const startTimeEpoch = safeNum(g?.startTimeEpoch);
     const startTime = startTimeEpoch ? new Date(startTimeEpoch * 1000).toISOString() : nowIso;

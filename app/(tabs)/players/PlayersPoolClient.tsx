@@ -66,6 +66,8 @@ type PoolPlayer = {
   chalkGamesRemaining?: number | null;
   expectedChalkGamesTotal?: number | null;
   completedTournamentGames?: number | null;
+  /** College team is in a currently live tournament game (canonical-expanded). */
+  playingInLiveGame?: boolean;
   ownerTeamName?: string | null;
 };
 
@@ -897,7 +899,7 @@ export function PlayersPoolClient({
   const filteredRows = useMemo(() => {
     let list = rows;
     if (showOnlyActivePlayers) {
-      list = list.filter((p) => roundPointsNumeric(p, activeRoundBucketGlobal) != null);
+      list = list.filter((p) => p.playingInLiveGame === true);
     }
     if (selectedOwnerNames.length === 0) return [];
     list = list.filter((p) => selectedOwnerNameSet.has(ownerFilterKey(p)));
@@ -907,7 +909,6 @@ export function PlayersPoolClient({
   }, [
     rows,
     showOnlyActivePlayers,
-    activeRoundBucketGlobal,
     selectedOwnerNames.length,
     selectedOwnerNameSet,
     selectedCollegeTeams.length,
@@ -1379,11 +1380,12 @@ export function PlayersPoolClient({
                 const roundRanks = [ps.r1, ps.r2, ps.r3, ps.r4, ps.r5, ps.r6] as const;
                 const regionalSeedSubline = seedNumeric(p);
 
+                const elim = eliminatedRoundForPlayer(p) != null;
                 return (
                   <tr
                     key={p.id}
                     className={`cursor-pointer group pool-table-row ${
-                      eliminatedRoundForPlayer(p) != null ? "pool-table-row-eliminated" : ""
+                      elim ? "pool-table-row-eliminated" : p.playingInLiveGame ? "pool-table-row-live" : ""
                     }`}
                   >
                     <PoolTableTeamLogoCell

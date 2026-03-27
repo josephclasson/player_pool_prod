@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isFinalStatus, isLiveStatus } from "@/lib/chalk-remaining-games";
+import { isFinalStatus, isLiveStatus, isPlausiblyLiveGameForUi } from "@/lib/chalk-remaining-games";
 import {
   computeExpectedChalkGamesPlayedFromBracket,
   type ChalkTeamMeta
@@ -130,6 +130,10 @@ export type SeasonProjectionBundle = {
   pointsByDisplayRoundByPlayer: Map<number, Record<number, number>>;
   /** At least one tournament game is live (for client polling). */
   hasLiveGames: boolean;
+  /**
+   * Internal `teams.id` values for schools currently in a live game (canonical-expanded, same idea as scoring).
+   */
+  teamIdsInLiveGame: Set<number>;
   /** Full bracket chalk: total R1–R6+ path games this team would play if all favorites win (from NCAA bracket JSON). */
   expectedChalkGamesTotalByTeamId: Map<number, number>;
   /** R1–R6 games already underway for projection: decisive finals + live (same game set as stats). */
@@ -252,6 +256,25 @@ export async function loadSeasonProjectionBundle(
     (g) => seasonTeamIdSet.has(g.team_a_id) || seasonTeamIdSet.has(g.team_b_id)
   );
 
+  /* Match `lib/scoring.ts` season scope for *live UI*: team membership OR calendar window, with fallback
+   * when the scoped set is too small — `gameRowsWithTimeSeason` alone drops live games when `games.team_*_id`
+   * rows do not overlap merged `teams` ids (duplicate-school drift). */
+  const gameRowsWithTimeForLiveUi = (() => {
+    const seasonStartMs = Date.UTC(seasonYear, 0, 1, 0, 0, 0, 0);
+    const seasonEndMs = Date.UTC(seasonYear + 1, 0, 1, 0, 0, 0, 0);
+    const scoped = gameRowsWithTime.filter((g) => {
+      const inSeasonTeams =
+        seasonTeamIdSet.has(g.team_a_id) || seasonTeamIdSet.has(g.team_b_id);
+      const atMs = new Date(g.start_time).getTime();
+      const inSeasonWindow =
+        seasonYear > 0 && Number.isFinite(atMs)
+          ? atMs >= seasonStartMs && atMs < seasonEndMs
+          : false;
+      return inSeasonTeams || inSeasonWindow;
+    });
+    return scoped.length >= 8 ? scoped : gameRowsWithTime;
+  })();
+
   let bracketState: BracketState = { seasonYear, games: [] };
   try {
     bracketState = await buildBracketStateFromHenrygdAndDb({
@@ -282,6 +305,36 @@ export async function loadSeasonProjectionBundle(
     canonicalByInternalTeamId.set(id, row ? resolveCanonicalTeamKeyFromRow(row) : `__id_${id}`);
   }
   reconcileCanonicalTeamIdsFromRows(canonRows, canonicalByInternalTeamId);
+
+  const nowMs = Date.now();
+  const liveGameRows = gameRowsWithTimeForLiveUi.filter((g) =>
+    isPlausiblyLiveGameForUi(
+      {
+        status: g.status,
+        start_time: g.start_time,
+        team_a_score: g.team_a_score,
+        team_b_score: g.team_b_score
+      },
+      nowMs
+    )
+  );
+  const teamIdsInLiveGame = new Set<number>();
+  for (const g of liveGameRows) {
+    if (g.team_a_id > 0) teamIdsInLiveGame.add(g.team_a_id);
+    if (g.team_b_id > 0) teamIdsInLiveGame.add(g.team_b_id);
+  }
+  if (teamIdsInLiveGame.size > 0) {
+    const liveCanonKeys = new Set<string>();
+    for (const tid of teamIdsInLiveGame) {
+      const k = canonicalByInternalTeamId.get(tid);
+      if (k) liveCanonKeys.add(k);
+    }
+    for (const id of allCanonTeamIds) {
+      const k = canonicalByInternalTeamId.get(id);
+      if (k && liveCanonKeys.has(k)) teamIdsInLiveGame.add(id);
+    }
+  }
+
   const eliminationRoundByCanonical = buildEliminationRoundByCanonicalFromGames(
     gameRowsWithTime,
     canonicalByInternalTeamId,
@@ -520,7 +573,7 @@ export async function loadSeasonProjectionBundle(
     }
   }
 
-  const hasLiveGames = dbGameRowsSeason.some((g) => isLiveStatus(g.status));
+  const hasLiveGames = liveGameRows.length > 0;
 
   let expectedChalkGamesTotalByTeamId = new Map<number, number>();
   try {
@@ -555,6 +608,7 @@ export async function loadSeasonProjectionBundle(
     statsByPlayer,
     pointsByDisplayRoundByPlayer,
     hasLiveGames,
+    teamIdsInLiveGame,
     expectedChalkGamesTotalByTeamId,
     completedTournamentGamesByTeamId,
     tournamentStatGameIdsByPlayerId

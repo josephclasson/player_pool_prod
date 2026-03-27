@@ -239,6 +239,8 @@ export async function GET(req: Request) {
       bundle
     });
     const projection = tproj.liveProjection;
+    const playingInLiveGame =
+      tid > 0 ? bundle.teamIdsInLiveGame.has(tid) : false;
     const byR = bundle.pointsByDisplayRoundByPlayer.get(pid) ?? {};
     /** Only rounds with at least one box-score row (so R3+ stay omitted until played). */
     const tournamentRoundPoints: Record<number, number> = {};
@@ -279,6 +281,7 @@ export async function GET(req: Request) {
       chalkGamesRemaining: tproj.liveExpectedChalkGamesRemaining,
       expectedChalkGamesTotal: tproj.expectedChalkGamesTotal,
       completedTournamentGames: tproj.completedTournamentGames,
+      playingInLiveGame,
       ownerTeamName: leagueId ? (ownerByPlayerId.get(pid) ?? null) : null,
       team: t
         ? {

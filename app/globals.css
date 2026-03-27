@@ -677,6 +677,31 @@ body {
   color: rgb(var(--pool-stats-body-text) / 0.56) !important;
 }
 
+/*
+ * Live game rows: yellow/amber highlight (player’s team is in an in-progress tournament game).
+ * Mirrors eliminated row borders without grayscale or heavy text muting.
+ */
+.pool-table tbody tr.pool-table-row.pool-table-row-live td {
+  background-color: rgb(250 204 21 / 0.15) !important;
+  border-top: none !important;
+  border-bottom: 1px solid rgb(202 138 4 / 0.42);
+}
+
+.pool-table tbody > tr.pool-table-row.pool-table-row-live:first-child td {
+  border-top: 1px solid rgb(202 138 4 / 0.42) !important;
+}
+
+.pool-table tbody tr.pool-table-row:not(.pool-table-row-live):has(+ tr.pool-table-row-live) td {
+  border-bottom: 1px solid rgb(202 138 4 / 0.42);
+}
+
+.pool-table tbody tr.pool-table-row.pool-table-row-live:nth-child(odd) td.pool-table-col-primary,
+.pool-table tbody tr.pool-table-row.pool-table-row-live:nth-child(even) td.pool-table-col-primary {
+  background-color: rgb(250 204 21 / 0.22) !important;
+  color: rgb(var(--pool-stats-accent)) !important;
+  font-weight: 600;
+}
+
 /* Row hover: mouse-capable only (avoid touch sticky highlights). */
 @media (hover: hover) and (pointer: fine) {
   .pool-table tbody tr.pool-table-row:hover td {
@@ -709,6 +734,18 @@ body {
 
   .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):has(+ tr.pool-table-row-eliminated:hover) td {
     border-bottom: 1px solid rgb(var(--theme-danger) / 0.4);
+  }
+
+  .pool-table tbody tr.pool-table-row.pool-table-row-live:hover td,
+  .pool-table tbody tr.pool-table-row.pool-table-row-live:hover td.pool-table-col-primary {
+    background-color: rgb(250 204 21 / 0.26) !important;
+    color: rgb(var(--pool-stats-body-text)) !important;
+    border-top: none !important;
+    border-bottom: 1px solid rgb(202 138 4 / 0.55);
+  }
+
+  .pool-table tbody tr.pool-table-row:not(.pool-table-row-live):has(+ tr.pool-table-row-live:hover) td {
+    border-bottom: 1px solid rgb(202 138 4 / 0.55);
   }
 }
 
@@ -1578,10 +1615,10 @@ body {
     border-right: none !important;
   }
 
-  /* Hover outline strip: not on eliminated rows (keep faint red row edges) */
-  .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):hover td,
-  .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):hover td:first-child,
-  .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):hover td:last-child {
+  /* Hover outline strip: not on eliminated / live rows (keep row edge accents) */
+  .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):not(.pool-table-row-live):hover td,
+  .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):not(.pool-table-row-live):hover td:first-child,
+  .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):not(.pool-table-row-live):hover td:last-child {
     border-top: none !important;
     border-bottom: none !important;
     border-left: none !important;
@@ -1600,6 +1637,19 @@ body {
 
   .pool-table tbody tr.pool-table-row:not(.pool-table-row-eliminated):has(+ tr.pool-table-row-eliminated) td {
     border-bottom: 1px solid rgb(var(--theme-danger) / 0.3) !important;
+  }
+
+  .pool-table tbody tr.pool-table-row.pool-table-row-live td {
+    border-top: none !important;
+    border-bottom: 1px solid rgb(202 138 4 / 0.42) !important;
+  }
+
+  .pool-table tbody > tr.pool-table-row.pool-table-row-live:first-child td {
+    border-top: 1px solid rgb(202 138 4 / 0.42) !important;
+  }
+
+  .pool-table tbody tr.pool-table-row:not(.pool-table-row-live):has(+ tr.pool-table-row-live) td {
+    border-bottom: 1px solid rgb(202 138 4 / 0.42) !important;
   }
 
   .pool-table:not(.pool-table-flush) {
