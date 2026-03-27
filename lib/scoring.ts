@@ -1,9 +1,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isFinalStatus, isLiveStatus, isPlausiblyLiveGameForUi } from "@/lib/chalk-remaining-games";
+import { isPlausiblyLiveGameForUi } from "@/lib/chalk-remaining-games";
+import {
+  applyDnpZerosForFinalFantasyBuckets,
+  buildFinalFantasyRoundBucketsByCanonicalTeam,
+  finalFantasyBucketsForPlayerFromCanonSlots,
+  includePlayerGameStatInFantasyTotals,
+  maxDbRoundAmongLiveOrFinal
+} from "@/lib/tournament-fantasy-round-scoring";
 import {
   buildEliminationRoundByCanonicalFromGames,
   fetchTeamRowsForCanonicalKeys,
-  participationBucketFromDbRound,
   reconcileCanonicalTeamIdsFromRows,
   resolveCanonicalTeamKeyFromRow,
   stablePoolSlugForTeamContext,
@@ -257,11 +263,8 @@ export async function loadLeagueScoringEngineState(
     statsByPlayer.set(pid, arr);
   }
 
-  // Determine current round + partial warning.
-  const liveOrFinalGames = gameRows.filter((g) => isLiveStatus(g.status) || isFinalStatus(g.status));
-  const currentRound = liveOrFinalGames.length
-    ? Math.max(...liveOrFinalGames.map((g) => safeNum(g.round)))
-    : 0;
+  // Highest bracket round with a live/final game (drives stale-status stat inclusion + API `currentRound`).
+  const currentRound = maxDbRoundAmongLiveOrFinal(gameRows);
   const displayCurrentRound = computeDisplayRound(currentRound);
   void displayCurrentRound; // keep for future use if needed by caller
 
@@ -391,24 +394,10 @@ export async function loadLeagueScoringEngineState(
     canonRowById
   );
 
-  /** Rounds where we may show DNP `0`: team has a *final* game in that display bucket only.
-   * Do not key off `live` or scheduled heuristics — that produced R3=0 before tip for upcoming games. */
-  const finalDisplayRoundsByCanonical = new Map<string, Set<number>>();
-  for (const g of gameRows) {
-    if (!isFinalStatus(g.status)) continue;
-    const gameRound = safeNum(g.round);
-    const bucket = participationBucketFromDbRound(gameRound);
-    if (bucket == null) continue;
-    for (const tid of [g.team_a_id, g.team_b_id]) {
-      if (tid <= 0) continue;
-      const canon = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
-      if (!canon) continue;
-      if (!finalDisplayRoundsByCanonical.has(canon)) {
-        finalDisplayRoundsByCanonical.set(canon, new Set());
-      }
-      finalDisplayRoundsByCanonical.get(canon)!.add(bucket);
-    }
-  }
+  const finalFantasyRoundBucketsByCanonical = buildFinalFantasyRoundBucketsByCanonicalTeam({
+    games: gameRows,
+    canonForTeamId: (tid) => stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById)
+  });
 
   // Important: only mark elimination from explicit final losses.
   // Do not infer elimination from participation gaps; that can false-positive when provider
@@ -428,12 +417,7 @@ export async function loadLeagueScoringEngineState(
       const g = gameById.get(st.game_id);
       if (!g) continue;
       const gameRound = safeNum(g.round);
-      const gameHasStartedForScoring =
-        isFinalStatus(g.status) ||
-        isLiveStatus(g.status) ||
-        // Keep resilience for stale provider statuses in already-completed rounds.
-        (currentRound > 0 && gameRound > 0 && gameRound < currentRound);
-      if (!gameHasStartedForScoring) continue;
+      if (!includePlayerGameStatInFantasyTotals(g.status, gameRound, currentRound)) continue;
       const pts = safeNum(st.points);
       totalScore += pts;
 
@@ -442,20 +426,14 @@ export async function loadLeagueScoringEngineState(
       pointsByRound[bucket] = (pointsByRound[bucket] ?? 0) + pts;
     }
 
-    const roundsToFill = new Set<number>();
     const canonPlayer = stablePoolSlugForTeamContext(effectiveTeamId, canonicalByInternalTeamId, canonRowById);
-    if (canonPlayer) {
-      const s = finalDisplayRoundsByCanonical.get(canonPlayer);
-      if (s) for (const r of s) roundsToFill.add(r);
-    }
     const canonSlot = stablePoolSlugForTeamContext(teamId, canonicalByInternalTeamId, canonRowById);
-    if (canonSlot && canonSlot !== canonPlayer) {
-      const s = finalDisplayRoundsByCanonical.get(canonSlot);
-      if (s) for (const r of s) roundsToFill.add(r);
-    }
-    for (const r of roundsToFill) {
-      if (!Object.prototype.hasOwnProperty.call(pointsByRound, r)) pointsByRound[r] = 0;
-    }
+    const dnpBuckets = finalFantasyBucketsForPlayerFromCanonSlots({
+      finalBucketsByCanon: finalFantasyRoundBucketsByCanonical,
+      canonPlayer,
+      canonSlot
+    });
+    applyDnpZerosForFinalFantasyBuckets(pointsByRound, dnpBuckets);
 
     const elimRounds: number[] = [];
     if (canonPlayer) {

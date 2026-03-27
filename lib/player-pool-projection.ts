@@ -1,9 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  isFinalStatus,
-  isLiveStatus,
-  isPlausiblyLiveGameForUi
-} from "@/lib/chalk-remaining-games";
+import { isPlausiblyLiveGameForUi } from "@/lib/chalk-remaining-games";
 import {
   computeExpectedChalkGamesPlayedFromBracket,
   type ChalkTeamMeta
@@ -11,6 +7,12 @@ import {
 import { normalizePlayerNameForMatch } from "@/lib/espn-mbb-directory";
 import { parseHenrygdBoxscorePlayerIdFromExternal } from "@/lib/player-henrygd-link";
 import { fantasyRoundBucketFromDbRound } from "@/lib/scoring";
+import {
+  applyDnpZerosForFinalFantasyBuckets,
+  buildFinalFantasyRoundBucketsByCanonicalTeam,
+  includePlayerGameStatInFantasyTotals,
+  maxDbRoundAmongLiveOrFinal
+} from "@/lib/tournament-fantasy-round-scoring";
 import {
   buildBracketStateFromHenrygdAndDb,
   calculatePlayerProjectionInt,
@@ -357,24 +359,14 @@ export async function loadSeasonProjectionBundle(
     gameTeamByGameId.set(g.id, { a: g.team_a_id, b: g.team_b_id });
   }
 
-  /** Display rounds eligible for DNP `0` fill: *final* games only (not live — avoids R3=0 before stats during tip). */
-  const participatedDisplayRoundsByCanonical = new Map<string, Set<number>>();
+  const maxLiveOrFinalDbRound = maxDbRoundAmongLiveOrFinal(dbGameRows);
+  const finalFantasyRoundBucketsByCanonical = buildFinalFantasyRoundBucketsByCanonicalTeam({
+    games: dbGameRows,
+    canonForTeamId: (tid) => stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById)
+  });
+  const gameIdToScoringMeta = new Map<number, { status: string; round: number }>();
   for (const g of dbGameRows) {
-    const status = String((g as { status?: unknown }).status ?? "");
-    if (!isFinalStatus(status)) continue;
-    const r = fantasyRoundBucketFromDbRound(safeNum((g as { round?: unknown }).round));
-    if (r == null) continue;
-    const a = safeNum((g as { team_a_id?: unknown }).team_a_id);
-    const b = safeNum((g as { team_b_id?: unknown }).team_b_id);
-    for (const tid of [a, b]) {
-      if (tid <= 0) continue;
-      const canon = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
-      if (!canon) continue;
-      if (!participatedDisplayRoundsByCanonical.has(canon)) {
-        participatedDisplayRoundsByCanonical.set(canon, new Set());
-      }
-      participatedDisplayRoundsByCanonical.get(canon)!.add(r);
-    }
+    gameIdToScoringMeta.set(g.id, { status: g.status, round: g.round });
   }
 
   const statsByPlayer = new Map<number, Array<{ points: unknown }>>();
@@ -520,11 +512,15 @@ export async function loadSeasonProjectionBundle(
       }
       if (poolPid == null || !poolIdSet.has(poolPid)) continue;
 
+      const gid = safeNum(row.game_id);
+      const meta = gameIdToScoringMeta.get(gid);
+      if (!meta) continue;
+      if (!includePlayerGameStatInFantasyTotals(meta.status, meta.round, maxLiveOrFinalDbRound)) continue;
+
       const arr = statsByPlayer.get(poolPid) ?? [];
       arr.push({ points: row.points });
       statsByPlayer.set(poolPid, arr);
 
-      const gid = safeNum(row.game_id);
       const embedded = row.games?.round;
       const gr =
         embedded != null && embedded !== "" ? safeNum(embedded) : gameIdToRound.get(gid);
@@ -546,18 +542,11 @@ export async function loadSeasonProjectionBundle(
       const tid = safeNum(pp.team_id);
       if (poolPid <= 0 || tid <= 0) continue;
       const canon = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
-      const part = canon ? participatedDisplayRoundsByCanonical.get(canon) : undefined;
-      if (!part || part.size === 0) continue;
-      let byR = pointsByDisplayRoundByPlayer.get(poolPid);
-      if (!byR) {
-        byR = {};
-        for (const r of part) byR[r] = 0;
-        pointsByDisplayRoundByPlayer.set(poolPid, byR);
-        continue;
-      }
-      for (const r of part) {
-        if (!Object.prototype.hasOwnProperty.call(byR, r)) byR[r] = 0;
-      }
+      const dnpBuckets = canon ? finalFantasyRoundBucketsByCanonical.get(canon) : undefined;
+      if (!dnpBuckets || dnpBuckets.size === 0) continue;
+      const byR = pointsByDisplayRoundByPlayer.get(poolPid) ?? {};
+      applyDnpZerosForFinalFantasyBuckets(byR, dnpBuckets);
+      pointsByDisplayRoundByPlayer.set(poolPid, byR);
     }
   }
 
