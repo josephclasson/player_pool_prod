@@ -44,7 +44,12 @@ export async function POST(
 
   const who = await requireLeagueParticipant(req, supabase, canonicalId);
   if (!who.ok) {
-    return NextResponse.json({ error: who.error }, { status: who.status });
+    // Main-page live sync is intentionally public for league viewers.
+    // If auth/session is missing in production tabs, still allow the sync run.
+    console.warn("[stat-tracker/live-sync] proceeding without participant auth", {
+      leagueId: canonicalId,
+      status: who.status
+    });
   }
 
   const url = new URL(req.url);

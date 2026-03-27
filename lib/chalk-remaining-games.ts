@@ -31,12 +31,12 @@ export function isLiveStatus(status: string): boolean {
 /** Ignore “live” rows whose listed tipoff was more than this many ms ago (stuck provider state). */
 export const MAX_TOURNAMENT_LIVE_GAME_AGE_MS = 8 * 60 * 60 * 1000;
 
-/** Upper bound for treating `scheduled` + scores as underway when `status` lags the feed. */
-const MAX_SCHEDULED_IN_PROGRESS_WINDOW_MS = 4.5 * 60 * 60 * 1000;
+/** Upper bound for treating `scheduled/pre` as underway when `status` lags the feed. */
+const MAX_SCHEDULED_IN_PROGRESS_WINDOW_MS = 6 * 60 * 60 * 1000;
 
 /**
  * True when a row should drive “playing live” UI: explicit live (or synonym) status, or a plausible
- * in-progress game while still `scheduled` (bounded window + numeric scores).
+ * in-progress game while still `scheduled/pre` (bounded tipoff window; score updates can lag in prod).
  */
 export function isPlausiblyLiveGameForUi(
   g: {
@@ -65,12 +65,7 @@ export function isPlausiblyLiveGameForUi(
   if (preLike) {
     if (!Number.isFinite(startMs)) return false;
     if (nowMs - startMs > MAX_SCHEDULED_IN_PROGRESS_WINDOW_MS) return false;
-    const a = g.team_a_score;
-    const b = g.team_b_score;
-    if (a == null || b == null) return false;
-    const an = typeof a === "number" ? a : Number(a);
-    const bn = typeof b === "number" ? b : Number(b);
-    if (!Number.isFinite(an) || !Number.isFinite(bn)) return false;
+    // Do not require scores here: some prod feeds keep scores null while game status lags.
     return nowMs >= startMs - 5 * 60 * 1000;
   }
   return false;
