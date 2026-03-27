@@ -92,6 +92,27 @@ export function bracketRowIsLiveOrFinal(gameState: unknown): boolean {
 }
 
 /**
+ * Map HenryGD scoreboard `bracketRound` / `championshipGame.round.roundNumber` → DB `games.round`
+ * (0 = First Four, 1 = R64 … 6 = championship).
+ *
+ * The feed uses **NCAA 1-based** labels (1 = First Four, 2 = R64, 4 = Sweet 16, 7 = championship),
+ * not our 0–6 buckets — treating 4 as DB round 4 put Sweet 16 stats in the R4 column.
+ * Position-style ids (e.g. 401) use the same `floor(id/100)-1` rule as `bracketPositionId`.
+ */
+export function mapHenrygdChampionshipRoundLabelToDbRound(n: number): number | null {
+  if (!Number.isFinite(n)) return null;
+  const r = Math.trunc(n);
+  if (r === 0) return 0;
+  if (r === 1) return 0;
+  if (r >= 2 && r <= 7) return r - 1;
+  if (r >= 100) {
+    const b = Math.floor(r / 100);
+    if (b >= 1 && b <= 7) return b - 1;
+  }
+  return null;
+}
+
+/**
  * Assign `henrygd_boxscore_player_id` to the canonical pool row. Clears the same id from any other
  * row on the team (legacy henrygd-only duplicates), merging `player_game_stats` onto the canonical id.
  */
@@ -601,40 +622,16 @@ export async function syncHenrygdMensD1ScoreboardToSupabase(opts: {
   for (const g of bracketGames) {
     const gameId = g?.gameID;
     const roundNumber = parseIntOrNull(g?.championshipGame?.round?.roundNumber);
-    // Map henrygd `bracketRound` to our `games.round` buckets (0..6 where 0 is First Four).
-    //
-    // The feed sometimes provides `bracketRound` already bucketed (0..6),
-    // but in other henrygd endpoints it can be a "position id" style number (e.g. 100..600),
-    // so we normalize by /100 when needed.
     const bracketRoundInput = g?.bracketRound;
-    const bracketRoundRaw =
+    const bracketRoundNum =
       typeof bracketRoundInput === "string" && bracketRoundInput.trim() === ""
         ? null
-        : safeNum(bracketRoundInput);
-    let mappedRound: number | null = null;
-    if (bracketRoundRaw != null) {
-      if (bracketRoundRaw >= 0 && bracketRoundRaw <= 6) {
-        mappedRound = bracketRoundRaw;
-      } else {
-        const bucket = Math.floor(bracketRoundRaw / 100);
-        if (bucket >= 0 && bucket <= 6) mappedRound = bucket;
-        // Some feeds use a 100/200/.. style position id where 100..700 maps to 0..6.
-        else if (bucket - 1 >= 0 && bucket - 1 <= 6) mappedRound = bucket - 1;
-      }
-    }
+        : parseIntOrNull(bracketRoundInput);
 
-    if (mappedRound == null) {
-      // Fallback: Map henrygd roundNumber to our `games.round`:
-      // - roundNumber 1 => First Four => store as 0
-      // - roundNumber 2 => Round of 64 => store as 1 (R1)
-      // - Some henrygd shapes can send position ids (e.g. 100..600); bucket those.
-      if (roundNumber != null) {
-        if (roundNumber >= 100) {
-          mappedRound = Math.floor(roundNumber / 100);
-        } else {
-          mappedRound = roundNumber === 1 ? 0 : roundNumber - 1;
-        }
-      }
+    let mappedRound: number | null =
+      bracketRoundNum != null ? mapHenrygdChampionshipRoundLabelToDbRound(bracketRoundNum) : null;
+    if (mappedRound == null && roundNumber != null) {
+      mappedRound = mapHenrygdChampionshipRoundLabelToDbRound(roundNumber);
     }
 
     if (mappedRound == null) continue;
