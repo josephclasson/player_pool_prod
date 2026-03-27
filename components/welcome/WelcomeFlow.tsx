@@ -94,15 +94,16 @@ export function WelcomeFlow() {
       return;
     }
     const row = teams.find((t) => t.id === teamId);
-    writePlayerPoolSession({
-      leagueId: lid,
-      leagueTeamId: teamId,
-      teamName: row?.teamName ?? "Owner",
-      ...(resolvedSeasonYear != null ? { seasonYear: resolvedSeasonYear } : {})
-    });
-    writeStoredActiveLeagueId(lid);
-    window.dispatchEvent(new Event(PLAYER_POOL_IDENTITY_CHANGE_EVENT));
     setBusy(true);
+    const persistPoolIdentity = () => {
+      writePlayerPoolSession({
+        leagueId: lid,
+        leagueTeamId: teamId,
+        teamName: row?.teamName ?? "Owner",
+        ...(resolvedSeasonYear != null ? { seasonYear: resolvedSeasonYear } : {})
+      });
+      writeStoredActiveLeagueId(lid);
+    };
     try {
       const res = await fetch(`/api/draft/${encodeURIComponent(lid)}/state`);
       if (res.ok) {
@@ -110,13 +111,16 @@ export function WelcomeFlow() {
           draftRoom?: { status?: string | null } | null;
         };
         if (String(j?.draftRoom?.status ?? "") === "completed") {
+          persistPoolIdentity();
           router.replace(`/leaderboard?leagueId=${encodeURIComponent(lid)}`);
           return;
         }
       }
+      persistPoolIdentity();
       router.replace(`/draft?leagueId=${encodeURIComponent(lid)}`);
     } catch {
       // If we cannot check draft status, keep the original behavior.
+      persistPoolIdentity();
       router.replace(`/draft?leagueId=${encodeURIComponent(lid)}`);
     } finally {
       setBusy(false);

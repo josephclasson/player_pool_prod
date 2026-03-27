@@ -1412,7 +1412,7 @@ function StatTrackerTabPageInner() {
       const pulled = await tryPullLiveSync({ force: true });
       if (!pulled) {
         setAuthHint(
-          "Could not sync live NCAA data. Re-open the pool from Home so your team is saved, sign in, or use Commissioner auth. Showing cached data."
+          "Could not sync live NCAA data. Re-open the pool from Home so your team is saved, or sign in as a league participant. Showing cached data."
         );
         await loadData({ force: true });
       }

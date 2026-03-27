@@ -22,6 +22,7 @@ import { resolveEspnTeamLogoForPoolRow } from "@/lib/espn-ncaam-assets";
 import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-directory";
 import { displayCollegeTeamNameForUi } from "@/lib/college-team-display";
 import { resolvePlayerHeadshotUrlCandidates } from "@/lib/player-media";
+import { postStatTrackerLiveSync } from "@/lib/pool-tournament-live-sync-client";
 
 type TeamInfo = {
   id: number;
@@ -737,6 +738,17 @@ export function PlayersPoolClient({
     }
   }, [seasonYear, qDeferred, effectiveLeagueId, rows.length, meta, snapshotKey]);
 
+  const tryPullLiveSync = useCallback(async (opts?: { force?: boolean }): Promise<boolean> => {
+    const lid = effectiveLeagueId.trim();
+    if (!lid) return false;
+    try {
+      await postStatTrackerLiveSync(lid, { force: opts?.force === true });
+      return true;
+    } catch {
+      return false;
+    }
+  }, [effectiveLeagueId]);
+
   useEffect(() => {
     void load();
   }, [load]);
@@ -753,13 +765,18 @@ export function PlayersPoolClient({
     return unchangedRefreshStreak >= 2 ? 60_000 : 30_000;
   }, [meta?.hasLiveGames, unchangedRefreshStreak]);
 
+  const tick = useCallback(async () => {
+    if (document.visibilityState !== "visible") return;
+    const pulled = await tryPullLiveSync();
+    await load({ silent: true, force: pulled });
+  }, [load, tryPullLiveSync]);
+
   useEffect(() => {
     const id = window.setInterval(() => {
-      if (document.visibilityState !== "visible") return;
-      void load({ silent: true });
+      void tick();
     }, pollMs);
     return () => window.clearInterval(id);
-  }, [pollMs, load]);
+  }, [pollMs, tick]);
 
   const leagueContext = Boolean(meta?.leagueId);
 
@@ -960,7 +977,12 @@ export function PlayersPoolClient({
               type="button"
               className="pool-top-icon-btn pool-btn-outline-cta pool-btn-outline-cta--sm shrink-0 !p-1 !w-9 !h-9 flex items-center justify-center"
               disabled={busy}
-              onClick={() => void load({ manual: true, force: true })}
+              onClick={() => {
+                void (async () => {
+                  const pulled = await tryPullLiveSync({ force: true });
+                  await load({ manual: true, force: true, silent: pulled });
+                })();
+              }}
               aria-label="Refresh Data"
               aria-busy={busy}
             >
