@@ -31,12 +31,6 @@ export function isLiveStatus(status: string): boolean {
 /** Ignore “live” rows whose listed tipoff was more than this many ms ago (stuck provider state). */
 export const MAX_TOURNAMENT_LIVE_GAME_AGE_MS = 8 * 60 * 60 * 1000;
 
-/** Upper bound for treating `scheduled/pre` as underway when `status` lags the feed. */
-const MAX_SCHEDULED_IN_PROGRESS_WINDOW_MS = 6 * 60 * 60 * 1000;
-
-/** Fallback upper bound for a non-final game to be considered "likely in progress" by tipoff time. */
-const MAX_LIKELY_IN_PROGRESS_WINDOW_MS = 12 * 60 * 60 * 1000;
-
 /**
  * True when a row should drive “playing live” UI: explicit live (or synonym) status, or a plausible
  * in-progress game while still `scheduled/pre` (bounded tipoff window; score updates can lag in prod).
@@ -57,36 +51,7 @@ export function isPlausiblyLiveGameForUi(
   const tipGraceMs = 10 * 60 * 1000;
   if (Number.isFinite(startMs) && nowMs < startMs - tipGraceMs) return false;
 
-  if (isLiveStatus(g.status)) return true;
-
-  const s = String(g.status ?? "").trim().toLowerCase();
-  const preLike =
-    s === "scheduled" ||
-    s === "pre" ||
-    s === "pre_game" ||
-    s === "pregame";
-  if (preLike) {
-    if (!Number.isFinite(startMs)) return false;
-    if (nowMs - startMs > MAX_SCHEDULED_IN_PROGRESS_WINDOW_MS) return false;
-    // Do not require scores here: some prod feeds keep scores null while game status lags.
-    return nowMs >= startMs - 5 * 60 * 1000;
-  }
-  return false;
-}
-
-/**
- * Very permissive fallback for provider status lag in production:
- * if a game is not final and tipoff is within a reasonable in-progress window, treat it as live-like.
- * Used only when strict live detection finds zero games.
- */
-export function isLikelyInProgressByTipoffWindow(
-  g: { status: string; start_time: string },
-  nowMs: number
-): boolean {
-  if (isFinalStatus(g.status)) return false;
-  const startMs = new Date(g.start_time).getTime();
-  if (!Number.isFinite(startMs)) return false;
-  const tipGraceMs = 10 * 60 * 1000;
-  if (nowMs < startMs - tipGraceMs) return false;
-  return nowMs - startMs <= MAX_LIKELY_IN_PROGRESS_WINDOW_MS;
+  // Important: "live" should only be true for explicit in-progress statuses.
+  // Do not infer live-ness from scheduled/pre tipoff windows.
+  return isLiveStatus(g.status);
 }

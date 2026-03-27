@@ -2,8 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isFinalStatus,
   isLiveStatus,
-  isPlausiblyLiveGameForUi,
-  isLikelyInProgressByTipoffWindow
+  isPlausiblyLiveGameForUi
 } from "@/lib/chalk-remaining-games";
 import {
   computeExpectedChalkGamesPlayedFromBracket,
@@ -307,36 +306,8 @@ export async function loadSeasonProjectionBundle(
       nowMs
     )
   );
-  const liveGameRowsEffective =
-    liveGameRows.length > 0
-      ? liveGameRows
-      : gameRowsWithTimeForLiveUi.filter((g) =>
-          isLikelyInProgressByTipoffWindow(
-            {
-              status: g.status,
-              start_time: g.start_time
-            },
-            nowMs
-          )
-        );
-  const liveGameRowsFinal =
-    liveGameRowsEffective.length > 0
-      ? liveGameRowsEffective
-      : (() => {
-          const nonFinalStarted = gameRowsWithTimeForLiveUi.filter((g) => {
-            if (isFinalStatus(g.status)) return false;
-            const r = safeNum(g.round);
-            if (r < 1 || r > 6) return false;
-            const startMs = new Date(g.start_time).getTime();
-            if (!Number.isFinite(startMs)) return false;
-            return startMs <= nowMs + 2 * 60 * 60 * 1000;
-          });
-          if (nonFinalStarted.length === 0) return [];
-          const maxRound = Math.max(...nonFinalStarted.map((g) => safeNum(g.round)));
-          return nonFinalStarted.filter((g) => safeNum(g.round) === maxRound);
-        })();
   const teamIdsInLiveGame = new Set<number>();
-  for (const g of liveGameRowsFinal) {
+  for (const g of liveGameRows) {
     if (g.team_a_id > 0) teamIdsInLiveGame.add(g.team_a_id);
     if (g.team_b_id > 0) teamIdsInLiveGame.add(g.team_b_id);
   }
@@ -590,7 +561,7 @@ export async function loadSeasonProjectionBundle(
     }
   }
 
-  const hasLiveGames = liveGameRowsFinal.length > 0;
+  const hasLiveGames = liveGameRows.length > 0;
 
   let expectedChalkGamesTotalByTeamId = new Map<number, number>();
   try {

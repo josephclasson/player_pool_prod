@@ -1,10 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  isFinalStatus,
-  isLiveStatus,
-  isPlausiblyLiveGameForUi,
-  isLikelyInProgressByTipoffWindow
-} from "@/lib/chalk-remaining-games";
+import { isFinalStatus, isLiveStatus, isPlausiblyLiveGameForUi } from "@/lib/chalk-remaining-games";
 import {
   buildEliminationRoundByCanonicalFromGames,
   fetchTeamRowsForCanonicalKeys,
@@ -301,39 +296,12 @@ export async function loadLeagueScoringEngineState(
       nowMs
     )
   );
-  const liveGamesEffective =
-    liveGames.length > 0
-      ? liveGames
-      : allGameRowsForLive.filter((g) =>
-          isLikelyInProgressByTipoffWindow(
-            {
-              status: g.status,
-              start_time: g.start_time
-            },
-            nowMs
-          )
-        );
-  const liveGamesFinal =
-    liveGamesEffective.length > 0
-      ? liveGamesEffective
-      : (() => {
-          const nonFinalStarted = allGameRowsForLive.filter((g) => {
-            if (isFinalStatus(g.status)) return false;
-            if (safeNum(g.round) < 1 || safeNum(g.round) > 6) return false;
-            const startMs = new Date(g.start_time).getTime();
-            if (!Number.isFinite(startMs)) return false;
-            return startMs <= nowMs + 2 * 60 * 60 * 1000;
-          });
-          if (nonFinalStarted.length === 0) return [];
-          const maxRound = Math.max(...nonFinalStarted.map((g) => safeNum(g.round)));
-          return nonFinalStarted.filter((g) => safeNum(g.round) === maxRound);
-        })();
-  const anyLiveGames = liveGamesFinal.length > 0;
-  const liveGamesCount = liveGamesFinal.length;
+  const anyLiveGames = liveGames.length > 0;
+  const liveGamesCount = liveGames.length;
 
   const partialDataWarning = (() => {
-    if (liveGamesFinal.length === 0) return false;
-    const latestSync = liveGamesFinal
+    if (liveGames.length === 0) return false;
+    const latestSync = liveGames
       .map((g) => g.last_synced_at ? new Date(g.last_synced_at).getTime() : 0)
       .reduce((a, b) => Math.max(a, b), 0);
     if (!latestSync) return true;
@@ -341,7 +309,7 @@ export async function loadLeagueScoringEngineState(
   })();
 
   const teamIdsInLiveGame = new Set<number>();
-  for (const g of liveGamesFinal) {
+  for (const g of liveGames) {
     if (g.team_a_id > 0) teamIdsInLiveGame.add(g.team_a_id);
     if (g.team_b_id > 0) teamIdsInLiveGame.add(g.team_b_id);
   }
@@ -462,10 +430,17 @@ export async function loadLeagueScoringEngineState(
     for (const st of playerStats) {
       const g = gameById.get(st.game_id);
       if (!g) continue;
+      const gameRound = safeNum(g.round);
+      const gameHasStartedForScoring =
+        isFinalStatus(g.status) ||
+        isLiveStatus(g.status) ||
+        // Keep resilience for stale provider statuses in already-completed rounds.
+        (currentRound > 0 && gameRound > 0 && gameRound < currentRound);
+      if (!gameHasStartedForScoring) continue;
       const pts = safeNum(st.points);
       totalScore += pts;
 
-      const bucket = fantasyRoundBucketFromDbRound(safeNum(g.round));
+      const bucket = fantasyRoundBucketFromDbRound(gameRound);
       if (bucket == null) continue;
       pointsByRound[bucket] = (pointsByRound[bucket] ?? 0) + pts;
     }
