@@ -392,13 +392,19 @@ export async function loadLeagueScoringEngineState(
   );
 
   const participatedDisplayRoundsByCanonical = new Map<string, Set<number>>();
+  const nowMsForParticipation = Date.now();
   for (const g of gameRows) {
     const gameRound = safeNum(g.round);
+    const startMs = new Date(String(g.start_time ?? "")).getTime();
+    const tipHasPassed = Number.isFinite(startMs) && startMs <= nowMsForParticipation;
     const countsAsParticipated =
       isFinalStatus(g.status) ||
       isLiveStatus(g.status) ||
-      // Fallback for stale providers: any game in a past round must have been played.
-      (currentRound > 0 && gameRound > 0 && gameRound < currentRound);
+      // Stale status only when tip has passed: avoid R3=0 before tip when max round elsewhere is higher.
+      (currentRound > 0 &&
+        gameRound > 0 &&
+        gameRound < currentRound &&
+        tipHasPassed);
     if (!countsAsParticipated) continue;
     const bucket = participationBucketFromDbRound(gameRound);
     if (bucket == null) continue;
