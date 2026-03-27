@@ -1101,6 +1101,11 @@ function StatTrackerTabPageInner() {
     [ownersSorted]
   );
 
+  const liveDraftedPlayersCount = useMemo(
+    () => leagueDraftedPlayers.filter((p) => p.playingInLiveGame).length,
+    [leagueDraftedPlayers]
+  );
+
   const leagueStatRanks = useMemo(
     () => buildLeagueStatRanks(leagueDraftedPlayers),
     [leagueDraftedPlayers]
@@ -1480,7 +1485,7 @@ function StatTrackerTabPageInner() {
                 <span className="inline-block whitespace-nowrap px-0.5">
                   Last synced {formatLastSyncedShort(api.lastSyncedAt)}
                   {api.anyLiveGames ? (
-                    <span className="text-emerald-500 font-semibold"> · Live ×{api.liveGamesCount}</span>
+                    <span className="text-emerald-500 font-semibold"> · Live ×{liveDraftedPlayersCount}</span>
                   ) : null}
                 </span>
               </div>
