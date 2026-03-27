@@ -2,7 +2,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isFinalStatus,
   isLiveStatus,
-  isPlausiblyLiveGameForUi
+  isPlausiblyLiveGameForUi,
+  isLikelyInProgressByTipoffWindow
 } from "@/lib/chalk-remaining-games";
 import {
   buildEliminationRoundByCanonicalFromGames,
@@ -300,12 +301,24 @@ export async function loadLeagueScoringEngineState(
       nowMs
     )
   );
-  const anyLiveGames = liveGames.length > 0;
-  const liveGamesCount = liveGames.length;
+  const liveGamesEffective =
+    liveGames.length > 0
+      ? liveGames
+      : allGameRowsForLive.filter((g) =>
+          isLikelyInProgressByTipoffWindow(
+            {
+              status: g.status,
+              start_time: g.start_time
+            },
+            nowMs
+          )
+        );
+  const anyLiveGames = liveGamesEffective.length > 0;
+  const liveGamesCount = liveGamesEffective.length;
 
   const partialDataWarning = (() => {
-    if (liveGames.length === 0) return false;
-    const latestSync = liveGames
+    if (liveGamesEffective.length === 0) return false;
+    const latestSync = liveGamesEffective
       .map((g) => g.last_synced_at ? new Date(g.last_synced_at).getTime() : 0)
       .reduce((a, b) => Math.max(a, b), 0);
     if (!latestSync) return true;
@@ -313,7 +326,7 @@ export async function loadLeagueScoringEngineState(
   })();
 
   const teamIdsInLiveGame = new Set<number>();
-  for (const g of liveGames) {
+  for (const g of liveGamesEffective) {
     if (g.team_a_id > 0) teamIdsInLiveGame.add(g.team_a_id);
     if (g.team_b_id > 0) teamIdsInLiveGame.add(g.team_b_id);
   }

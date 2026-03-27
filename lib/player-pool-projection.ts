@@ -1,5 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isFinalStatus, isLiveStatus, isPlausiblyLiveGameForUi } from "@/lib/chalk-remaining-games";
+import {
+  isFinalStatus,
+  isLiveStatus,
+  isPlausiblyLiveGameForUi,
+  isLikelyInProgressByTipoffWindow
+} from "@/lib/chalk-remaining-games";
 import {
   computeExpectedChalkGamesPlayedFromBracket,
   type ChalkTeamMeta
@@ -302,8 +307,20 @@ export async function loadSeasonProjectionBundle(
       nowMs
     )
   );
+  const liveGameRowsEffective =
+    liveGameRows.length > 0
+      ? liveGameRows
+      : gameRowsWithTimeForLiveUi.filter((g) =>
+          isLikelyInProgressByTipoffWindow(
+            {
+              status: g.status,
+              start_time: g.start_time
+            },
+            nowMs
+          )
+        );
   const teamIdsInLiveGame = new Set<number>();
-  for (const g of liveGameRows) {
+  for (const g of liveGameRowsEffective) {
     if (g.team_a_id > 0) teamIdsInLiveGame.add(g.team_a_id);
     if (g.team_b_id > 0) teamIdsInLiveGame.add(g.team_b_id);
   }
@@ -557,7 +574,7 @@ export async function loadSeasonProjectionBundle(
     }
   }
 
-  const hasLiveGames = liveGameRows.length > 0;
+  const hasLiveGames = liveGameRowsEffective.length > 0;
 
   let expectedChalkGamesTotalByTeamId = new Map<number, number>();
   try {
