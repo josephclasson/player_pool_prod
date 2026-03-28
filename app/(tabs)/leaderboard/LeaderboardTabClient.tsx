@@ -965,6 +965,10 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
 
       {leagueId && error && <div className="pool-alert-danger pool-alert-compact">{error}</div>}
 
+      {leagueId && !data && !error && (
+        <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
+      )}
+
       {leagueId && data && teamsSorted.length === 0 && (
         <div className="pool-alert pool-alert-compact">
           No scoring data yet. Sync games from Commissioner Tools when the tournament starts.

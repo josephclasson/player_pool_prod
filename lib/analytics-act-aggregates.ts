@@ -4,19 +4,16 @@ import {
   conferenceSeoSlugForDraftedPlayerTeam,
   OTHER_D1_CONFERENCE_SEO
 } from "@/lib/mbb-pool-slug-to-conference-seo";
-import {
-  playerAdvancedThroughCurrentRound,
-  rosterPlayersToOwnerMetrics,
-  type LeaderboardOwnerPlayerMetrics
-} from "@/lib/leaderboard-owner-metrics";
+import { rosterPlayersToOwnerMetrics, type LeaderboardOwnerPlayerMetrics } from "@/lib/leaderboard-owner-metrics";
 import type { LeaderboardApiPayload } from "@/lib/scoring/persist-league-scoreboard";
 import type { LeaderboardRosterPlayerApi } from "@/lib/scoring/leaderboard-roster-detail";
 
 export type AnalyticsActAggregateRow = {
   key: string;
   label: string;
+  /** Drafted players in this bucket (school / conference / seed / draft round). */
+  tot: number;
   remain: number;
-  adv: number;
   roundScores: Record<number, number>;
   totalScore: number;
 };
@@ -27,12 +24,9 @@ function metricsForPlayer(p: LeaderboardRosterPlayerApi): LeaderboardOwnerPlayer
   return rosterPlayersToOwnerMetrics([p])[0]!;
 }
 
-function foldMetrics(
-  players: LeaderboardOwnerPlayerMetrics[],
-  currentRound: number
-): Omit<AnalyticsActAggregateRow, "key" | "label"> {
+function foldMetrics(players: LeaderboardOwnerPlayerMetrics[]): Omit<AnalyticsActAggregateRow, "key" | "label"> {
+  const tot = players.length;
   const remain = players.filter((m) => !m.eliminated).length;
-  const adv = players.filter((m) => playerAdvancedThroughCurrentRound(m, currentRound)).length;
   const roundScores: Record<number, number> = {};
   for (let r = 1; r <= 6; r++) {
     let sum = 0;
@@ -50,7 +44,7 @@ function foldMetrics(
   for (let r = 1; r <= 6; r++) {
     if (Object.prototype.hasOwnProperty.call(roundScores, r)) totalScore += roundScores[r]!;
   }
-  return { remain, adv, roundScores, totalScore };
+  return { tot, remain, roundScores, totalScore };
 }
 
 /** Sort by total (desc), tie-break label; assign standings # 1..n. */
@@ -85,10 +79,7 @@ function allDraftedPlayers(teams: LeaderboardApiPayload["teams"]): LeaderboardRo
   return out;
 }
 
-export function buildSchoolPerformanceRows(
-  teams: LeaderboardApiPayload["teams"],
-  currentRound: number
-): AnalyticsActAggregateRow[] {
+export function buildSchoolPerformanceRows(teams: LeaderboardApiPayload["teams"]): AnalyticsActAggregateRow[] {
   const buckets = new Map<string, { label: string; players: LeaderboardOwnerPlayerMetrics[] }>();
   for (const p of allDraftedPlayers(teams)) {
     const team = p.team;
@@ -107,7 +98,7 @@ export function buildSchoolPerformanceRows(
   }
   const rows: AnalyticsActAggregateRow[] = [];
   for (const [key, { label, players }] of buckets) {
-    const folded = foldMetrics(players, currentRound);
+    const folded = foldMetrics(players);
     rows.push({ key, label, ...folded });
   }
   return rows;
@@ -164,8 +155,7 @@ function displayConferenceLabelForUi(slug: string): string {
 }
 
 export function buildConferencePerformanceRows(
-  teams: LeaderboardApiPayload["teams"],
-  currentRound: number
+  teams: LeaderboardApiPayload["teams"]
 ): AnalyticsActAggregateRow[] {
   const buckets = new Map<string, { label: string; players: LeaderboardOwnerPlayerMetrics[] }>();
   for (const p of allDraftedPlayers(teams)) {
@@ -181,16 +171,13 @@ export function buildConferencePerformanceRows(
   }
   const rows: AnalyticsActAggregateRow[] = [];
   for (const [key, { label, players }] of buckets) {
-    const folded = foldMetrics(players, currentRound);
+    const folded = foldMetrics(players);
     rows.push({ key, label, ...folded });
   }
   return rows;
 }
 
-export function buildSeedPerformanceRows(
-  teams: LeaderboardApiPayload["teams"],
-  currentRound: number
-): AnalyticsActAggregateRow[] {
+export function buildSeedPerformanceRows(teams: LeaderboardApiPayload["teams"]): AnalyticsActAggregateRow[] {
   const buckets = new Map<number, LeaderboardOwnerPlayerMetrics[]>();
   for (const p of allDraftedPlayers(teams)) {
     const seed = p.team?.seed;
@@ -204,7 +191,7 @@ export function buildSeedPerformanceRows(
   }
   const rows: AnalyticsActAggregateRow[] = [];
   for (const [seed, players] of buckets) {
-    const folded = foldMetrics(players, currentRound);
+    const folded = foldMetrics(players);
     rows.push({
       key: `seed:${seed}`,
       label: `${seed} Seeds`,
@@ -216,7 +203,6 @@ export function buildSeedPerformanceRows(
 
 export function buildRoundPerformanceRows(
   teams: LeaderboardApiPayload["teams"],
-  currentRound: number,
   numTeams: number
 ): AnalyticsActAggregateRow[] {
   const buckets = new Map<number, LeaderboardOwnerPlayerMetrics[]>();
@@ -234,7 +220,7 @@ export function buildRoundPerformanceRows(
   const sortedRounds = [...buckets.keys()].sort((a, b) => a - b);
   for (const r of sortedRounds) {
     const players = buckets.get(r)!;
-    const folded = foldMetrics(players, currentRound);
+    const folded = foldMetrics(players);
     rows.push({
       key: `draftRound:${r}`,
       label: `Round ${r}`,

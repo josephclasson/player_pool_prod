@@ -32,8 +32,8 @@ type LeaderboardSnapshot = {
 type AnalyticsSortKey =
   | "standingsRank"
   | "label"
+  | "tot"
   | "remain"
-  | "adv"
   | "r1"
   | "r2"
   | "r3"
@@ -46,8 +46,8 @@ type AnalyticsSortKey =
 const SORT_HEADER_ARIA: Record<AnalyticsSortKey, string> = {
   standingsRank: "standings rank (#)",
   label: "row label",
+  tot: "total drafted players in this group (TOT)",
   remain: "players remaining (REM)",
-  adv: "advanced count",
   r1: "round 1 points",
   r2: "round 2 points",
   r3: "round 3 points",
@@ -187,11 +187,11 @@ function sortRows(
       case "label":
         cmp = a.label.localeCompare(b.label) * mult;
         break;
+      case "tot":
+        cmp = (a.tot - b.tot) * mult;
+        break;
       case "remain":
         cmp = (a.remain - b.remain) * mult;
-        break;
-      case "adv":
-        cmp = (a.adv - b.adv) * mult;
         break;
       case "r1":
         cmp = compareNullableNumbers(roundSortValue(a.roundScores, 1), roundSortValue(b.roundScores, 1), mult);
@@ -298,25 +298,25 @@ function AnalyticsActTable({
                   {labelHeader}
                 </SortableTh>
                 <SortableTh
+                  columnKey="tot"
+                  sortKey={sortKey}
+                  sortDir={sortDir}
+                  onSort={onSort}
+                  align="center"
+                  title="Total drafted players in this group (all pools combined)"
+                >
+                  TOT
+                </SortableTh>
+                <SortableTh
                   columnKey="remain"
                   sortKey={sortKey}
                   sortDir={sortDir}
                   onSort={onSort}
                   align="center"
                   title="Drafted players whose team is still in the tournament"
-                >
-                  REM
-                </SortableTh>
-                <SortableTh
-                  columnKey="adv"
-                  sortKey={sortKey}
-                  sortDir={sortDir}
-                  onSort={onSort}
-                  align="center"
-                  title="Drafted players whose team clinched the next round: final win in the league’s active round, or eliminated only in a later round"
                   className="pool-table-col-group-end"
                 >
-                  ADV
+                  REM
                 </SortableTh>
                 {([1, 2, 3, 4, 5, 6] as const).map((r) => (
                   <SortableTh
@@ -372,9 +372,9 @@ function AnalyticsActTable({
                         {row.label}
                       </span>
                     </td>
-                    <td className="px-1 py-2 text-center font-semibold text-foreground align-middle">{row.remain}</td>
+                    <td className="px-1 py-2 text-center font-semibold text-foreground align-middle">{row.tot}</td>
                     <td className="px-1 py-2 text-center font-semibold text-foreground align-middle pool-table-col-group-end">
-                      {row.adv}
+                      {row.remain}
                     </td>
                     {([1, 2, 3, 4, 5, 6] as const).map((r) => (
                       <td
@@ -567,28 +567,27 @@ export function AnalyticsPageClient({ leagueId }: { leagueId?: string }) {
     });
   }, [data?.teams]);
 
-  const currentRound = data?.currentRound ?? 0;
   const numTeams = teamsSorted.length;
 
   const schoolRows = useMemo(() => {
     if (teamsSorted.length === 0) return [];
-    return assignAnalyticsRanks(buildSchoolPerformanceRows(teamsSorted, currentRound));
-  }, [teamsSorted, currentRound]);
+    return assignAnalyticsRanks(buildSchoolPerformanceRows(teamsSorted));
+  }, [teamsSorted]);
 
   const conferenceRows = useMemo(() => {
     if (teamsSorted.length === 0) return [];
-    return assignAnalyticsRanks(buildConferencePerformanceRows(teamsSorted, currentRound));
-  }, [teamsSorted, currentRound]);
+    return assignAnalyticsRanks(buildConferencePerformanceRows(teamsSorted));
+  }, [teamsSorted]);
 
   const seedRows = useMemo(() => {
     if (teamsSorted.length === 0) return [];
-    return assignAnalyticsRanks(buildSeedPerformanceRows(teamsSorted, currentRound));
-  }, [teamsSorted, currentRound]);
+    return assignAnalyticsRanks(buildSeedPerformanceRows(teamsSorted));
+  }, [teamsSorted]);
 
   const roundRows = useMemo(() => {
     if (teamsSorted.length === 0) return [];
-    return assignAnalyticsRanks(buildRoundPerformanceRows(teamsSorted, currentRound, numTeams));
-  }, [teamsSorted, currentRound, numTeams]);
+    return assignAnalyticsRanks(buildRoundPerformanceRows(teamsSorted, numTeams));
+  }, [teamsSorted, numTeams]);
 
   const schoolMax = useMemo(() => maxTotalInRows(schoolRows), [schoolRows]);
   const conferenceMax = useMemo(() => maxTotalInRows(conferenceRows), [conferenceRows]);
@@ -717,6 +716,10 @@ export function AnalyticsPageClient({ leagueId }: { leagueId?: string }) {
       )}
 
       {leagueId && error && <div className="pool-alert-danger pool-alert-compact">{error}</div>}
+
+      {leagueId && !data && !error && (
+        <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
+      )}
 
       {leagueId && data && teamsSorted.length === 0 && (
         <div className="pool-alert pool-alert-compact">

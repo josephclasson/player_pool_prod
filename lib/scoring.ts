@@ -452,6 +452,21 @@ export async function loadLeagueScoringEngineState(
 
     const canonPlayer = stablePoolSlugForTeamContext(effectiveTeamId, canonicalByInternalTeamId, canonRowById);
     const canonSlot = stablePoolSlugForTeamContext(teamId, canonicalByInternalTeamId, canonRowById);
+
+    // Live game with no `player_game_stats` row yet (or 0 pts not written): still show 0 for that round in UI.
+    for (const g of liveGames) {
+      const b = fantasyRoundBucketFromDbRound(safeNum(g.round));
+      if (b == null) continue;
+      const ca = stablePoolSlugForTeamContext(g.team_a_id, canonicalByInternalTeamId, canonRowById);
+      const cb = stablePoolSlugForTeamContext(g.team_b_id, canonicalByInternalTeamId, canonRowById);
+      const matchPlayer = Boolean(canonPlayer && (ca === canonPlayer || cb === canonPlayer));
+      const matchSlot = Boolean(
+        canonSlot && canonSlot !== canonPlayer && (ca === canonSlot || cb === canonSlot)
+      );
+      if (!matchPlayer && !matchSlot) continue;
+      if (!Object.prototype.hasOwnProperty.call(pointsByRound, b)) pointsByRound[b] = 0;
+    }
+
     const dnpBuckets = finalFantasyBucketsForPlayerFromCanonSlots({
       finalBucketsByCanon: finalFantasyRoundBucketsByCanonical,
       canonPlayer,

@@ -7,7 +7,8 @@ import {
 const ON_PAGE_DISPLAY_BY_CANONICAL: Record<string, string> = {
   "st-john-s": "St. John's",
   "saint-mary-s": "St. Mary's",
-  byu: "BYU"
+  byu: "BYU",
+  vcu: "VCU"
 };
 
 /** Trailing “St” / “St.” (state-school shorthand) → “ St.” */
@@ -24,13 +25,23 @@ function normalizeByuDisplay(label: string): string {
   return label;
 }
 
+function normalizeVcuDisplay(label: string): string {
+  const t = label.trim();
+  if (!t) return label;
+  if (/^vcu$/i.test(t)) return "VCU";
+  if (/^vcu\s+rams?$/i.test(t)) return "VCU";
+  return label;
+}
+
 function applyCollegeTeamDisplayStringTransforms(label: string): string {
   const s = label.trim();
   if (!s) return s;
 
   let out = s.replace(/\bSt\.?\s*John'?s?\s*\(\s*NY\s*\)/gi, "St. John's");
 
-  if (/\bmount\b/i.test(out)) return normalizeTrailingStateAbbreviation(normalizeByuDisplay(out));
+  if (/\bmount\b/i.test(out)) {
+    return normalizeTrailingStateAbbreviation(normalizeVcuDisplay(normalizeByuDisplay(out)));
+  }
 
   const looksStMary = /\b(st\.?\s*mary|saint\s*mary|st\s*marys?)\b/i.test(out);
   if (looksStMary) {
@@ -46,6 +57,7 @@ function applyCollegeTeamDisplayStringTransforms(label: string): string {
   }
 
   out = normalizeByuDisplay(out);
+  out = normalizeVcuDisplay(out);
   out = normalizeTrailingStateAbbreviation(out);
   return out;
 }

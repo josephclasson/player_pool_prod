@@ -226,12 +226,17 @@ export async function loadSeasonProjectionBundle(
     }
   }
 
-  const teamsRows = await fetchTournamentSeasonTeamsMerged(
-    supabase,
-    seasonYear,
-    extraTeamIdsForMerge,
-    "id, overall_seed, external_team_id, seed"
-  );
+  const [teamsRows, seasonTeamsScopeRes] = await Promise.all([
+    fetchTournamentSeasonTeamsMerged(
+      supabase,
+      seasonYear,
+      extraTeamIdsForMerge,
+      "id, overall_seed, external_team_id, seed"
+    ),
+    seasonYear > 0
+      ? supabase.from("teams").select("id").ilike("external_team_id", `%-${seasonYear}`)
+      : Promise.resolve({ data: [] as { id?: unknown }[] })
+  ]);
 
   const teamIdByExternalTeamId = new Map<string, number>(
     teamsRows.map((t) => [
@@ -254,6 +259,29 @@ export async function loadSeasonProjectionBundle(
     (id) => id > 0
   );
   const seasonTeamIdSet = new Set(teamIds);
+
+  const seasonTeamIdSetForScope = new Set<number>();
+  for (const t of seasonTeamsScopeRes.data ?? []) {
+    const id = safeNum((t as { id?: unknown }).id);
+    if (id > 0) seasonTeamIdSetForScope.add(id);
+  }
+  const seasonStartMs = seasonYear > 0 ? Date.UTC(seasonYear, 0, 1, 0, 0, 0, 0) : 0;
+  const seasonEndMs = seasonYear > 0 ? Date.UTC(seasonYear + 1, 0, 1, 0, 0, 0, 0) : 0;
+  const seasonScopedGameRowsWithTime =
+    seasonYear > 0 || seasonTeamIdSetForScope.size > 0
+      ? gameRowsWithTime.filter((g) => {
+          const ta = g.team_a_id;
+          const tb = g.team_b_id;
+          const inSeasonTeams = seasonTeamIdSetForScope.has(ta) || seasonTeamIdSetForScope.has(tb);
+          const atMs = new Date(g.start_time).getTime();
+          const inSeasonWindow =
+            seasonYear > 0 && Number.isFinite(atMs) ? atMs >= seasonStartMs && atMs < seasonEndMs : false;
+          return inSeasonWindow || inSeasonTeams;
+        })
+      : gameRowsWithTime;
+  /** Align with `loadLeagueScoringEngineState`: avoid false eliminations from other seasons’ games in `games`. */
+  const gameRowsWithTimeForElimination =
+    seasonScopedGameRowsWithTime.length >= 8 ? seasonScopedGameRowsWithTime : gameRowsWithTime;
 
   const dbGameRowsSeason = dbGameRows.filter(
     (g) => seasonTeamIdSet.has(g.team_a_id) || seasonTeamIdSet.has(g.team_b_id)
@@ -326,7 +354,7 @@ export async function loadSeasonProjectionBundle(
   }
 
   const eliminationRoundByCanonical = buildEliminationRoundByCanonicalFromGames(
-    gameRowsWithTime,
+    gameRowsWithTimeForElimination,
     canonicalByInternalTeamId,
     canonRowById
   );

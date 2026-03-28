@@ -1729,6 +1729,10 @@ function StatTrackerTabPageInner() {
       </div>
 
       <div className="min-w-0 pool-scores-owner-list">
+      {leagueId && api == null && !error ? (
+        <div className="py-10 text-center text-sm text-muted-foreground">Loading…</div>
+      ) : (
+        <>
       {orderedSelectedOwners.map((owner) => {
         const isOpen = openByOwnerId[owner.ownerId] ?? true;
         const rank = rankByOwnerId.get(owner.ownerId) ?? 0;
@@ -2419,11 +2423,11 @@ function StatTrackerTabPageInner() {
           </div>
         );
       })}
-      {visibleOwnerCount === 0 ? (
-        <div className="pool-text-faint px-1 py-2 text-[11px]">
-          {api == null ? "Loading scores…" : "No tables match current filters."}
-        </div>
+      {visibleOwnerCount === 0 && api != null ? (
+        <div className="pool-text-faint px-1 py-2 text-[11px]">No tables match current filters.</div>
       ) : null}
+        </>
+      )}
       </div>
     </div>
   );

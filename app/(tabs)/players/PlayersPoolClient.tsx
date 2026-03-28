@@ -71,6 +71,11 @@ type PoolPlayer = {
   completedTournamentGames?: number | null;
   /** College team is in a currently live tournament game (canonical-expanded). */
   playingInLiveGame?: boolean;
+  /**
+   * True when the team has a confirmed tournament loss (same `allTeams.isActive` as projections).
+   * Undefined on older cached snapshots — client falls back to chalk heuristic.
+   */
+  tournamentEliminated?: boolean;
   ownerTeamName?: string | null;
 };
 
@@ -120,14 +125,21 @@ function displayCollegeTeam(t: TeamInfo): string {
 }
 
 function eliminatedRoundForPlayer(p: PoolPlayer): number | null {
+  if (p.playingInLiveGame === true) return null;
+
   const chalkRem = p.chalkGamesRemaining;
   const completed = p.completedTournamentGames;
 
   const chalkRemN = chalkRem == null ? null : Number(chalkRem);
   const completedN = completed == null ? null : Number(completed);
 
-  // Backend convention: `chalkGamesRemaining = 0` means eliminated.
-  if (chalkRemN == null || !Number.isFinite(chalkRemN) || chalkRemN !== 0) return null;
+  const inferredEliminatedFromChalk =
+    chalkRemN != null && Number.isFinite(chalkRemN) && chalkRemN === 0;
+  const isEliminated =
+    p.tournamentEliminated === true ||
+    (p.tournamentEliminated !== false && inferredEliminatedFromChalk);
+
+  if (!isEliminated) return null;
 
   if (completedN != null && Number.isFinite(completedN)) {
     const er = Math.trunc(completedN);
@@ -793,6 +805,9 @@ export function PlayersPoolClient({
 
   const leagueContext = Boolean(meta?.leagueId);
 
+  /** No `meta` yet ⇒ first fetch has not completed; avoid empty table chrome (headers with no rows). */
+  const playersTableAwaitingFirstLoad = rows.length === 0 && meta == null;
+
   const activeRoundBucketGlobal = useMemo(() => {
     let max = 0;
     for (const p of rows) {
@@ -1239,6 +1254,11 @@ export function PlayersPoolClient({
 
         <div className="pool-card pool-card-compact pool-players-table-card min-w-0">
           <div className="pool-table-viewport min-w-0 overflow-x-auto md:overflow-x-auto">
+            {playersTableAwaitingFirstLoad ? (
+              <div className="py-10 px-2 text-center text-sm text-muted-foreground">
+                {error ? "Unable to load." : "Loading…"}
+              </div>
+            ) : (
             <table className="pool-table pool-players-stat-table text-xs min-w-0">
               <thead>
                 <tr>
@@ -1536,13 +1556,6 @@ export function PlayersPoolClient({
                   </tr>
                 );
               })}
-              {rows.length === 0 && (busy || meta == null) && (
-                <tr className="pool-table-empty">
-                  <td colSpan={15} className="py-8 text-center pool-text-faint text-[11px]">
-                    Loading player stats…
-                  </td>
-                </tr>
-              )}
               {rows.length === 0 && !busy && meta != null && (
                 <tr className="pool-table-empty">
                   <td colSpan={15} className="py-8 text-center pool-text-faint text-[11px]">
@@ -1562,6 +1575,7 @@ export function PlayersPoolClient({
               )}
             </tbody>
           </table>
+            )}
           </div>
         </div>
       </div>
