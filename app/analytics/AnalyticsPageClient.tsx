@@ -8,6 +8,7 @@ import {
   maxTotalInRows,
   pointsBehindLeaderInTable,
   buildSchoolPerformanceRows,
+  buildConferencePerformanceRows,
   buildSeedPerformanceRows,
   buildRoundPerformanceRows,
   type AnalyticsActAggregateRankedRow
@@ -312,7 +313,7 @@ function AnalyticsActTable({
                   sortDir={sortDir}
                   onSort={onSort}
                   align="center"
-                  title="Drafted players whose team advanced through the league’s current tournament round"
+                  title="Drafted players whose team clinched the next round: final win in the league’s active round, or eliminated only in a later round"
                   className="pool-table-col-group-end"
                 >
                   ADV
@@ -355,8 +356,14 @@ function AnalyticsActTable({
             <tbody>
               {displayRows.map((row) => {
                 const behind = pointsBehindLeaderInTable(row.totalScore, maxTotal);
+                const groupAllEliminated = row.remain === 0;
                 return (
-                  <tr key={row.key} className="pool-table-row">
+                  <tr
+                    key={row.key}
+                    className={["pool-table-row", groupAllEliminated ? "pool-table-row-eliminated" : ""]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
                     <td className="px-1 py-2 text-left tabular-nums text-foreground/80 align-middle">
                       {ordinalRankLabel(row.rank)}
                     </td>
@@ -413,12 +420,15 @@ export function AnalyticsPageClient({ leagueId }: { leagueId?: string }) {
   const etagRef = useRef<string | null>(null);
   const lastLoadedAtRef = useRef(0);
 
-  const [schoolOpen, setSchoolOpen] = useState(true);
-  const [seedOpen, setSeedOpen] = useState(true);
-  const [roundOpen, setRoundOpen] = useState(true);
+  const [schoolOpen, setSchoolOpen] = useState(false);
+  const [conferenceOpen, setConferenceOpen] = useState(false);
+  const [seedOpen, setSeedOpen] = useState(false);
+  const [roundOpen, setRoundOpen] = useState(false);
 
   const [schoolSortKey, setSchoolSortKey] = useState<AnalyticsSortKey>("total");
   const [schoolSortDir, setSchoolSortDir] = useState<"asc" | "desc">("desc");
+  const [conferenceSortKey, setConferenceSortKey] = useState<AnalyticsSortKey>("total");
+  const [conferenceSortDir, setConferenceSortDir] = useState<"asc" | "desc">("desc");
   const [seedSortKey, setSeedSortKey] = useState<AnalyticsSortKey>("total");
   const [seedSortDir, setSeedSortDir] = useState<"asc" | "desc">("desc");
   const [roundSortKey, setRoundSortKey] = useState<AnalyticsSortKey>("total");
@@ -565,6 +575,11 @@ export function AnalyticsPageClient({ leagueId }: { leagueId?: string }) {
     return assignAnalyticsRanks(buildSchoolPerformanceRows(teamsSorted, currentRound));
   }, [teamsSorted, currentRound]);
 
+  const conferenceRows = useMemo(() => {
+    if (teamsSorted.length === 0) return [];
+    return assignAnalyticsRanks(buildConferencePerformanceRows(teamsSorted, currentRound));
+  }, [teamsSorted, currentRound]);
+
   const seedRows = useMemo(() => {
     if (teamsSorted.length === 0) return [];
     return assignAnalyticsRanks(buildSeedPerformanceRows(teamsSorted, currentRound));
@@ -576,6 +591,7 @@ export function AnalyticsPageClient({ leagueId }: { leagueId?: string }) {
   }, [teamsSorted, currentRound, numTeams]);
 
   const schoolMax = useMemo(() => maxTotalInRows(schoolRows), [schoolRows]);
+  const conferenceMax = useMemo(() => maxTotalInRows(conferenceRows), [conferenceRows]);
   const seedMax = useMemo(() => maxTotalInRows(seedRows), [seedRows]);
   const roundMax = useMemo(() => maxTotalInRows(roundRows), [roundRows]);
 
@@ -590,6 +606,13 @@ export function AnalyticsPageClient({ leagueId }: { leagueId?: string }) {
     else {
       setSchoolSortKey(k);
       setSchoolSortDir(defaultSortDir(k));
+    }
+  }
+  function handleConferenceSort(k: AnalyticsSortKey) {
+    if (k === conferenceSortKey) setConferenceSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setConferenceSortKey(k);
+      setConferenceSortDir(defaultSortDir(k));
     }
   }
   function handleSeedSort(k: AnalyticsSortKey) {
@@ -665,7 +688,7 @@ export function AnalyticsPageClient({ leagueId }: { leagueId?: string }) {
           </div>
         </div>
         <div className="mt-1.5 pt-2 border-t border-border/25 text-[10px] text-foreground/45 hidden md:block">
-          School, tournament seed, and draft-round totals for players selected in your pool (ACT columns).
+          School, conference, tournament seed, and draft-round totals for players selected in your pool (ACT columns).
           {roundLiveLabel != null ? (
             <span className="ml-1.5 tabular-nums">· Round live R{roundLiveLabel}</span>
           ) : null}
@@ -713,6 +736,17 @@ export function AnalyticsPageClient({ leagueId }: { leagueId?: string }) {
             tableOpen={schoolOpen}
             onToggleOpen={() => setSchoolOpen((v) => !v)}
             maxTotal={schoolMax}
+          />
+          <AnalyticsActTable
+            title="Conference Performance"
+            labelHeader="CONF"
+            rowsRanked={conferenceRows}
+            sortKey={conferenceSortKey}
+            sortDir={conferenceSortDir}
+            onSort={handleConferenceSort}
+            tableOpen={conferenceOpen}
+            onToggleOpen={() => setConferenceOpen((v) => !v)}
+            maxTotal={conferenceMax}
           />
           <AnalyticsActTable
             title="Seed Performance"

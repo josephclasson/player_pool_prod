@@ -9,7 +9,9 @@ import { resolveEspnTeamLogoForPoolRow } from "@/lib/espn-ncaam-assets";
 import { resolvePlayerHeadshotUrlCandidates } from "@/lib/player-media";
 import { regionNameFromOverallSeedApprox } from "@/lib/henrygd-bracket-seeds";
 import { loadSeasonProjectionBundle, playerTournamentProjections } from "@/lib/player-pool-projection";
+import { playerAdvancedPastLeagueActiveRound } from "@/lib/leaderboard-owner-metrics";
 import type { LeagueLeaderboardTeamRow, LeagueScoringEngineState } from "@/lib/scoring";
+import { stablePoolSlugForTeamContext } from "@/lib/tournament-team-canonical";
 
 function safeNum(x: unknown) {
   const n = typeof x === "number" ? x : Number(x);
@@ -48,6 +50,10 @@ export type LeaderboardRosterPlayerApi = {
     shortName: string | null;
     seed: number | null;
     region: string | null;
+    /** Conference SEO slug from `teams.conference` (e.g. `big-ten`, `acc`). */
+    conference: string | null;
+    /** `teams.external_team_id` (e.g. `iowa-st-2026`); used when `conference` is null. */
+    externalTeamId?: string | null;
     logoUrl: string | null;
   } | null;
   /** Fantasy points by tournament display round R1–R6. */
@@ -59,6 +65,11 @@ export type LeaderboardRosterPlayerApi = {
   eliminated?: boolean;
   /** Tournament display round where team was eliminated (1..6), else null. */
   eliminatedRound?: number | null;
+  /**
+   * True when the team has clinched advancement past the league’s active display round
+   * (final win in that round, or eliminated only later).
+   */
+  advancedPastActiveRound?: boolean;
   /** League-wide draft order (1 = first overall). Used for “best pick per draft round”. */
   pickOverall?: number | null;
 };
@@ -229,6 +240,8 @@ export async function buildLeaderboardRosterPlayersByLeagueTeam(
 
       const computed = state.slotComputed.get(slotId);
       const pr = playerById.get(playerId);
+      const playerTeamFromDb = pr != null ? safeNum(pr.team_id) : 0;
+      const effectiveTeamId = playerTeamFromDb > 0 ? playerTeamFromDb : teamId;
       const playerTeamId = pr != null ? safeNum(pr.team_id) : teamId;
       const collegeRow = teamById.get(playerTeamId) ?? teamById.get(teamId);
       const rosterTid = playerTeamId > 0 ? playerTeamId : teamId;
@@ -273,6 +286,19 @@ export async function buildLeaderboardRosterPlayersByLeagueTeam(
 
       const ownerDisplay = String(lt.ownerName ?? "").trim() || "—";
 
+      const playerCanonKey = stablePoolSlugForTeamContext(
+        effectiveTeamId,
+        state.canonicalByInternalTeamId,
+        state.canonRowById
+      );
+      const advancedPastActiveRound = playerAdvancedPastLeagueActiveRound({
+        currentRound: state.currentRound,
+        eliminated: computed?.eliminated ?? false,
+        eliminatedRound: computed?.eliminatedRound ?? null,
+        playerCanonKey,
+        finalWinBucketsByCanon: state.finalWinDisplayBucketsByCanonical
+      });
+
       const pickOverallFromSlot = safeNum(slot.pick_overall);
       let pickOverall: number | null = pickOverallFromSlot > 0 ? pickOverallFromSlot : null;
       if (pickOverall == null) {
@@ -284,6 +310,13 @@ export async function buildLeaderboardRosterPlayersByLeagueTeam(
         }
       }
 
+      const confRaw =
+        collegeRow?.conference != null && String(collegeRow.conference).trim()
+          ? String(collegeRow.conference).trim()
+          : null;
+      const extTeamRaw = collegeRow?.external_team_id != null ? String(collegeRow.external_team_id).trim() : "";
+      const externalTeamId = extTeamRaw !== "" ? extTeamRaw : null;
+
       const teamPayload = collegeRow
         ? {
             id: safeNum(collegeRow.id),
@@ -291,6 +324,8 @@ export async function buildLeaderboardRosterPlayersByLeagueTeam(
             shortName: collegeRow.short_name != null ? String(collegeRow.short_name) : null,
             seed,
             region: regionLabelForTeamRow(collegeRow),
+            conference: confRaw,
+            externalTeamId,
             logoUrl: resolveLogoForTeamRow(collegeRow)
           }
         : rosterTid > 0
@@ -300,6 +335,8 @@ export async function buildLeaderboardRosterPlayersByLeagueTeam(
               shortName: null,
               seed: null,
               region: null,
+              conference: null,
+              externalTeamId: null,
               logoUrl: null as string | null
             }
           : null;
@@ -322,6 +359,7 @@ export async function buildLeaderboardRosterPlayersByLeagueTeam(
         plusMinus: liveRounded - origRounded,
         eliminated: computed?.eliminated ?? false,
         eliminatedRound: computed?.eliminatedRound ?? null,
+        advancedPastActiveRound,
         pickOverall
       });
     }

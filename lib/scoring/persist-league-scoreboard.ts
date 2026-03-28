@@ -6,10 +6,12 @@ import {
 } from "@/lib/all-tournament-team";
 import { computeLeagueProjections } from "@/lib/projections";
 import { buildPlayerPoolRecordsForLeague } from "@/lib/players-pool-for-league";
+import { playerAdvancedPastLeagueActiveRound } from "@/lib/leaderboard-owner-metrics";
 import {
   aggregateLeaderboardFromEngineState,
   loadLeagueScoringEngineState
 } from "@/lib/scoring";
+import { stablePoolSlugForTeamContext } from "@/lib/tournament-team-canonical";
 import {
   buildLeaderboardRosterPlayersByLeagueTeam,
   type LeaderboardRosterPlayerApi
@@ -291,6 +293,51 @@ export async function ensureUndraftedAllTournamentOnLeaderboardPayload(
   }
 }
 
+/**
+ * Cached `league_live_scoreboard.payload` rows may predate `advancedPastActiveRound` on roster players.
+ * Recomputes flags from the live scoring engine so ADV ≠ REM for teams still waiting on the active round.
+ */
+export async function enrichLeaderboardPayloadAdvancedPastActiveRound(
+  supabase: SupabaseClient,
+  leagueId: string,
+  payload: LeaderboardApiPayload
+): Promise<LeaderboardApiPayload> {
+  if (payload.teams.length === 0) return payload;
+  const needs = payload.teams.some((t) =>
+    (t.players ?? []).some((p) => typeof p.advancedPastActiveRound !== "boolean")
+  );
+  if (!needs) return payload;
+
+  const state = await loadLeagueScoringEngineState(supabase, leagueId);
+  if (!state) return payload;
+
+  const wins = state.finalWinDisplayBucketsByCanonical;
+  const canonByTid = state.canonicalByInternalTeamId;
+  const canonRow = state.canonRowById;
+  const currentRound = state.currentRound;
+
+  return {
+    ...payload,
+    teams: payload.teams.map((t) => ({
+      ...t,
+      players: (t.players ?? []).map((p) => {
+        if (typeof p.advancedPastActiveRound === "boolean") return p;
+        const tid = p.team?.id;
+        const playerCanonKey =
+          tid != null && tid > 0 ? stablePoolSlugForTeamContext(tid, canonByTid, canonRow) : null;
+        const advancedPastActiveRound = playerAdvancedPastLeagueActiveRound({
+          currentRound,
+          eliminated: p.eliminated === true,
+          eliminatedRound: p.eliminatedRound ?? null,
+          playerCanonKey,
+          finalWinBucketsByCanon: wins
+        });
+        return { ...p, advancedPastActiveRound };
+      })
+    }))
+  };
+}
+
 /** Attach latest `projectionOriginal` from `projections` (e.g. when serving cached leaderboard JSON). */
 export async function mergeLeaderboardProjectionOriginalsFromDb(
   supabase: SupabaseClient,
@@ -347,7 +394,12 @@ export async function mergeLeaderboardProjectionOriginalsFromDb(
     })
   };
 
-  return ensureUndraftedAllTournamentOnLeaderboardPayload(supabase, leagueId, baseMerged);
+  const withUndrafted = await ensureUndraftedAllTournamentOnLeaderboardPayload(
+    supabase,
+    leagueId,
+    baseMerged
+  );
+  return enrichLeaderboardPayloadAdvancedPastActiveRound(supabase, leagueId, withUndrafted);
 }
 
 

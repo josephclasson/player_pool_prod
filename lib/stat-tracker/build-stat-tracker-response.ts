@@ -9,12 +9,14 @@ import {
 import { resolveEspnTeamLogoForPoolRow } from "@/lib/espn-ncaam-assets";
 import { regionNameFromOverallSeedApprox } from "@/lib/henrygd-bracket-seeds";
 import { loadSeasonProjectionBundle, playerTournamentProjections } from "@/lib/player-pool-projection";
+import { playerAdvancedPastLeagueActiveRound } from "@/lib/leaderboard-owner-metrics";
 import { resolvePlayerHeadshotUrlCandidates } from "@/lib/player-media";
 import {
   loadLeagueScoringEngineState,
   resolveLeagueOwnerDisplayName,
   type LeagueScoringEngineState
 } from "@/lib/scoring";
+import { stablePoolSlugForTeamContext } from "@/lib/tournament-team-canonical";
 
 function safeNum(x: unknown) {
   const n = typeof x === "number" ? x : Number(x);
@@ -68,6 +70,8 @@ export type StatTrackerPlayerRow = {
   eliminated: boolean;
   /** Tournament display round where team was eliminated (1..6), else null. */
   eliminatedRound: number | null;
+  /** Clinched past the league’s active display round (final win there, or eliminated only later). */
+  advancedPastActiveRound: boolean;
   /** Player's college team is in a game with `live` status. */
   playingInLiveGame: boolean;
 };
@@ -240,6 +244,8 @@ export async function buildStatTrackerApiResponse(
     const playerId = safeNum(slot.player_id);
     const rosterTeamId = safeNum(slot.team_id);
     const pRow = playerById.get(playerId);
+    const playerTeamFromDb = pRow != null ? safeNum(pRow.team_id) : 0;
+    const effectiveTeamId = playerTeamFromDb > 0 ? playerTeamFromDb : rosterTeamId;
     const playerTeamId = pRow != null ? safeNum(pRow.team_id) : rosterTeamId;
     const collegeRow = teamById.get(playerTeamId) ?? teamById.get(rosterTeamId);
 
@@ -300,6 +306,19 @@ export async function buildStatTrackerApiResponse(
       (playerTeamId > 0 && liveTeamIds.has(playerTeamId)) ||
       (rosterTeamId > 0 && liveTeamIds.has(rosterTeamId));
 
+    const playerCanonKey = stablePoolSlugForTeamContext(
+      effectiveTeamId,
+      engine.canonicalByInternalTeamId,
+      engine.canonRowById
+    );
+    const advancedPastActiveRound = playerAdvancedPastLeagueActiveRound({
+      currentRound: engine.currentRound,
+      eliminated: c?.eliminated ?? false,
+      eliminatedRound: c?.eliminatedRound ?? null,
+      playerCanonKey,
+      finalWinBucketsByCanon: engine.finalWinDisplayBucketsByCanonical
+    });
+
     const row: StatTrackerPlayerRow = {
       rosterSlotId: slotId,
       playerId,
@@ -319,6 +338,7 @@ export async function buildStatTrackerApiResponse(
       originalProjection,
       eliminated: c?.eliminated ?? false,
       eliminatedRound: c?.eliminatedRound ?? null,
+      advancedPastActiveRound,
       playingInLiveGame
     };
 

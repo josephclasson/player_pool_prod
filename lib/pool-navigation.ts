@@ -2,13 +2,14 @@
  * Tab routes that require a completed pool session (league + owner row) and a `leagueId` query.
  * Used by client-side navigation and URL sync.
  */
-/** Owner tabs: require pool session (league + team chosen on `/`). */
+/** Owner tabs: require pool session (league + team chosen on `/`) and sync `?leagueId=`. */
 export const POOL_APP_PATH_PREFIXES = [
   "/draft",
   "/stat-tracker",
   "/leaderboard",
   "/players",
-  "/history"
+  "/history",
+  "/analytics"
 ] as const;
 
 /**
@@ -33,7 +34,6 @@ export function poolRouteWantsLeagueIdQuery(pathname: string): boolean {
 export function poolRouteIsPublic(pathname: string): boolean {
   if (pathname === "/") return true;
   if (pathname.startsWith("/join")) return true;
-  if (pathname.startsWith("/analytics")) return true;
   return false;
 }
 

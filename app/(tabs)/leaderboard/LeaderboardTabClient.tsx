@@ -1215,7 +1215,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           sortDir={sortDir}
                           onSort={handleSortClick}
                           align="center"
-                          title="Players whose team advanced through the league’s current tournament round"
+                          title="Players whose team has clinched the next round: final win in the league’s active round, or eliminated only in a later round"
                         >
                           ADV
                         </SortableTh>
@@ -1445,6 +1445,8 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           : pl.filter((p) =>
                               playerAdvancedThroughCurrentRound(p, leaderboardDerived.currentRound)
                             ).length;
+                      const ownerRosterAllEliminated =
+                        pl.length > 0 && remainCount === 0;
 
                       const projFooterClass =
                         pm.value != null && pm.value !== 0
@@ -1454,7 +1456,15 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                           : "";
 
                       return (
-                        <tr key={team.leagueTeamId} className="pool-table-row">
+                        <tr
+                          key={team.leagueTeamId}
+                          className={[
+                            "pool-table-row",
+                            ownerRosterAllEliminated ? "pool-table-row-eliminated" : ""
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
                           <td className="px-1 py-2 text-left tabular-nums text-foreground/80 align-middle">
                             {ordinalRankLabel(team.rank)}
                           </td>

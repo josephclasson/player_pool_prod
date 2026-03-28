@@ -51,7 +51,7 @@ const mobilePrimaryNav: readonly { href: string; label: string; icon: LucideIcon
   { href: "/players", label: "Players", icon: UsersRound }
 ];
 
-type MobileMoreItem = { href: string; label: string; subtitle: string; icon: LucideIcon };
+type MobileMoreItem = { href: string; label: string; subtitle?: string; icon: LucideIcon };
 type MobileThemeKey = "red" | "orange" | "yellow" | "green" | "blue" | "purple" | "mono" | "crazy_people";
 const MOBILE_THEME_OPTIONS: Array<{ key: MobileThemeKey; label: string }> = [
   { key: "red", label: "Red" },
@@ -330,7 +330,9 @@ function MobileBottomTabNav({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold leading-tight">{t.label}</span>
-                        <span className="mt-0.5 block text-[11px] leading-snug text-foreground/45">{t.subtitle}</span>
+                        {t.subtitle ? (
+                          <span className="mt-0.5 block text-[11px] leading-snug text-foreground/45">{t.subtitle}</span>
+                        ) : null}
                       </span>
                     </button>
                   </li>
@@ -433,7 +435,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const mobileMoreItems = useMemo<MobileMoreItem[]>(() => {
     const items: MobileMoreItem[] = [
-      { href: "/analytics", label: "Analytics", subtitle: "Under construction", icon: BarChart3 },
+      { href: "/analytics", label: "Analytics", icon: BarChart3 },
       { href: "/history", label: "History", subtitle: "Under construction", icon: History }
     ];
     if (commUnlocked) {

@@ -161,12 +161,22 @@ export function poolApiRowToLeaderboardRosterPlayerApi(row: Record<string, unkno
     const osRaw = t.overallSeed != null ? safePoolNum(t.overallSeed) : 0;
     if (osRaw >= 1 && osRaw <= 68) overallSeed = Math.trunc(osRaw);
     if (tid > 0) {
+      const conf =
+        t.conference != null && String(t.conference).trim() ? String(t.conference).trim() : null;
+      const extRaw =
+        t.externalTeamId != null && String(t.externalTeamId).trim()
+          ? String(t.externalTeamId).trim()
+          : t.external_team_id != null && String(t.external_team_id).trim()
+            ? String(t.external_team_id).trim()
+            : null;
       team = {
         id: tid,
         name: nm || `Team #${tid}`,
         shortName: t.shortName != null ? String(t.shortName) : null,
         seed,
         region: t.region != null ? String(t.region) : null,
+        conference: conf,
+        externalTeamId: extRaw,
         logoUrl: t.logoUrl != null ? String(t.logoUrl) : null
       };
     }
@@ -216,6 +226,7 @@ export function poolApiRowToLeaderboardRosterPlayerApi(row: Record<string, unkno
     plusMinus: origRounded != null ? liveRounded - origRounded : null,
     eliminated: false,
     eliminatedRound: null,
+    advancedPastActiveRound: false,
     pickOverall: null
   };
 }

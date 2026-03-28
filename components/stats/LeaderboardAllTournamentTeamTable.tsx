@@ -40,6 +40,7 @@ type TablePlayer = {
   originalProjection: number | null;
   eliminated: boolean;
   eliminatedRound: number | null;
+  advancedPastActiveRound?: boolean;
 };
 
 function rosterRowToTablePlayer(p: LeaderboardRosterPlayerApi): TablePlayer {
@@ -80,7 +81,8 @@ function rosterRowToTablePlayer(p: LeaderboardRosterPlayerApi): TablePlayer {
     projection: proj,
     originalProjection: p.originalProjection,
     eliminated: p.eliminated ?? false,
-    eliminatedRound: p.eliminatedRound ?? null
+    eliminatedRound: p.eliminatedRound ?? null,
+    advancedPastActiveRound: p.advancedPastActiveRound
   };
 }
 
@@ -284,6 +286,9 @@ function buildLeagueStatRanks(players: TablePlayer[]): LeagueStatRanks {
 }
 
 function playerAdvancedThroughCurrentRound(p: TablePlayer, currentRound: number): boolean {
+  if (typeof p.advancedPastActiveRound === "boolean") {
+    return p.advancedPastActiveRound;
+  }
   const R = currentRound <= 0 ? 1 : currentRound;
   const er = p.eliminatedRound;
   if (er == null) {

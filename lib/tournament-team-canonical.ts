@@ -125,6 +125,18 @@ function bracketSeoToPoolSlug(seo: string): string | null {
 }
 
 /**
+ * `external_team_id` like `iowa-st-2026` → pool slug (`cbbSchoolBySlug` key), e.g. `iowa-state`.
+ * Used when `teams.conference` is missing (bracket upserts) for analytics fallbacks.
+ */
+export function poolSlugFromExternalTeamIdString(externalTeamId: string | null | undefined): string | null {
+  const ext = String(externalTeamId ?? "").trim();
+  if (!ext) return null;
+  const base = canonicalBaseFromExternalTeamId(ext);
+  if (!base || /^\d+$/.test(base)) return null;
+  return normalizeExternalBaseToPoolSlug(base);
+}
+
+/**
  * Map henrygd/ESPN/bracket external base string → canonical pool slug (`cbbSchoolBySlug` key).
  */
 function normalizeExternalBaseToPoolSlug(base: string): string | null {
@@ -437,4 +449,36 @@ export function buildEliminationRoundByCanonicalFromGames(
     }
   }
   return eliminationRoundByCanonical;
+}
+
+/**
+ * Per canonical school: display buckets (R1–R6) where that team has at least one **final** game **win**.
+ * Used for ADV = “clinched advance past the league’s active round” (won that round’s game, or lost later).
+ */
+export function buildFinalWinDisplayBucketsByCanonicalFromGames(
+  gameRows: MinimalGameForElimination[],
+  canonicalByInternalTeamId: Map<number, string>,
+  teamRowByInternalId?: Map<number, TeamRowForCanonical>
+): Map<string, Set<number>> {
+  const out = new Map<string, Set<number>>();
+  for (const g of gameRows) {
+    if (!isFinalStatus(g.status)) continue;
+    const bucket = participationBucketFromDbRound(safeNum(g.round));
+    if (bucket == null) continue;
+    for (const side of [0, 1] as const) {
+      const tid = side === 0 ? g.team_a_id : g.team_b_id;
+      if (tid <= 0) continue;
+      const rawTeam = side === 0 ? g.team_a_score : g.team_b_score;
+      const rawOpp = side === 0 ? g.team_b_score : g.team_a_score;
+      if (rawTeam == null && rawOpp == null) continue;
+      const teamPts = side === 0 ? safeNum(g.team_a_score) : safeNum(g.team_b_score);
+      const oppPts = side === 0 ? safeNum(g.team_b_score) : safeNum(g.team_a_score);
+      if (teamPts <= oppPts) continue;
+      const canon = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, teamRowByInternalId);
+      if (!canon) continue;
+      if (!out.has(canon)) out.set(canon, new Set());
+      out.get(canon)!.add(bucket);
+    }
+  }
+  return out;
 }

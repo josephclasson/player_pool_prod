@@ -9,6 +9,7 @@ import {
 } from "@/lib/tournament-fantasy-round-scoring";
 import {
   buildEliminationRoundByCanonicalFromGames,
+  buildFinalWinDisplayBucketsByCanonicalFromGames,
   fetchTeamRowsForCanonicalKeys,
   reconcileCanonicalTeamIdsFromRows,
   resolveCanonicalTeamKeyFromRow,
@@ -137,6 +138,10 @@ export type LeagueScoringEngineState = {
   slotsByLeagueTeam: Map<string, Array<Record<string, unknown>>>;
   slotComputed: Map<string, LeagueScoringSlotComputed>;
   profileById: Map<string, { display_name?: string | null }>;
+  /** Canonical school → display rounds (1–6) with a recorded final win (for ADV vs active round). */
+  finalWinDisplayBucketsByCanonical: Map<string, Set<number>>;
+  canonicalByInternalTeamId: Map<number, string>;
+  canonRowById: Map<number, TeamRowForCanonical>;
 };
 
 /**
@@ -399,6 +404,20 @@ export async function loadLeagueScoringEngineState(
     canonRowById
   );
 
+  const finalWinDisplayBucketsByCanonical = buildFinalWinDisplayBucketsByCanonicalFromGames(
+    gameRows.map((g) => ({
+      round: g.round,
+      status: g.status,
+      start_time: g.start_time,
+      team_a_id: g.team_a_id,
+      team_b_id: g.team_b_id,
+      team_a_score: g.team_a_score,
+      team_b_score: g.team_b_score
+    })),
+    canonicalByInternalTeamId,
+    canonRowById
+  );
+
   const finalFantasyRoundBucketsByCanonical = buildFinalFantasyRoundBucketsByCanonicalTeam({
     games: gameRows,
     canonForTeamId: (tid) => stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById)
@@ -487,7 +506,10 @@ export async function loadLeagueScoringEngineState(
     slots: slots as Array<Record<string, unknown>>,
     slotsByLeagueTeam,
     slotComputed,
-    profileById
+    profileById,
+    finalWinDisplayBucketsByCanonical,
+    canonicalByInternalTeamId,
+    canonRowById
   };
 }
 

@@ -1,6 +1,10 @@
 import { draftRoundFromPickOverall, resolvedPickOverall } from "@/lib/all-tournament-team";
 import { displayCollegeTeamNameForUi } from "@/lib/college-team-display";
 import {
+  conferenceSeoSlugForDraftedPlayerTeam,
+  OTHER_D1_CONFERENCE_SEO
+} from "@/lib/mbb-pool-slug-to-conference-seo";
+import {
   playerAdvancedThroughCurrentRound,
   rosterPlayersToOwnerMetrics,
   type LeaderboardOwnerPlayerMetrics
@@ -96,6 +100,80 @@ export function buildSchoolPerformanceRows(
     );
     const key =
       typeof team.id === "number" && team.id > 0 ? `id:${team.id}` : `name:${label.toLowerCase()}`;
+    const m = metricsForPlayer(p);
+    const cur = buckets.get(key);
+    if (cur) cur.players.push(m);
+    else buckets.set(key, { label, players: [m] });
+  }
+  const rows: AnalyticsActAggregateRow[] = [];
+  for (const [key, { label, players }] of buckets) {
+    const folded = foldMetrics(players, currentRound);
+    rows.push({ key, label, ...folded });
+  }
+  return rows;
+}
+
+/** Known `teams.conference` SEO slugs → display names (Big Ten, SEC, …). */
+const CONFERENCE_SLUG_LABELS: Record<string, string> = {
+  "big-ten": "Big Ten",
+  "big-12": "Big 12",
+  sec: "SEC",
+  acc: "ACC",
+  "pac-12": "Pac-12",
+  american: "American",
+  usa: "C-USA",
+  "big-east": "Big East",
+  "mountain-west": "Mountain West",
+  "west-coast": "WCC",
+  wcc: "WCC",
+  ivy: "Ivy",
+  "ivy-league": "Ivy",
+  "a-10": "A-10",
+  "sun-belt": "Sun Belt",
+  mac: "MAC",
+  mvc: "MVC",
+  maac: "MAAC",
+  caa: "CAA",
+  asun: "ASUN",
+  "big-sky": "Big Sky",
+  "big-south": "Big South",
+  "big-west": "Big West",
+  cusa: "C-USA",
+  horizon: "Horizon",
+  "missouri-valley": "MVC",
+  "ohio-valley": "OVC",
+  ovc: "OVC",
+  "patriot-league": "Patriot",
+  southern: "Southern",
+  "southland": "Southland",
+  "summit-league": "Summit",
+  "swac": "SWAC",
+  "wac": "WAC"
+};
+
+function displayConferenceLabelForUi(slug: string): string {
+  const raw = slug.trim();
+  if (!raw) return "—";
+  const lower = raw.toLowerCase();
+  if (CONFERENCE_SLUG_LABELS[lower]) return CONFERENCE_SLUG_LABELS[lower];
+  return lower
+    .split(/[-_\s]+/)
+    .filter(Boolean)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(" ");
+}
+
+export function buildConferencePerformanceRows(
+  teams: LeaderboardApiPayload["teams"],
+  currentRound: number
+): AnalyticsActAggregateRow[] {
+  const buckets = new Map<string, { label: string; players: LeaderboardOwnerPlayerMetrics[] }>();
+  for (const p of allDraftedPlayers(teams)) {
+    const team = p.team;
+    if (!team) continue;
+    const slug = conferenceSeoSlugForDraftedPlayerTeam(team);
+    const key = `conf:${slug}`;
+    const label = displayConferenceLabelForUi(slug);
     const m = metricsForPlayer(p);
     const cur = buckets.get(key);
     if (cur) cur.players.push(m);

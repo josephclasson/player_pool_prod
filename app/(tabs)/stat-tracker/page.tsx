@@ -56,6 +56,7 @@ type TrackerPlayerRow = {
   originalProjection: number | null;
   eliminated: boolean;
   eliminatedRound: number | null;
+  advancedPastActiveRound: boolean;
   playingInLiveGame: boolean;
 };
 
@@ -271,28 +272,15 @@ type FooterTotals = {
   tppgAvg: string;
   /** Roster players whose college team is still in the tournament (respects table filters). */
   remainingPlayers: number;
-  /** Roster players whose team advanced through the league’s current tournament round (respects filters). */
+  /** Roster players whose team clinched past the league’s active round (respects filters). */
   advancedCount: number;
   /** Players currently in a live game (respects table filters). */
   livePlayingCount: number;
 };
 
-/** Aligns league `currentRound` with advancement logic (pre-tournament → R1). */
-function displayTournamentRoundForAdvancement(currentRound: number): number {
-  return currentRound <= 0 ? 1 : currentRound;
-}
-
-/**
- * True if the player’s team survived the current NCAA display round (lost in a later round
- * or not eliminated yet).
- */
-function playerAdvancedThroughCurrentRound(p: TrackerPlayerRow, currentRound: number): boolean {
-  const R = displayTournamentRoundForAdvancement(currentRound);
-  const er = p.eliminatedRound;
-  if (er == null) {
-    return !p.eliminated;
-  }
-  return er > R;
+/** True if the team has clinched advancement past the league’s active display round (server-computed). */
+function playerAdvancedThroughCurrentRound(p: TrackerPlayerRow, _currentRound: number): boolean {
+  return p.advancedPastActiveRound;
 }
 
 /**
@@ -303,7 +291,7 @@ function playerAdvancedThroughCurrentRound(p: TrackerPlayerRow, currentRound: nu
  * - **Projection** (~52%): summed live projection when every roster player has one; otherwise
  *   current tournament points as a fallback “expected strength” proxy.
  * - **Still alive** (~28%): share of roster whose team is not eliminated (`remaining / roster size`).
- * - **Advanced** (~20%): share of roster that advanced through the league’s current round.
+ * - **Advanced** (~20%): share of roster that clinched past the league’s active display round.
  *
  * **Model:** weights = `0.025 + exp(composite × 2.35)` (strictly positive). **Win %** =
  * `weight_i / Σ weights` (same as first pick under Plackett–Luce). **In the money %** =
@@ -1074,6 +1062,7 @@ function StatTrackerTabPageInner() {
         originalProjection: p.originalProjection,
         eliminated: p.eliminated,
         eliminatedRound: p.eliminatedRound ?? null,
+        advancedPastActiveRound: p.advancedPastActiveRound,
         playingInLiveGame: p.playingInLiveGame
       }))
     }));

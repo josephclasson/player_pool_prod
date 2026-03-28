@@ -10,6 +10,11 @@ export type LeaderboardOwnerPlayerMetrics = {
   projection: number | null;
   eliminated: boolean;
   eliminatedRound: number | null;
+  /**
+   * When set from the leaderboard API: true if the team has **clinched** advancement past the league’s
+   * active display round (final win in that round, or eliminated only in a later round).
+   */
+  advancedPastActiveRound?: boolean;
 };
 
 /** Map API roster rows to metrics inputs; missing elimination fields default to still alive. */
@@ -20,6 +25,7 @@ export function rosterPlayersToOwnerMetrics(
         projection: number | null;
         eliminated?: boolean;
         eliminatedRound?: number | null;
+        advancedPastActiveRound?: boolean;
       }>
     | undefined
 ): LeaderboardOwnerPlayerMetrics[] {
@@ -30,7 +36,9 @@ export function rosterPlayersToOwnerMetrics(
     eliminatedRound:
       p.eliminatedRound != null && Number.isFinite(Number(p.eliminatedRound))
         ? Math.trunc(Number(p.eliminatedRound))
-        : null
+        : null,
+    advancedPastActiveRound:
+      typeof p.advancedPastActiveRound === "boolean" ? p.advancedPastActiveRound : undefined
   }));
 }
 
@@ -60,10 +68,36 @@ export function displayTournamentRoundForAdvancement(currentRound: number): numb
   return currentRound <= 0 ? 1 : currentRound;
 }
 
+/**
+ * True when the team has **already** advanced past the league’s active display round `R`:
+ * they lost in a **later** round (survived R), or they are still alive and have a **final win**
+ * recorded in bucket `R` (won the current-round game; not merely waiting or live).
+ */
+export function playerAdvancedPastLeagueActiveRound(opts: {
+  currentRound: number;
+  eliminated: boolean;
+  eliminatedRound: number | null;
+  playerCanonKey: string | null;
+  finalWinBucketsByCanon: Map<string, Set<number>> | undefined;
+}): boolean {
+  const R = displayTournamentRoundForAdvancement(opts.currentRound);
+  const er = opts.eliminatedRound;
+  if (er != null) {
+    return er > R;
+  }
+  if (opts.eliminated) return false;
+  const canon = opts.playerCanonKey;
+  if (!canon || !opts.finalWinBucketsByCanon) return false;
+  return opts.finalWinBucketsByCanon.get(canon)?.has(R) ?? false;
+}
+
 export function playerAdvancedThroughCurrentRound(
   p: LeaderboardOwnerPlayerMetrics,
   currentRound: number
 ): boolean {
+  if (typeof p.advancedPastActiveRound === "boolean") {
+    return p.advancedPastActiveRound;
+  }
   const R = displayTournamentRoundForAdvancement(currentRound);
   const er = p.eliminatedRound;
   if (er == null) {
