@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import {
   patchPlayerPoolSessionSeasonYear,
@@ -431,18 +431,21 @@ export function AppShell({ children }: { children: ReactNode }) {
     ? navTabs
     : navTabs.filter((t) => t.href !== "/commissioner");
 
-  const mobileMoreItems: MobileMoreItem[] = [
-    { href: "/analytics", label: "Advanced Analytics", subtitle: "Under construction", icon: BarChart3 },
-    { href: "/history", label: "Player Pool History", subtitle: "Under construction", icon: History }
-  ];
-  if (commUnlocked) {
-    mobileMoreItems.push({
-      href: "/commissioner",
-      label: "Commissioner Tools",
-      subtitle: "Sync, draft admin, invites",
-      icon: ShieldCheck
-    });
-  }
+  const mobileMoreItems = useMemo<MobileMoreItem[]>(() => {
+    const items: MobileMoreItem[] = [
+      { href: "/analytics", label: "Analytics", subtitle: "Under construction", icon: BarChart3 },
+      { href: "/history", label: "History", subtitle: "Under construction", icon: History }
+    ];
+    if (commUnlocked) {
+      items.push({
+        href: "/commissioner",
+        label: "Commissioner Tools",
+        subtitle: "Sync, draft admin, invites",
+        icon: ShieldCheck
+      });
+    }
+    return items;
+  }, [commUnlocked]);
 
   const navigateWithLeague = (href: string) => {
     const pathOnly = href.split("?")[0] ?? href;

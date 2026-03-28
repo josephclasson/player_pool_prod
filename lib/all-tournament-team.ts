@@ -1,7 +1,7 @@
 import type { LeaderboardRosterPlayerApi } from "@/lib/scoring/persist-league-scoreboard";
 
 /** Draft order index for “best pick per round” (camelCase API or legacy snake_case). */
-function resolvedPickOverall(p: LeaderboardRosterPlayerApi): number | null {
+export function resolvedPickOverall(p: LeaderboardRosterPlayerApi): number | null {
   const camel = p.pickOverall;
   if (camel != null && Number.isFinite(Number(camel)) && Number(camel) >= 1) {
     return Number(camel);

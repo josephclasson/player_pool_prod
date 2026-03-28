@@ -15,7 +15,7 @@ const querySchema = z.object({
   )
 });
 
-function buildEtag(parts: Array<string, number | null | undefined>): string {
+function buildEtag(parts: Array<string | number | null | undefined>): string {
   const raw = parts.map((p) => String(p ?? "")).join("|");
   return `W/"${Buffer.from(raw).toString("base64url")}"`;
 }

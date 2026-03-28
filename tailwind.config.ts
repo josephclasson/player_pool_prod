@@ -11,6 +11,7 @@ const config: Config = {
         muted: "rgb(var(--theme-muted) / <alpha-value>)",
         accent: "rgb(var(--theme-accent) / <alpha-value>)",
         accentSoft: "rgb(var(--theme-accent-soft) / <alpha-value>)",
+        onAccent: "rgb(var(--theme-on-accent) / <alpha-value>)",
         border: "rgb(var(--theme-border) / <alpha-value>)",
         danger: "rgb(var(--theme-danger) / <alpha-value>)",
         success: "rgb(var(--theme-success) / <alpha-value>)",

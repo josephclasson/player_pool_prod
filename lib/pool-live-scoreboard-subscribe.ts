@@ -8,12 +8,12 @@ import { liveScoreboardPushDebounceMs } from "@/lib/pool-refresh-intervals";
 export function subscribeLeagueLiveScoreboard(
   leagueId: string | null | undefined,
   onUpdate: () => void,
-  opts?: { debounceMs?: number; channelPrefix: string }
+  opts: { debounceMs?: number; channelPrefix: string }
 ): () => void {
   const id = leagueId?.trim();
   if (!id) return () => {};
 
-  const debounceMs = opts?.debounceMs ?? liveScoreboardPushDebounceMs();
+  const debounceMs = opts.debounceMs ?? liveScoreboardPushDebounceMs();
   const prefix = opts.channelPrefix;
 
   const sb = createBrowserSupabaseClient();

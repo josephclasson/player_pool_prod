@@ -13,6 +13,8 @@
   --theme-muted: 17 24 39; /* #111827 */
   --theme-accent: 37 99 235; /* #2563EB */
   --theme-accent-soft: 29 78 216; /* #1D4ED8 */
+  /** Text/icon color on solid `theme-accent` fills (e.g. primary buttons). */
+  --theme-on-accent: 255 255 255;
   --theme-border: 31 41 55; /* #1F2937 */
   --theme-danger: 220 38 38; /* #DC2626 */
   --theme-success: 34 197 94; /* #22C55E */
@@ -159,6 +161,8 @@ html[data-theme="mono"] {
   --pool-stats-accent: 245 245 245;
   --pool-stats-border: 74 74 74;
   --pool-stats-body-text: 245 245 245;
+  /* Light gray accent fill needs dark labels (primary Button, pool-btn-primary-cta). */
+  --theme-on-accent: 12 12 14;
 }
 
 html[data-theme="crazy_people"] {
@@ -168,6 +172,7 @@ html[data-theme="crazy_people"] {
   --theme-muted: 234 234 236;
   --theme-accent: 38 38 38;
   --theme-accent-soft: 92 92 96;
+  --theme-on-accent: 255 255 255;
   --theme-border: 198 198 204;
   --theme-danger: 220 38 38;
   --theme-success: 22 163 74;
@@ -1944,7 +1949,7 @@ body {
   padding: 0.5rem 1rem;
   font-size: 0.75rem;
   font-weight: 600;
-  color: rgb(255 255 255);
+  color: rgb(var(--theme-on-accent));
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   transition: filter 0.2s ease, transform 0.15s ease;
 }
