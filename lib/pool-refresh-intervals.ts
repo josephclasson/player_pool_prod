@@ -14,8 +14,8 @@ function envMs(name: string, fallback: number, minMs = 3000): number {
 /** Stat tracker background tick: tries live-sync, then falls back to GET. */
 export function statTrackerPollIntervalMs(anyLiveGames: boolean): number {
   return anyLiveGames
-    ? envMs("NEXT_PUBLIC_STAT_TRACKER_POLL_LIVE_MS", 12_000)
-    : envMs("NEXT_PUBLIC_STAT_TRACKER_POLL_IDLE_MS", 36_000);
+    ? envMs("NEXT_PUBLIC_STAT_TRACKER_POLL_LIVE_MS", 10_000)
+    : envMs("NEXT_PUBLIC_STAT_TRACKER_POLL_IDLE_MS", 30_000);
 }
 
 /**
@@ -28,12 +28,12 @@ export function adaptivePoolListPollMs(opts: {
 }): number {
   const { hasLiveGames, unchangedRefreshStreak } = opts;
   if (hasLiveGames) {
-    const fast = envMs("NEXT_PUBLIC_POOL_POLL_LIVE_FAST_MS", 10_000);
-    const slow = envMs("NEXT_PUBLIC_POOL_POLL_LIVE_SLOW_MS", 24_000);
+    const fast = envMs("NEXT_PUBLIC_POOL_POLL_LIVE_FAST_MS", 8_000);
+    const slow = envMs("NEXT_PUBLIC_POOL_POLL_LIVE_SLOW_MS", 20_000);
     return unchangedRefreshStreak >= 3 ? slow : fast;
   }
-  const fast = envMs("NEXT_PUBLIC_POOL_POLL_IDLE_FAST_MS", 25_000);
-  const slow = envMs("NEXT_PUBLIC_POOL_POLL_IDLE_SLOW_MS", 55_000);
+  const fast = envMs("NEXT_PUBLIC_POOL_POLL_IDLE_FAST_MS", 22_000);
+  const slow = envMs("NEXT_PUBLIC_POOL_POLL_IDLE_SLOW_MS", 48_000);
   return unchangedRefreshStreak >= 2 ? slow : fast;
 }
 

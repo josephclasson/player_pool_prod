@@ -223,12 +223,15 @@ export async function mergeLeaderboardProjectionOriginalsFromDb(
   leagueId: string,
   payload: LeaderboardApiPayload
 ): Promise<LeaderboardApiPayload> {
-  const payloadWithPicks = await enrichLeaderboardPayloadPickOverall(supabase, leagueId, payload);
+  const [payloadWithPicks, projRes] = await Promise.all([
+    enrichLeaderboardPayloadPickOverall(supabase, leagueId, payload),
+    supabase
+      .from("projections")
+      .select("league_team_id, projection_chalk_original")
+      .eq("league_id", leagueId)
+  ]);
 
-  const { data: projRows } = await supabase
-    .from("projections")
-    .select("league_team_id, projection_chalk_original")
-    .eq("league_id", leagueId);
+  const projRows = projRes.data;
 
   const origByLt = new Map<string, number | null>(
     (projRows ?? []).map((r: { league_team_id: string; projection_chalk_original: unknown }) => [

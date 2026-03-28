@@ -124,17 +124,41 @@ export async function buildStatTrackerApiResponse(
     };
   }
 
-  const projections = await computeLeagueProjections(supabase, leagueId);
+  const allSlots = engine.slots;
+  const playerIds = Array.from(
+    new Set(allSlots.map((s) => safeNum(s.player_id)).filter((id) => id > 0))
+  );
+  let teamIds = Array.from(new Set(allSlots.map((s) => safeNum(s.team_id)).filter((id) => id > 0)));
+
+  const playersPromise =
+    playerIds.length > 0 && seasonYear != null
+      ? supabase
+          .from("players")
+          .select("id, name, short_name, position, team_id, season_ppg, headshot_url, espn_athlete_id")
+          .in("id", playerIds)
+          .eq("season_year", seasonYear)
+      : Promise.resolve({ data: [] as any[], error: null });
+
+  const bundlePromise =
+    seasonYear != null && playerIds.length > 0
+      ? loadSeasonProjectionBundle(supabase, seasonYear, playerIds)
+      : Promise.resolve(null);
+
+  const espnIdxPromise = getEspnMbbTeamIndex().catch((): null => null);
+
+  const [projections, liveSbRes, playerRes, bundle, espnIdx, draftRoomRes] = await Promise.all([
+    computeLeagueProjections(supabase, leagueId),
+    supabase.from("league_live_scoreboard").select("updated_at").eq("league_id", leagueId).maybeSingle(),
+    playersPromise,
+    bundlePromise,
+    espnIdxPromise,
+    supabase.from("draft_rooms").select("id").eq("league_id", leagueId).maybeSingle()
+  ]);
+
   const slotProj = projections.slotProjectionByRosterSlotId;
+  const liveScoreboardRow = liveSbRes.data;
 
   // "Synced" should reflect either latest game provider sync OR latest cached scoreboard recompute.
-  // In practice, users hit Refresh Data and expect the timestamp to advance even when provider
-  // game rows did not change materially on that pull.
-  const { data: liveScoreboardRow } = await supabase
-    .from("league_live_scoreboard")
-    .select("updated_at")
-    .eq("league_id", leagueId)
-    .maybeSingle();
   const mergedLastSyncedAt = (() => {
     const a = engine.lastSyncedAt ? new Date(engine.lastSyncedAt).getTime() : 0;
     const bRaw = (liveScoreboardRow as { updated_at?: unknown } | null)?.updated_at;
@@ -143,65 +167,30 @@ export async function buildStatTrackerApiResponse(
     return m > 0 ? new Date(m).toISOString() : null;
   })();
 
-  const allSlots = engine.slots;
-  const playerIds = Array.from(
-    new Set(allSlots.map((s) => safeNum(s.player_id)).filter((id) => id > 0))
-  );
-  let teamIds = Array.from(new Set(allSlots.map((s) => safeNum(s.team_id)).filter((id) => id > 0)));
-
-  const { data: playerRows } =
-    playerIds.length > 0 && seasonYear
-      ? await supabase
-          .from("players")
-          .select("id, name, short_name, position, team_id, season_ppg, headshot_url, espn_athlete_id")
-          .in("id", playerIds)
-          .eq("season_year", seasonYear)
-      : { data: [] as any[] };
-
+  const playerRows = (playerRes.data ?? []) as Record<string, unknown>[];
   const playerById = new Map<number, Record<string, unknown>>(
-    (playerRows ?? []).map((p: Record<string, unknown>) => [safeNum(p.id), p])
+    playerRows.map((p) => [safeNum(p.id), p])
   );
 
-  for (const p of playerRows ?? []) {
+  for (const p of playerRows) {
     const tid = safeNum((p as { team_id?: unknown }).team_id);
     if (tid > 0) teamIds.push(tid);
   }
-  teamIds = [...new Set(teamIds)];
+  teamIds = [...new Set(teamIds.filter((id) => id > 0))];
 
   const { data: teamsSeason } =
-    seasonYear != null
+    teamIds.length > 0
       ? await supabase
           .from("teams")
           .select(
             "id, name, short_name, seed, overall_seed, region, conference, is_power5, external_team_id, logo_url"
           )
-          .ilike("external_team_id", `%-${seasonYear}`)
+          .in("id", teamIds)
       : { data: [] as any[] };
 
   const teamById = new Map<number, Record<string, unknown>>(
     (teamsSeason ?? []).map((t: Record<string, unknown>) => [safeNum(t.id), t])
   );
-
-  const missingTeamIds = teamIds.filter((id) => id > 0 && !teamById.has(id));
-  if (missingTeamIds.length > 0) {
-    const { data: extraTeams } = await supabase
-      .from("teams")
-      .select(
-        "id, name, short_name, seed, overall_seed, region, conference, is_power5, external_team_id, logo_url"
-      )
-      .in("id", missingTeamIds);
-    for (const t of extraTeams ?? []) {
-      const id = safeNum((t as { id?: unknown }).id);
-      if (id > 0) teamById.set(id, t as Record<string, unknown>);
-    }
-  }
-
-  let espnIdx: Awaited<ReturnType<typeof getEspnMbbTeamIndex>> | null = null;
-  try {
-    espnIdx = await getEspnMbbTeamIndex();
-  } catch {
-    espnIdx = null;
-  }
 
   const resolvedLogoByTeamId = new Map<number, string | null>();
   function resolveLogoForTeamRow(t: Record<string, unknown>): string | null {
@@ -234,11 +223,6 @@ export async function buildStatTrackerApiResponse(
     resolvedLogoByTeamId.set(id, fallback);
     return fallback;
   }
-
-  const bundle =
-    seasonYear != null && playerIds.length > 0
-      ? await loadSeasonProjectionBundle(supabase, seasonYear, playerIds)
-      : null;
 
   const rowsByLt = new Map<string, StatTrackerPlayerRow[]>();
   for (const lt of engine.leagueTeamRows) {
@@ -345,13 +329,8 @@ export async function buildStatTrackerApiResponse(
 
   type DraftPickRow = { player_id: number; league_team_id: string; pick_overall: number };
 
-  const { data: draftRoom } = await supabase
-    .from("draft_rooms")
-    .select("id")
-    .eq("league_id", leagueId)
-    .maybeSingle();
   let draftPicks: DraftPickRow[] = [];
-  const draftRoomId = (draftRoom as { id?: string } | null)?.id;
+  const draftRoomId = (draftRoomRes.data as { id?: string } | null)?.id;
   if (draftRoomId) {
     const { data: picks } = await supabase
       .from("player_draft_picks")
