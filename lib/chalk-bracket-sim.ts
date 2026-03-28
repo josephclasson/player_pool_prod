@@ -70,7 +70,7 @@ function serializeExpectedGamesKey(seasonYear: number) {
  * R1–R6 (round of 64 through championship). Winners who played a play-in game are still credited
  * only from the round of 64 onward — e.g. max 6 games to a title, same as a 1-seed.
  *
- * Used for original / live projection chalk totals (`playerTournamentProjectionsCore`).
+ * Used for draft / analytics expectations tied to the full bracket structure (not player “original” projection).
  */
 export async function computeExpectedChalkGamesPlayedFromBracket(opts: {
   seasonYear: number;

@@ -216,27 +216,6 @@ export async function computeLeagueProjections(
     });
   }
 
-  let expectedChalkGamesTotalByTeamId = new Map<number, number>();
-  try {
-    const metaByTeamId = new Map<number, BracketChalkTeamMeta>();
-    for (const t of teamsRows) {
-      const id = safeNum((t as { id: unknown }).id);
-      if (id <= 0) continue;
-      metaByTeamId.set(id, {
-        teamId: id,
-        overallSeed: (t as { overall_seed?: unknown }).overall_seed != null ? safeNum((t as { overall_seed: unknown }).overall_seed) : null,
-        regionalSeed: (t as { seed?: unknown }).seed != null ? safeNum((t as { seed: unknown }).seed) : null
-      });
-    }
-    expectedChalkGamesTotalByTeamId = await computeExpectedChalkGamesPlayedFromBracket({
-      seasonYear,
-      metaByTeamId,
-      teamIdByExternalTeamId
-    });
-  } catch {
-    expectedChalkGamesTotalByTeamId = new Map();
-  }
-
   const completedTournamentGamesByTeamId = new Map<number, number>();
   for (const teamId of rosterTeamIds) {
     completedTournamentGamesByTeamId.set(teamId, countPlayedTournamentGamesForTeam(teamId, dbGameRows));
@@ -306,7 +285,6 @@ export async function computeLeagueProjections(
         teamEliminated: eliminated,
         bracketState,
         allTeams: allTeamsProjection,
-        expectedChalkGamesTotalByTeamId,
         completedTournamentGamesByTeamId,
         statDistinctGameCount: statGameIdsByPlayerId.get(playerId)?.size ?? 0
       }).liveProjection;

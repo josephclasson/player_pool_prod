@@ -15,6 +15,7 @@ import {
 } from "@/lib/tournament-fantasy-round-scoring";
 import {
   buildBracketStateFromHenrygdAndDb,
+  calculateExpectedRemainingGames,
   calculatePlayerProjectionInt,
   countPlayedTournamentGamesForTeam,
   sumPointsFromPlayerGameStats,
@@ -153,9 +154,9 @@ export type SeasonProjectionBundle = {
 };
 
 export type PlayerTournamentProjectionDetail = {
-  /** Pre-tournament: season PPG × expected chalk games for the full run. */
+  /** Pre-tournament: season PPG × committee rank bucket (R1–R6 game count); stable for the whole tournament. */
   originalProjection: number;
-  /** Actual fantasy points so far + PPG × (expected chalk games − games played: decisive finals + live), 0 remaining if eliminated. */
+  /** Actual fantasy points so far + PPG × hybrid-bracket expected remaining R1–R6 games; 0 remaining if eliminated. */
   liveProjection: number;
   expectedChalkGamesTotal: number;
   /** Decisive finals + live R1–R6 games for this team (matches chalk slots subtracted from expected). */
@@ -627,7 +628,6 @@ export function playerTournamentProjectionsCore(opts: {
   teamEliminated: boolean;
   bracketState: BracketState;
   allTeams: Map<string, { overallRank: number; isActive: boolean }>;
-  expectedChalkGamesTotalByTeamId: Map<number, number>;
   completedTournamentGamesByTeamId: Map<number, number>;
   /**
    * When set (e.g. distinct stat game_ids for this player), used with
@@ -644,9 +644,16 @@ export function playerTournamentProjectionsCore(opts: {
   const statN = opts.statDistinctGameCount ?? 0;
   const played = Math.max(teamPlayed, statN);
   const overallRank = opts.allTeams.get(String(tid))?.overallRank ?? null;
-  const effectiveOriginalG = fallbackOriginalGamesFromOverallRank(overallRank);
+  /** Pre-tournament baseline only (committee rank → expected R1–R6 games); stable for the whole tournament. */
+  const originalChalkGames = fallbackOriginalGamesFromOverallRank(overallRank);
 
-  const liveRemaining = eliminated ? 0 : Math.max(0, effectiveOriginalG - played);
+  const useHybridRemaining =
+    !eliminated && opts.bracketState.games.length > 0;
+  const liveRemaining = eliminated
+    ? 0
+    : useHybridRemaining
+      ? calculateExpectedRemainingGames(String(tid), opts.bracketState, opts.allTeams)
+      : Math.max(0, originalChalkGames - played);
 
   const liveProjection = calculatePlayerProjectionInt({
     seasonPpg: ppg,
@@ -655,12 +662,12 @@ export function playerTournamentProjectionsCore(opts: {
     expectedRemainingGames: liveRemaining
   });
 
-  const originalProjection = Math.round(ppg * effectiveOriginalG);
+  const originalProjection = Math.round(ppg * originalChalkGames);
 
   return {
     originalProjection,
     liveProjection,
-    expectedChalkGamesTotal: effectiveOriginalG,
+    expectedChalkGamesTotal: originalChalkGames,
     completedTournamentGames: played,
     liveExpectedChalkGamesRemaining: liveRemaining
   };
@@ -684,7 +691,6 @@ export function playerTournamentProjections(opts: {
     teamEliminated: eliminated,
     bracketState: opts.bundle.bracketState,
     allTeams: opts.bundle.allTeams,
-    expectedChalkGamesTotalByTeamId: opts.bundle.expectedChalkGamesTotalByTeamId,
     completedTournamentGamesByTeamId: opts.bundle.completedTournamentGamesByTeamId,
     statDistinctGameCount
   });

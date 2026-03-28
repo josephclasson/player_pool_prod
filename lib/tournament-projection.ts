@@ -230,6 +230,9 @@ export async function buildBracketStateFromHenrygdAndDb(opts: {
 /**
  * Additional not-yet-started games (scheduled / missing DB row) the team is expected to play
  * on their hybrid path. Final and live games do not add to this count (points come from actuals).
+ *
+ * First Four (`round` 0 in bracket state) is skipped so counts align with fantasy R1–R6 and chalk
+ * sim totals that exclude play-in games.
  */
 export function calculateExpectedRemainingGames(
   teamId: string,
@@ -250,6 +253,7 @@ export function calculateExpectedRemainingGames(
   let remaining = 0;
   for (const g of sorted) {
     if (!alive) break;
+    if (g.round < 1 || g.round > 6) continue;
     if (g.teamAId !== tid && g.teamBId !== tid) continue;
 
     if (g.gameStatus === "final") {
