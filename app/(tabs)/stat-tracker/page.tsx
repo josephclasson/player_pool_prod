@@ -6,7 +6,8 @@ import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Radio, RefreshCcw, ShieldCheck } from "lucide-react";
-import { createBrowserSupabaseClient } from "@/lib/supabase/browser";
+import { subscribeLeagueLiveScoreboard } from "@/lib/pool-live-scoreboard-subscribe";
+import { statTrackerPollIntervalMs } from "@/lib/pool-refresh-intervals";
 import {
   readStoredSnapshot,
   readStoredStatTrackerShowInlineRanks,
@@ -1033,28 +1034,12 @@ function StatTrackerTabPageInner() {
   }, [loadData]);
 
   useEffect(() => {
-    if (!leagueId) return;
-    const sb = createBrowserSupabaseClient();
-    if (!sb) return;
-    const ch = sb
-      .channel(`stat_lb:${leagueId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: "league_live_scoreboard",
-          filter: `league_id=eq.${leagueId}`
-        },
-        () => void loadData()
-      )
-      .subscribe();
-    return () => {
-      void sb.removeChannel(ch);
-    };
+    return subscribeLeagueLiveScoreboard(leagueId, () => void loadData({ force: true }), {
+      channelPrefix: "stat_lb"
+    });
   }, [leagueId, loadData]);
 
-  const pollMs = api?.anyLiveGames ? 20_000 : 45_000;
+  const pollMs = statTrackerPollIntervalMs(Boolean(api?.anyLiveGames));
   useEffect(() => {
     if (!leagueId) return;
     const id = window.setInterval(() => {
@@ -1352,6 +1337,11 @@ function StatTrackerTabPageInner() {
   const collapsedOwnerRowMeasureRef = useRef<HTMLDivElement | null>(null);
   const [collapsedOwnerStripWidthPx, setCollapsedOwnerStripWidthPx] = useState(0);
 
+  /** ACT vs PROJ column layout is per owner so toggling one roster table does not change every card. */
+  const [statTrackerViewByOwner, setStatTrackerViewByOwner] = useState<
+    Record<string, StatTrackerViewMode>
+  >({});
+
   useLayoutEffect(() => {
     const wrap = collapsedOwnerRowMeasureRef.current;
     if (!wrap || selectedOwners.length === 0) {
@@ -1367,15 +1357,16 @@ function StatTrackerTabPageInner() {
     const mobile =
       typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches;
     for (const o of selectedOwners) {
-      const r = rankByOwnerId.get(o.ownerId) ?? 0;
+      const vm = statTrackerViewByOwner[o.ownerId] ?? "base";
+      const pr = projectedRankByOwnerId.get(o.ownerId);
+      const standingsR = rankByOwnerId.get(o.ownerId) ?? 0;
+      const r = vm === "proj" && pr != null ? pr : standingsR;
       rankSlot.textContent = ordinalRankLabel(r);
       nameSlot.textContent = mobile ? abbreviateOwnerNameForMobile(o.ownerName) : o.ownerName;
       max = Math.max(max, wrap.offsetWidth);
     }
     setCollapsedOwnerStripWidthPx(Math.min(Math.ceil(max), MAX_OWNER_STRIP_PX));
-  }, [selectedOwners, rankByOwnerId]);
-
-  const [statTrackerViewMode, setStatTrackerViewMode] = useState<StatTrackerViewMode>("base");
+  }, [selectedOwners, rankByOwnerId, statTrackerViewByOwner, projectedRankByOwnerId]);
   const [showInlineRanks, setShowInlineRanks] = useState(true);
 
   const [commissionerSession, setCommissionerSession] = useState(false);
@@ -1393,22 +1384,6 @@ function StatTrackerTabPageInner() {
   useEffect(() => {
     writeStoredStatTrackerShowInlineRanks(showInlineRanks);
   }, [showInlineRanks]);
-
-  const showTppgColumns = statTrackerViewMode === "proj";
-  const showProjectionColumns = statTrackerViewMode === "proj";
-
-  const TABLE_COLS =
-    3 + // logo, headshot, player
-    (statTrackerViewMode === "base"
-      ? 1 + // AVG
-        6 + // R1-R6
-        1 // TOT
-      : 1 + // PPG
-        1 + // tournament PPG
-        1 + // +/-
-        1 + // TOTAL
-        3); // ORIG, LIVE, +/-
-  const projBlockDivider = showProjectionColumns ? " pool-table-col-total-divider" : "";
 
   async function onManualRefresh() {
     setRefreshBusy(true);
@@ -1770,6 +1745,24 @@ function StatTrackerTabPageInner() {
         const rank = rankByOwnerId.get(owner.ownerId) ?? 0;
         const projectedRank = projectedRankByOwnerId.get(owner.ownerId);
         const outcomeProb = ownerOutcomeProbsByOwnerId.get(owner.ownerId);
+        const ownerViewMode = statTrackerViewByOwner[owner.ownerId] ?? "base";
+        const showProjectionColumns = ownerViewMode === "proj";
+        const projBlockDivider = showProjectionColumns ? " pool-table-col-total-divider" : "";
+        const tableColCount =
+          3 +
+          (ownerViewMode === "base"
+            ? 1 + // PPG + R1–R6 + TOT
+              6 +
+              1
+            : 1 + // PPG + AVG + TPPG Δ + TOT + ORIG + LIVE + +/−
+              1 +
+              1 +
+              1 +
+              3);
+        const headerRankLabel =
+          ownerViewMode === "proj" && projectedRank != null
+            ? ordinalRankLabel(projectedRank)
+            : ordinalRankLabel(rank);
         const visiblePlayers = showOnlyActivePlayers
           ? owner.players.filter((p) => p.playingInLiveGame)
           : owner.players;
@@ -1811,231 +1804,6 @@ function StatTrackerTabPageInner() {
 
         const ownerToggle = () => setOpenByOwnerId((prev) => ({ ...prev, [owner.ownerId]: !isOpen }));
 
-        const collapsedSummaryTable = (
-          <div className="pool-collapsed-summary-table-wrap min-w-0 flex-1 max-w-full">
-            <table className="pool-table pool-table-flush pool-table-collapsed-summary w-full">
-              <thead>
-                <tr>
-                  <th className="text-center" title="Roster players whose team is still in the tournament">
-                    <span className="md:hidden">REM</span>
-                    <span className="hidden md:inline">Remain</span>
-                  </th>
-                  <th
-                    className="text-center pool-table-col-group-end"
-                    title="Players whose team advanced through the league’s current tournament round (survived that round)"
-                  >
-                    <span className="md:hidden">ADV</span>
-                    <span className="hidden md:inline">Adv</span>
-                  </th>
-                  <th className="text-center">
-                    <MRoundSt r={1} />
-                  </th>
-                  <th className="text-center">
-                    <MRoundSt r={2} />
-                  </th>
-                  <th className="text-center">
-                    <MRoundSt r={3} />
-                  </th>
-                  <th className="text-center">
-                    <MRoundSt r={4} />
-                  </th>
-                  <th className="text-center">
-                    <MRoundSt r={5} />
-                  </th>
-                  <th className="text-center">
-                    <MRoundSt r={6} />
-                  </th>
-                  <th className="text-center pool-table-col-primary">
-                    <MTotSt />
-                  </th>
-                  <th
-                    className="hidden text-center md:table-cell"
-                    title="Standings rank among selected owners by summed live projections when every roster player has a projection"
-                  >
-                    Rank
-                  </th>
-                  {showProjectionColumns ? (
-                    <th className="hidden text-center md:table-cell">Orig</th>
-                  ) : null}
-                  {showProjectionColumns ? (
-                    <th className="hidden text-center md:table-cell">Live</th>
-                  ) : null}
-                  {showProjectionColumns ? (
-                    <th className="hidden text-center pool-table-col-group-end md:table-cell">+/−</th>
-                  ) : null}
-                  <th
-                    className="hidden text-center md:table-cell"
-                    title="Model over all league owners: Plackett–Luce weights from live projection (or points fallback), roster share still alive, and share advanced through current round — not affected by Owner filter"
-                  >
-                    Win %
-                  </th>
-                  <th
-                    className="hidden text-center md:table-cell"
-                    title="Estimated chance to finish in the top 3 among all league owners (top min(3,n) if fewer than 3 teams in the league) — not affected by Owner filter"
-                  >
-                    Money %
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="pool-table-row">
-                  <td className="px-1 py-1 text-center font-semibold text-foreground align-middle">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.remainingPlayers.rank}
-                      draftedCount={fo.remainingPlayers.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {footer.remainingPlayers}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="px-1 py-1 text-center font-semibold text-foreground align-middle pool-table-col-group-end">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.advanced.rank}
-                      draftedCount={fo.advanced.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {footer.advancedCount}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="px-1 py-1 text-center font-semibold text-foreground sleeper-score-font align-middle">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.r1.rank}
-                      draftedCount={fo.r1.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {formatMaybeNumber(footer.roundScores[1])}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="px-1 py-1 text-center font-semibold text-foreground sleeper-score-font align-middle">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.r2.rank}
-                      draftedCount={fo.r2.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {formatMaybeNumber(footer.roundScores[2])}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="px-1 py-1 text-center font-semibold text-foreground sleeper-score-font align-middle">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.r3.rank}
-                      draftedCount={fo.r3.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {formatMaybeNumber(footer.roundScores[3])}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="px-1 py-1 text-center font-semibold text-foreground sleeper-score-font align-middle">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.r4.rank}
-                      draftedCount={fo.r4.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {formatMaybeNumber(footer.roundScores[4])}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="px-1 py-1 text-center font-semibold text-foreground sleeper-score-font align-middle">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.r5.rank}
-                      draftedCount={fo.r5.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {formatMaybeNumber(footer.roundScores[5])}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="px-1 py-1 text-center font-semibold text-foreground sleeper-score-font align-middle">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.r6.rank}
-                      draftedCount={fo.r6.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {formatMaybeNumber(footer.roundScores[6])}
-                    </StatCellWithRank>
-                  </td>
-                  <td
-                    className={`px-1 py-1 text-center font-semibold sleeper-score-font pool-table-col-primary align-middle${projBlockDivider}`}
-                  >
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={fo.total.rank}
-                      draftedCount={fo.total.pool}
-                      rankContext="owner-aggregate"
-                    >
-                      {footer.totalPts}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="hidden px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle md:table-cell">
-                    {projectedRank != null ? ordinalRankLabel(projectedRank) : "—"}
-                  </td>
-                  {showProjectionColumns ? (
-                    <td className="hidden px-1 py-1 text-center font-semibold sleeper-score-font align-middle md:table-cell">
-                      <StatCellWithRank
-                        showRank={showInlineRanks}
-                        rank={fo.origProj.rank}
-                        draftedCount={fo.origProj.pool}
-                        rankContext="owner-aggregate"
-                      >
-                        {footer.origProjSum}
-                      </StatCellWithRank>
-                    </td>
-                  ) : null}
-                  {showProjectionColumns ? (
-                    <td className="hidden px-1 py-1 text-center font-semibold sleeper-score-font align-middle md:table-cell">
-                      <StatCellWithRank
-                        showRank={showInlineRanks}
-                        rank={fo.liveProj.rank}
-                        draftedCount={fo.liveProj.pool}
-                        rankContext="owner-aggregate"
-                      >
-                        {footer.liveProjSum != null ? String(footer.liveProjSum) : "—"}
-                      </StatCellWithRank>
-                    </td>
-                  ) : null}
-                  {showProjectionColumns ? (
-                    <td className="hidden px-1 py-1 text-center font-semibold sleeper-score-font align-middle pool-table-col-group-end md:table-cell">
-                      <StatCellWithRank
-                        showRank={showInlineRanks}
-                        rank={fo.projPlusMinus.rank}
-                        draftedCount={fo.projPlusMinus.pool}
-                        rankContext="owner-aggregate"
-                      >
-                        <span className={projFooterClass}>{projFooterText}</span>
-                      </StatCellWithRank>
-                    </td>
-                  ) : null}
-                  <td className="hidden px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle md:table-cell">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={outcomeProbRanks?.winPct.rank}
-                      draftedCount={outcomeProbRanks?.winPct.pool ?? 0}
-                      rankContext="owner-aggregate"
-                    >
-                      {outcomeProb != null ? `${outcomeProb.winPct.toFixed(1)}%` : "—"}
-                    </StatCellWithRank>
-                  </td>
-                  <td className="hidden px-1 py-1 text-center font-semibold text-foreground tabular-nums align-middle md:table-cell">
-                    <StatCellWithRank
-                      showRank={showInlineRanks}
-                      rank={outcomeProbRanks?.moneyPct.rank}
-                      draftedCount={outcomeProbRanks?.moneyPct.pool ?? 0}
-                      rankContext="owner-aggregate"
-                    >
-                      {outcomeProb != null ? `${outcomeProb.top3Pct.toFixed(1)}%` : "—"}
-                    </StatCellWithRank>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        );
-
         return (
           <div key={owner.ownerId} id={`stat-tracker-owner-${owner.ownerId}`} className="pool-card pool-card-compact">
             {isOpen ? (
@@ -2047,7 +1815,7 @@ function StatTrackerTabPageInner() {
                 >
                   <div className="flex min-w-0 items-center gap-1 shrink-0">
                     <div className="text-xs pool-owner-rank min-w-[2.25rem] shrink-0 text-left tabular-nums">
-                      {ordinalRankLabel(rank)}
+                      {headerRankLabel}
                     </div>
                     <div
                       className="text-sm font-semibold pool-owner-name min-w-0 truncate max-w-[min(100%,14rem)] sm:max-w-[18rem]"
@@ -2057,12 +1825,12 @@ function StatTrackerTabPageInner() {
                     </div>
                   </div>
                   <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-wrap items-baseline justify-start gap-x-1.5 gap-y-0.5 text-left text-[10px] sm:text-[11px] font-normal tabular-nums">
-                    {projectedRank != null ? (
+                    {projectedRank != null && ownerViewMode === "base" ? (
                       <span>
                         Projected Rank: {ordinalRankLabel(projectedRank)}
                       </span>
                     ) : null}
-                    {projectedRank != null && outcomeProb != null ? (
+                    {projectedRank != null && ownerViewMode === "base" && outcomeProb != null ? (
                       <span className="pool-owner-header-stat-meta-sep select-none" aria-hidden>
                         ·
                       </span>
@@ -2085,20 +1853,20 @@ function StatTrackerTabPageInner() {
                       tabIndex={0}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setStatTrackerViewMode("base");
+                        setStatTrackerViewByOwner((p) => ({ ...p, [owner.ownerId]: "base" }));
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           e.stopPropagation();
-                          setStatTrackerViewMode("base");
+                          setStatTrackerViewByOwner((p) => ({ ...p, [owner.ownerId]: "base" }));
                         }
                       }}
                       className={[
                         "pool-view-tab inline-flex items-center bg-transparent border-0 p-0 m-0 cursor-pointer select-none font-semibold whitespace-nowrap leading-none",
-                        statTrackerViewMode === "base" ? "text-white border-b border-white" : "text-white/55 hover:text-white"
+                        ownerViewMode === "base" ? "text-white border-b border-white" : "text-white/55 hover:text-white"
                       ].join(" ")}
-                      aria-pressed={statTrackerViewMode === "base"}
+                      aria-pressed={ownerViewMode === "base"}
                     >
                       ACT
                     </span>
@@ -2107,20 +1875,20 @@ function StatTrackerTabPageInner() {
                       tabIndex={0}
                       onClick={(e) => {
                         e.stopPropagation();
-                        setStatTrackerViewMode("proj");
+                        setStatTrackerViewByOwner((p) => ({ ...p, [owner.ownerId]: "proj" }));
                       }}
                       onKeyDown={(e) => {
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           e.stopPropagation();
-                          setStatTrackerViewMode("proj");
+                          setStatTrackerViewByOwner((p) => ({ ...p, [owner.ownerId]: "proj" }));
                         }
                       }}
                       className={[
                         "pool-view-tab inline-flex items-center bg-transparent border-0 p-0 m-0 cursor-pointer select-none font-semibold whitespace-nowrap leading-none",
-                        statTrackerViewMode === "proj" ? "text-white border-b border-white" : "text-white/55 hover:text-white"
+                        ownerViewMode === "proj" ? "text-white border-b border-white" : "text-white/55 hover:text-white"
                       ].join(" ")}
-                      aria-pressed={statTrackerViewMode === "proj"}
+                      aria-pressed={ownerViewMode === "proj"}
                     >
                       PROJ
                     </span>
@@ -2147,7 +1915,7 @@ function StatTrackerTabPageInner() {
                       >
                         Player
                       </th>
-                      {statTrackerViewMode === "base" ? (
+                      {ownerViewMode === "base" ? (
                         <th className="text-center" title="Tournament points per game">
                           PPG
                         </th>
@@ -2159,7 +1927,7 @@ function StatTrackerTabPageInner() {
                           PPG
                         </th>
                       )}
-                      {statTrackerViewMode === "proj" ? (
+                      {ownerViewMode === "proj" ? (
                         <th
                           className="text-center"
                           title="Season points per game"
@@ -2167,7 +1935,7 @@ function StatTrackerTabPageInner() {
                           AVG
                         </th>
                       ) : null}
-                      {statTrackerViewMode === "proj" ? (
+                      {ownerViewMode === "proj" ? (
                         <th
                           className="text-center"
                           title="Tournament PPG minus season PPG (PPG − AVG)"
@@ -2175,7 +1943,7 @@ function StatTrackerTabPageInner() {
                           +/−
                         </th>
                       ) : null}
-                      {statTrackerViewMode === "base" ? (
+                      {ownerViewMode === "base" ? (
                         <>
                           <th className="text-center">
                             <MRoundSt r={1} />
@@ -2200,7 +1968,7 @@ function StatTrackerTabPageInner() {
                       <th
                         className={[
                           "text-center",
-                          statTrackerViewMode === "proj" ? "hidden md:table-cell" : "pool-table-col-primary",
+                          ownerViewMode === "proj" ? "hidden md:table-cell" : "pool-table-col-primary",
                         ].join(" ")}
                       >
                         <MTotSt />
@@ -2285,7 +2053,7 @@ function StatTrackerTabPageInner() {
                               <PoolPlayerSublineTeamSeedOwner teamName={p.teamName} seed={p.seed} regionName={p.region} />
                             </div>
                           </td>
-                          {statTrackerViewMode === "base" ? (
+                          {ownerViewMode === "base" ? (
                             <td className="px-1 py-2 text-center transition-colors">
                               <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.tppg.get(rowKey)} draftedCount={dc}>
                                 {computeDisplayTournamentPpg(p).toFixed(1)}
@@ -2298,14 +2066,14 @@ function StatTrackerTabPageInner() {
                               </StatCellWithRank>
                             </td>
                           )}
-                          {statTrackerViewMode === "proj" ? (
+                          {ownerViewMode === "proj" ? (
                             <td className="px-1 py-2 text-center transition-colors">
                               <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.ppg.get(rowKey)} draftedCount={dc}>
                                 {p.seasonPpg.toFixed(1)}
                               </StatCellWithRank>
                             </td>
                           ) : null}
-                          {statTrackerViewMode === "proj" ? (
+                          {ownerViewMode === "proj" ? (
                             <td className="px-1 py-2 text-center transition-colors">
                               <StatCellWithRank
                                 showRank={showInlineRanks}
@@ -2322,7 +2090,7 @@ function StatTrackerTabPageInner() {
                               </StatCellWithRank>
                             </td>
                           ) : null}
-                          {statTrackerViewMode === "base" ? (
+                          {ownerViewMode === "base" ? (
                             <>
                               <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
                                 <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r1.get(rowKey)} draftedCount={dc}>
@@ -2359,7 +2127,7 @@ function StatTrackerTabPageInner() {
                           <td
                             className={[
                               `px-1 py-2 text-center transition-colors sleeper-score-font${projBlockDivider}`,
-                              statTrackerViewMode === "proj" ? "hidden md:table-cell" : "pool-table-col-primary",
+                              ownerViewMode === "proj" ? "hidden md:table-cell" : "pool-table-col-primary",
                             ].join(" ")}
                           >
                             <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.total.get(rowKey)} draftedCount={dc}>
@@ -2410,7 +2178,7 @@ function StatTrackerTabPageInner() {
                     })}
                     {visiblePlayersAfterTeamFilter.length === 0 && (
                       <tr className="pool-table-empty">
-                        <td colSpan={TABLE_COLS} className="py-4 text-[11px]">
+                        <td colSpan={tableColCount} className="py-4 text-[11px]">
                           No players match current filters.
                         </td>
                       </tr>
@@ -2425,9 +2193,11 @@ function StatTrackerTabPageInner() {
                         <span className="hidden md:inline">TOTALS</span>
                       </td>
                       <td className="px-1 py-2 text-center text-[11px] font-normal tabular-nums opacity-90 align-middle leading-tight pool-table-player-col min-w-0">
-                        {footer.remainingPlayers} remaining
+                        {showOnlyActivePlayers
+                          ? `${footer.livePlayingCount} playing`
+                          : `${footer.remainingPlayers} remaining`}
                       </td>
-                      {statTrackerViewMode === "base" ? (
+                      {ownerViewMode === "base" ? (
                         <td className="px-1 py-2 text-center font-semibold">
                           <StatCellWithRank
                             showRank={showInlineRanks}
@@ -2450,7 +2220,7 @@ function StatTrackerTabPageInner() {
                           </StatCellWithRank>
                         </td>
                       )}
-                      {statTrackerViewMode === "proj" ? (
+                      {ownerViewMode === "proj" ? (
                         <td className="px-1 py-2 text-center font-semibold">
                           <StatCellWithRank
                             showRank={showInlineRanks}
@@ -2462,7 +2232,7 @@ function StatTrackerTabPageInner() {
                           </StatCellWithRank>
                         </td>
                       ) : null}
-                      {statTrackerViewMode === "proj" ? (
+                      {ownerViewMode === "proj" ? (
                         <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                           <StatCellWithRank
                             showRank={showInlineRanks}
@@ -2474,7 +2244,7 @@ function StatTrackerTabPageInner() {
                           </StatCellWithRank>
                         </td>
                       ) : null}
-                      {statTrackerViewMode === "base" ? (
+                      {ownerViewMode === "base" ? (
                         <>
                           <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                             <StatCellWithRank
@@ -2541,7 +2311,7 @@ function StatTrackerTabPageInner() {
                       <td
                         className={[
                           `px-1 py-2 text-center font-semibold sleeper-score-font${projBlockDivider}`,
-                          statTrackerViewMode === "proj" ? "hidden md:table-cell" : "pool-table-col-primary",
+                          ownerViewMode === "proj" ? "hidden md:table-cell" : "pool-table-col-primary",
                         ].join(" ")}
                       >
                         <StatCellWithRank
@@ -2604,7 +2374,7 @@ function StatTrackerTabPageInner() {
               >
                 <div className="flex min-w-0 items-center gap-1 shrink-0">
                   <div className="text-xs pool-owner-rank min-w-[2.25rem] shrink-0 text-left tabular-nums">
-                    {ordinalRankLabel(rank)}
+                    {headerRankLabel}
                   </div>
                   <div
                     className="text-sm font-semibold pool-owner-name min-w-0 truncate max-w-[min(100%,14rem)] sm:max-w-[18rem]"
@@ -2615,12 +2385,12 @@ function StatTrackerTabPageInner() {
                 </div>
 
                 <div className="pool-owner-header-stat-meta hidden md:flex min-w-0 flex-1 flex-nowrap items-center justify-start gap-x-1 text-left text-[10px] font-normal tabular-nums leading-none whitespace-nowrap">
-                  {projectedRank != null ? (
+                  {projectedRank != null && ownerViewMode === "base" ? (
                     <span>
                       Projected Rank: {ordinalRankLabel(projectedRank)}
                     </span>
                   ) : null}
-                  {projectedRank != null && outcomeProb != null ? (
+                  {projectedRank != null && ownerViewMode === "base" && outcomeProb != null ? (
                     <span className="pool-owner-header-stat-meta-sep select-none" aria-hidden>
                       ·
                     </span>

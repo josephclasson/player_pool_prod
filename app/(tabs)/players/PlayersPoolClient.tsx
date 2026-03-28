@@ -23,6 +23,8 @@ import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-direct
 import { displayCollegeTeamNameForUi } from "@/lib/college-team-display";
 import { resolvePlayerHeadshotUrlCandidates } from "@/lib/player-media";
 import { postStatTrackerLiveSync } from "@/lib/pool-tournament-live-sync-client";
+import { subscribeLeagueLiveScoreboard } from "@/lib/pool-live-scoreboard-subscribe";
+import { adaptivePoolListPollMs } from "@/lib/pool-refresh-intervals";
 
 type TeamInfo = {
   id: number;
@@ -754,16 +756,27 @@ export function PlayersPoolClient({
   }, [load]);
 
   useEffect(() => {
+    return subscribeLeagueLiveScoreboard(
+      effectiveLeagueId.trim() || null,
+      () => void load({ silent: true, force: true }),
+      { channelPrefix: "players_lb" }
+    );
+  }, [effectiveLeagueId, load]);
+
+  useEffect(() => {
     return () => {
       loadControllerRef.current?.abort();
     };
   }, []);
 
-  const pollMs = useMemo(() => {
-    const hasLive = Boolean(meta?.hasLiveGames);
-    if (hasLive) return unchangedRefreshStreak >= 3 ? 30_000 : 15_000;
-    return unchangedRefreshStreak >= 2 ? 60_000 : 30_000;
-  }, [meta?.hasLiveGames, unchangedRefreshStreak]);
+  const pollMs = useMemo(
+    () =>
+      adaptivePoolListPollMs({
+        hasLiveGames: Boolean(meta?.hasLiveGames),
+        unchangedRefreshStreak
+      }),
+    [meta?.hasLiveGames, unchangedRefreshStreak]
+  );
 
   const tick = useCallback(async () => {
     if (document.visibilityState !== "visible") return;
@@ -964,7 +977,7 @@ export function PlayersPoolClient({
                       <span className="ml-1.5 text-emerald-500 font-semibold">· Live</span>
                     ) : null}
                     <span className="ml-1.5 text-foreground/40">
-                      · Auto-refresh ~{meta.hasLiveGames ? 15 : 30}s
+                      · Auto-refresh ~{Math.max(1, Math.round(pollMs / 1000))}s
                     </span>
                   </>
                 ) : (

@@ -40,6 +40,8 @@ import {
   tournamentOuTooltip
 } from "@/lib/tournament-total-ou";
 import { postStatTrackerLiveSync } from "@/lib/pool-tournament-live-sync-client";
+import { subscribeLeagueLiveScoreboard } from "@/lib/pool-live-scoreboard-subscribe";
+import { adaptivePoolListPollMs } from "@/lib/pool-refresh-intervals";
 
 const LeaderboardAllTournamentTeamTable = dynamic(
   () =>
@@ -630,16 +632,25 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
   }, [leagueId, load]);
 
   useEffect(() => {
+    return subscribeLeagueLiveScoreboard(leagueId, () => void load({ silent: true, force: true }), {
+      channelPrefix: "leaderboard_lb"
+    });
+  }, [leagueId, load]);
+
+  useEffect(() => {
     return () => {
       loadControllerRef.current?.abort();
     };
   }, []);
 
-  const pollMs = useMemo(() => {
-    const hasLive = Boolean(data?.anyLiveGames);
-    if (hasLive) return unchangedRefreshStreak >= 3 ? 30_000 : 15_000;
-    return unchangedRefreshStreak >= 2 ? 60_000 : 30_000;
-  }, [data?.anyLiveGames, unchangedRefreshStreak]);
+  const pollMs = useMemo(
+    () =>
+      adaptivePoolListPollMs({
+        hasLiveGames: Boolean(data?.anyLiveGames),
+        unchangedRefreshStreak
+      }),
+    [data?.anyLiveGames, unchangedRefreshStreak]
+  );
 
   useEffect(() => {
     if (!leagueId) return;
