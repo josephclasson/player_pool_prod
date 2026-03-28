@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { PoolPlayerSublineTeamSeedOwner } from "@/components/stats/PoolPlayerSublineTeamSeedOwner";
 import { PoolTablePlayerPhotoCell, PoolTableTeamLogoCell } from "@/components/stats/PoolTableMediaCells";
@@ -372,17 +372,20 @@ function computeFooterTotals(visible: TablePlayer[], currentRound: number) {
 function InlineLeagueStatRank({
   rank,
   draftedCount,
-  context = "player-league"
+  context = "player-league",
+  rankAmongLabel = "drafted players"
 }: {
   rank: number | undefined;
   draftedCount: number;
   context?: "player-league" | "owner-aggregate";
+  /** Noun phrase for player-league context, e.g. "drafted players" or "undrafted pool players". */
+  rankAmongLabel?: string;
 }) {
   if (rank == null || draftedCount <= 0) return null;
   const title =
     context === "owner-aggregate"
       ? `Owner rank ${rank} of ${draftedCount} teams (1 = best)`
-      : `League rank ${rank} of ${draftedCount} drafted players (1 = best)`;
+      : `League rank ${rank} of ${draftedCount} ${rankAmongLabel} (1 = best)`;
   return (
     <span
       className="pool-inline-rank hidden md:block text-[9px] sm:text-[10px] font-bold tabular-nums leading-none mt-0.5 text-[rgb(var(--pool-stats-accent))]"
@@ -399,7 +402,8 @@ function StatCellWithRank({
   draftedCount,
   className,
   showRank = true,
-  rankContext = "player-league"
+  rankContext = "player-league",
+  rankAmongLabel = "drafted players"
 }: {
   children: ReactNode;
   rank: number | undefined;
@@ -407,12 +411,18 @@ function StatCellWithRank({
   className?: string;
   showRank?: boolean;
   rankContext?: "player-league" | "owner-aggregate";
+  rankAmongLabel?: string;
 }) {
   return (
     <div className={["flex flex-col items-center justify-center gap-0", className].filter(Boolean).join(" ")}>
       <div>{children}</div>
       {showRank ? (
-        <InlineLeagueStatRank rank={rank} draftedCount={draftedCount} context={rankContext} />
+        <InlineLeagueStatRank
+          rank={rank}
+          draftedCount={draftedCount}
+          context={rankContext}
+          rankAmongLabel={rankAmongLabel}
+        />
       ) : null}
     </div>
   );
@@ -477,6 +487,10 @@ function EmptyHighlightTableRow({ showTppgColumns }: { showTppgColumns: boolean 
 
 const ALL_TOURNAMENT_TEAM_SIZE = 8;
 
+function highlightTableColumnCount(showTppgColumns: boolean): number {
+  return 3 + 1 + (showTppgColumns ? 2 : 0) + 6 + 1 + 3;
+}
+
 type LeaderboardPlayersHighlightTableProps = {
   title: string;
   subtitle: ReactNode;
@@ -485,6 +499,15 @@ type LeaderboardPlayersHighlightTableProps = {
   currentRound: number;
   showTppgColumns: boolean;
   showInlineRanks: boolean;
+  /** Inline rank tooltip: "… of N &lt;label&gt; (1 = best)" for player-league cells. */
+  rankAmongLabel?: string;
+  /** When there are no data rows, show one full-width message instead of an empty table + footer. */
+  emptyBodyMessage?: string | null;
+  /**
+   * Leaders page: on viewports below `md` (768px), start collapsed; expand on `md+`.
+   * Avoids hydration mismatch by defaulting to collapsed then opening once on desktop.
+   */
+  collapseByDefaultOnMobile?: boolean;
 };
 
 function LeaderboardPlayersHighlightTable({
@@ -494,12 +517,25 @@ function LeaderboardPlayersHighlightTable({
   allTablePlayers,
   currentRound,
   showTppgColumns,
-  showInlineRanks
+  showInlineRanks,
+  rankAmongLabel = "drafted players",
+  emptyBodyMessage = null,
+  collapseByDefaultOnMobile = false
 }: LeaderboardPlayersHighlightTableProps) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(() => !collapseByDefaultOnMobile);
+
+  useEffect(() => {
+    if (!collapseByDefaultOnMobile) return;
+    if (typeof window === "undefined") return;
+    if (window.matchMedia("(min-width: 768px)").matches) {
+      setOpen(true);
+    }
+  }, [collapseByDefaultOnMobile]);
   const leagueStatRanks = buildLeagueStatRanks(allTablePlayers);
   const filledRows = bodyRows.filter((p): p is TablePlayer => p != null);
   const footer = computeFooterTotals(filledRows, currentRound);
+  const showEmptyMessage = filledRows.length === 0 && emptyBodyMessage != null && emptyBodyMessage !== "";
+  const tableColCount = highlightTableColumnCount(showTppgColumns);
   const tppgFooterText =
     footer.tppgDeltaHasAny
       ? `${footer.tppgDeltaSum > 0 ? "+" : ""}${footer.tppgDeltaSum.toFixed(1)}`
@@ -622,7 +658,18 @@ function LeaderboardPlayersHighlightTable({
             </tr>
           </thead>
           <tbody>
-            {bodyRows.map((p, rowIdx) => {
+            {showEmptyMessage ? (
+              <tr className="pool-table-row">
+                <td
+                  colSpan={tableColCount}
+                  className="px-2 py-4 text-center text-[11px] text-foreground/70 align-middle"
+                >
+                  {emptyBodyMessage}
+                </td>
+              </tr>
+            ) : null}
+            {!showEmptyMessage
+              ? bodyRows.map((p, rowIdx) => {
               if (!p) {
                 return <EmptyHighlightTableRow key={`empty-${rowIdx}`} showTppgColumns={showTppgColumns} />;
               }
@@ -673,13 +720,13 @@ function LeaderboardPlayersHighlightTable({
                     </div>
                   </td>
                   <td className="px-1 py-2 text-center transition-colors">
-                    <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.ppg.get(rowKey)} draftedCount={dc}>
+                    <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.ppg.get(rowKey)} draftedCount={dc}>
                       {p.seasonPpg.toFixed(1)}
                     </StatCellWithRank>
                   </td>
                   {showTppgColumns ? (
                     <td className="hidden px-1 py-2 text-center text-foreground/80 transition-colors md:table-cell">
-                      <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.tppg.get(rowKey)} draftedCount={dc}>
+                      <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.tppg.get(rowKey)} draftedCount={dc}>
                         {computeDisplayTournamentPpg(p).toFixed(1)}
                       </StatCellWithRank>
                     </td>
@@ -687,6 +734,7 @@ function LeaderboardPlayersHighlightTable({
                   {showTppgColumns ? (
                     <td className="hidden px-1 py-2 text-center transition-colors md:table-cell">
                       <StatCellWithRank
+                        rankAmongLabel={rankAmongLabel}
                         showRank={showInlineRanks}
                         rank={leagueStatRanks.tppgDelta.get(rowKey)}
                         draftedCount={dc}
@@ -700,54 +748,55 @@ function LeaderboardPlayersHighlightTable({
                     </td>
                   ) : null}
                   <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                    <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r1.get(rowKey)} draftedCount={dc}>
+                    <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.r1.get(rowKey)} draftedCount={dc}>
                       {displayRoundScoreCell(p, 1)}
                     </StatCellWithRank>
                   </td>
                   <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                    <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r2.get(rowKey)} draftedCount={dc}>
+                    <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.r2.get(rowKey)} draftedCount={dc}>
                       {displayRoundScoreCell(p, 2)}
                     </StatCellWithRank>
                   </td>
                   <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                    <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r3.get(rowKey)} draftedCount={dc}>
+                    <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.r3.get(rowKey)} draftedCount={dc}>
                       {displayRoundScoreCell(p, 3)}
                     </StatCellWithRank>
                   </td>
                   <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                    <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r4.get(rowKey)} draftedCount={dc}>
+                    <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.r4.get(rowKey)} draftedCount={dc}>
                       {displayRoundScoreCell(p, 4)}
                     </StatCellWithRank>
                   </td>
                   <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                    <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r5.get(rowKey)} draftedCount={dc}>
+                    <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.r5.get(rowKey)} draftedCount={dc}>
                       {displayRoundScoreCell(p, 5)}
                     </StatCellWithRank>
                   </td>
                   <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                    <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r6.get(rowKey)} draftedCount={dc}>
+                    <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.r6.get(rowKey)} draftedCount={dc}>
                       {displayRoundScoreCell(p, 6)}
                     </StatCellWithRank>
                   </td>
                   <td
                     className={`px-1 py-2 text-center transition-colors sleeper-score-font pool-table-col-primary${projBlockDivider}`}
                   >
-                    <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.total.get(rowKey)} draftedCount={dc}>
+                    <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.total.get(rowKey)} draftedCount={dc}>
                       {p.total}
                     </StatCellWithRank>
                   </td>
                   <td className="hidden px-1 py-2 text-center transition-colors sleeper-score-font md:table-cell">
-                    <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.origProj.get(rowKey)} draftedCount={dc}>
+                    <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.origProj.get(rowKey)} draftedCount={dc}>
                       {origR != null ? String(origR) : "—"}
                     </StatCellWithRank>
                   </td>
                   <td className="hidden px-1 py-2 text-center transition-colors sleeper-score-font md:table-cell">
-                    <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.liveProj.get(rowKey)} draftedCount={dc}>
+                    <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={showInlineRanks} rank={leagueStatRanks.liveProj.get(rowKey)} draftedCount={dc}>
                       {String(liveR)}
                     </StatCellWithRank>
                   </td>
                   <td className="hidden px-1 py-2 text-center transition-colors sleeper-score-font md:table-cell">
                     <StatCellWithRank
+                      rankAmongLabel={rankAmongLabel}
                       showRank={showInlineRanks}
                       rank={leagueStatRanks.projPlusMinus.get(rowKey)}
                       draftedCount={dc}
@@ -761,7 +810,9 @@ function LeaderboardPlayersHighlightTable({
                   </td>
                 </tr>
               );
-            })}
+            })
+              : null}
+            {!showEmptyMessage ? (
             <tr className="pool-table-footer-row">
               <td
                 className="hidden w-10 max-w-[2.5rem] p-1 align-middle md:table-cell"
@@ -775,77 +826,78 @@ function LeaderboardPlayersHighlightTable({
                 {footer.remainingPlayers} remaining
               </td>
               <td className="px-1 py-2 text-center font-semibold">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   {footer.seasonPpgAvg}
                 </StatCellWithRank>
               </td>
               {showTppgColumns ? (
                 <td className="hidden px-1 py-2 text-center font-semibold md:table-cell">
-                  <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                  <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                     {footer.tppgAvg}
                   </StatCellWithRank>
                 </td>
               ) : null}
               {showTppgColumns ? (
                 <td className="hidden px-1 py-2 text-center font-semibold sleeper-score-font md:table-cell">
-                  <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                  <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                     <span className={tppgFooterClass}>{tppgFooterText}</span>
                   </StatCellWithRank>
                 </td>
               ) : null}
               <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   {formatMaybeNumber(footer.roundScores[1])}
                 </StatCellWithRank>
               </td>
               <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   {formatMaybeNumber(footer.roundScores[2])}
                 </StatCellWithRank>
               </td>
               <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   {formatMaybeNumber(footer.roundScores[3])}
                 </StatCellWithRank>
               </td>
               <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   {formatMaybeNumber(footer.roundScores[4])}
                 </StatCellWithRank>
               </td>
               <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   {formatMaybeNumber(footer.roundScores[5])}
                 </StatCellWithRank>
               </td>
               <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   {formatMaybeNumber(footer.roundScores[6])}
                 </StatCellWithRank>
               </td>
               <td
                 className={`px-1 py-2 text-center font-semibold sleeper-score-font pool-table-col-primary${projBlockDivider}`}
               >
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   {footer.totalPts}
                 </StatCellWithRank>
               </td>
               <td className="hidden px-1 py-2 text-center font-semibold sleeper-score-font md:table-cell">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   {footer.origProjSum}
                 </StatCellWithRank>
               </td>
               <td className="hidden px-1 py-2 text-center font-semibold sleeper-score-font md:table-cell">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   {footer.liveProjSum != null ? String(footer.liveProjSum) : "—"}
                 </StatCellWithRank>
               </td>
               <td className="hidden px-1 py-2 text-center font-semibold sleeper-score-font md:table-cell">
-                <StatCellWithRank showRank={false} rank={undefined} draftedCount={0}>
+                <StatCellWithRank rankAmongLabel={rankAmongLabel} showRank={false} rank={undefined} draftedCount={0}>
                   <span className={projFooterClass}>{projFooterText}</span>
                 </StatCellWithRank>
               </td>
             </tr>
+            ) : null}
           </tbody>
         </table>
       </div>
@@ -881,6 +933,7 @@ export function LeaderboardAllTournamentTeamTable({
       currentRound={currentRound}
       showTppgColumns={showTppgColumns}
       showInlineRanks={showInlineRanks}
+      collapseByDefaultOnMobile
     />
   );
 }
@@ -922,6 +975,7 @@ export function LeaderboardBestSelectionByRoundTable({
       currentRound={currentRound}
       showTppgColumns={showTppgColumns}
       showInlineRanks={showInlineRanks}
+      collapseByDefaultOnMobile
     />
   );
 }
@@ -963,6 +1017,45 @@ export function LeaderboardWorstSelectionByRoundTable({
       currentRound={currentRound}
       showTppgColumns={showTppgColumns}
       showInlineRanks={showInlineRanks}
+      collapseByDefaultOnMobile
+    />
+  );
+}
+
+/**
+ * Renders top undrafted tournament scorers. Data is included on the leaderboard API payload
+ * (`undraftedAllTournamentTeamPlayers`) so there is no second client fetch.
+ */
+export function LeaderboardUndraftedAllTournamentTeamTable({
+  players,
+  currentRound,
+  showTppgColumns,
+  showInlineRanks
+}: {
+  players: LeaderboardRosterPlayerApi[];
+  currentRound: number;
+  showTppgColumns: boolean;
+  showInlineRanks: boolean;
+}) {
+  const allTablePlayers = players.map(rosterRowToTablePlayer);
+  const bodyRows: (TablePlayer | null)[] = allTablePlayers;
+
+  return (
+    <LeaderboardPlayersHighlightTable
+      title="Undrafted All-Tournament Team"
+      subtitle={<span>Top {ALL_TOURNAMENT_TEAM_SIZE} undrafted players in the pool by tournament points</span>}
+      bodyRows={bodyRows}
+      allTablePlayers={allTablePlayers}
+      currentRound={currentRound}
+      showTppgColumns={showTppgColumns}
+      showInlineRanks={showInlineRanks}
+      rankAmongLabel="undrafted pool players"
+      emptyBodyMessage={
+        players.length === 0
+          ? "No undrafted players in the pool for this league (everyone is on a roster), or the pool list is empty."
+          : null
+      }
+      collapseByDefaultOnMobile
     />
   );
 }

@@ -67,6 +67,14 @@ const LeaderboardWorstSelectionByRoundTable = dynamic(
   { ssr: false, loading: () => null }
 );
 
+const LeaderboardUndraftedAllTournamentTeamTable = dynamic(
+  () =>
+    import("@/components/stats/LeaderboardAllTournamentTeamTable").then(
+      (m) => m.LeaderboardUndraftedAllTournamentTeamTable
+    ),
+  { ssr: false, loading: () => null }
+);
+
 /** Chicago-style title case (matches StatTracker toolbar labels). */
 const BOOK_TITLE_MINOR = new Set([
   "a",
@@ -885,7 +893,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
             <h1 className="stat-tracker-page-title text-center md:text-center">Leaderboard</h1>
               {data?.lastSyncedAt ? (
                 <div
-                  className={`text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block text-center ${
+                  className={`pool-hero-sync-meta text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block text-center ${
                     heroPulse ? "motion-safe:animate-pulse" : ""
                   }`}
                 >
@@ -895,7 +903,7 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
                   ) : null}
                 </div>
               ) : (
-                <div className="text-[10px] text-foreground/45 mt-0.5 hidden md:block text-center">
+                <div className="pool-hero-sync-meta text-[10px] text-foreground/45 mt-0.5 hidden md:block text-center">
                   Live leaderboard status
                 </div>
               )}
@@ -1645,6 +1653,12 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
 
           <LeaderboardAllTournamentTeamTable
             teams={teamsSorted}
+            currentRound={leaderboardDerived.currentRound}
+            showTppgColumns={showTppgColumns}
+            showInlineRanks={showInlineRanks}
+          />
+          <LeaderboardUndraftedAllTournamentTeamTable
+            players={data?.undraftedAllTournamentTeamPlayers ?? []}
             currentRound={leaderboardDerived.currentRound}
             showTppgColumns={showTppgColumns}
             showInlineRanks={showInlineRanks}

@@ -968,7 +968,7 @@ export function PlayersPoolClient({
               <span className="md:hidden">Players</span>
               <span className="hidden md:inline">Players</span>
             </h1>
-              <div className="text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block text-center">
+              <div className="pool-hero-sync-meta text-[10px] tabular-nums text-foreground/50 mt-0.5 hidden md:block text-center">
                 {meta ? (
                   <>
                     {meta.lastSyncedAt ? `Synced ${new Date(meta.lastSyncedAt).toLocaleString()}` : "Synced —"}

@@ -1,5 +1,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  allLeagueDraftedPlayers,
+  topKAllTournamentPlayers,
+  undraftedPoolPlayersForAllTournamentTeam
+} from "@/lib/all-tournament-team";
 import { computeLeagueProjections } from "@/lib/projections";
+import { buildPlayerPoolRecordsForLeague } from "@/lib/players-pool-for-league";
 import {
   aggregateLeaderboardFromEngineState,
   loadLeagueScoringEngineState
@@ -19,6 +25,8 @@ export type LeaderboardApiPayload = {
   partialDataWarning: boolean;
   anyLiveGames: boolean;
   liveGamesCount: number;
+  /** League `season_year` when known (player pool / undrafted highlights). */
+  seasonYear?: number | null;
   /** ISO time when this payload was built / written to cache */
   cacheUpdatedAt: string;
   teams: Array<{
@@ -41,6 +49,11 @@ export type LeaderboardApiPayload = {
     /** `totalScore + tqsAdjustment` */
     adjustedTotalScore: number;
   }>;
+  /**
+   * Top 8 undrafted pool players by tournament points (same shape as roster rows).
+   * Built with the leaderboard so the Leaders page does not need a second pool fetch.
+   */
+  undraftedAllTournamentTeamPlayers?: LeaderboardRosterPlayerApi[];
 };
 
 function safeNum(x: unknown): number {
@@ -132,7 +145,17 @@ export async function buildLeaderboardApiPayload(
   supabase: SupabaseClient,
   leagueId: string
 ): Promise<LeaderboardApiPayload> {
-  const state = await loadLeagueScoringEngineState(supabase, leagueId);
+  const [{ data: leagueRowEarly }, state] = await Promise.all([
+    supabase.from("leagues").select("season_year").eq("id", leagueId).maybeSingle(),
+    loadLeagueScoringEngineState(supabase, leagueId)
+  ]);
+  const seasonYearEarly =
+    (leagueRowEarly as { season_year?: unknown } | null)?.season_year != null
+      ? safeNum((leagueRowEarly as { season_year: unknown }).season_year)
+      : null;
+  const seasonYearResolved =
+    seasonYearEarly != null && seasonYearEarly > 0 ? seasonYearEarly : null;
+
   const cacheUpdatedAt = new Date().toISOString();
 
   if (!state) {
@@ -142,10 +165,15 @@ export async function buildLeaderboardApiPayload(
       partialDataWarning: false,
       anyLiveGames: false,
       liveGamesCount: 0,
+      seasonYear: seasonYearResolved,
       cacheUpdatedAt,
       teams: []
     };
   }
+
+  const seasonYearForPayload =
+    seasonYearResolved ??
+    (state.seasonYear != null && state.seasonYear > 0 ? state.seasonYear : null);
 
   const scoring = aggregateLeaderboardFromEngineState(state);
   const projections = await computeLeagueProjections(supabase, leagueId);
@@ -153,23 +181,31 @@ export async function buildLeaderboardApiPayload(
     projections.teams.map((t) => [t.leagueTeamId, t.projectionChalk])
   );
 
-  const { data: leagueRow } = await supabase
-    .from("leagues")
-    .select("season_year")
-    .eq("id", leagueId)
-    .maybeSingle();
-  const seasonYear = (leagueRow as { season_year?: number } | null)?.season_year;
-
   let playersByLt: Record<string, LeaderboardRosterPlayerApi[]> = {};
-  if (seasonYear) {
-    playersByLt = await buildLeaderboardRosterPlayersByLeagueTeam(
-      supabase,
-      leagueId,
-      seasonYear,
-      state,
-      scoring.teams,
-      projections.slotProjectionByRosterSlotId
-    );
+  let poolRecords: Record<string, unknown>[] = [];
+  if (seasonYearForPayload != null) {
+    const poolPromise =
+      scoring.teams.length > 0
+        ? buildPlayerPoolRecordsForLeague(supabase, {
+            seasonYear: seasonYearForPayload,
+            leagueId,
+            limit: 8000
+          })
+        : Promise.resolve({ players: [] as Record<string, unknown>[], hasLiveGames: false });
+
+    const [byLt, poolPack] = await Promise.all([
+      buildLeaderboardRosterPlayersByLeagueTeam(
+        supabase,
+        leagueId,
+        seasonYearForPayload,
+        state,
+        scoring.teams,
+        projections.slotProjectionByRosterSlotId
+      ),
+      poolPromise
+    ]);
+    playersByLt = byLt;
+    poolRecords = poolPack.players;
   }
 
   const { data: projRows } = await supabase
@@ -206,15 +242,53 @@ export async function buildLeaderboardApiPayload(
     };
   });
 
+  let undraftedAllTournamentTeamPlayers: LeaderboardRosterPlayerApi[] = [];
+  if (seasonYearForPayload != null && teams.length > 0) {
+    const drafted = allLeagueDraftedPlayers(teams);
+    const draftedIds = new Set(drafted.map((p) => p.playerId));
+    const undraftedApi = undraftedPoolPlayersForAllTournamentTeam(poolRecords, draftedIds);
+    undraftedAllTournamentTeamPlayers = topKAllTournamentPlayers(undraftedApi, 8);
+  }
+
   return {
     currentRound: scoring.currentRound,
     lastSyncedAt: scoring.lastSyncedAt,
     partialDataWarning: scoring.partialDataWarning,
     anyLiveGames: scoring.anyLiveGames,
     liveGamesCount: scoring.liveGamesCount,
+    seasonYear: seasonYearForPayload,
     cacheUpdatedAt,
-    teams
+    teams,
+    undraftedAllTournamentTeamPlayers
   };
+}
+
+/** Cached payloads from before `undraftedAllTournamentTeamPlayers` existed. */
+export async function ensureUndraftedAllTournamentOnLeaderboardPayload(
+  supabase: SupabaseClient,
+  leagueId: string,
+  payload: LeaderboardApiPayload
+): Promise<LeaderboardApiPayload> {
+  if (Array.isArray(payload.undraftedAllTournamentTeamPlayers)) return payload;
+  if (payload.teams.length === 0 || payload.seasonYear == null || payload.seasonYear <= 0) {
+    return { ...payload, undraftedAllTournamentTeamPlayers: [] };
+  }
+  try {
+    const { players: rows } = await buildPlayerPoolRecordsForLeague(supabase, {
+      seasonYear: payload.seasonYear,
+      leagueId,
+      limit: 8000
+    });
+    const drafted = allLeagueDraftedPlayers(payload.teams);
+    const draftedIds = new Set(drafted.map((p) => p.playerId));
+    const undraftedApi = undraftedPoolPlayersForAllTournamentTeam(rows, draftedIds);
+    return {
+      ...payload,
+      undraftedAllTournamentTeamPlayers: topKAllTournamentPlayers(undraftedApi, 8)
+    };
+  } catch {
+    return { ...payload, undraftedAllTournamentTeamPlayers: [] };
+  }
 }
 
 /** Attach latest `projectionOriginal` from `projections` (e.g. when serving cached leaderboard JSON). */
@@ -251,7 +325,7 @@ export async function mergeLeaderboardProjectionOriginalsFromDb(
       )
     : null;
 
-  return {
+  const baseMerged: LeaderboardApiPayload = {
     ...payloadWithPicks,
     teams: payloadWithPicks.teams.map((t) => {
       const projectionOriginal = origByLt.has(t.leagueTeamId)
@@ -272,7 +346,10 @@ export async function mergeLeaderboardProjectionOriginalsFromDb(
       };
     })
   };
+
+  return ensureUndraftedAllTournamentOnLeaderboardPayload(supabase, leagueId, baseMerged);
 }
+
 
 export async function persistLeagueLiveScoreboard(
   supabase: SupabaseClient,

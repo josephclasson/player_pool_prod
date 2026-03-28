@@ -118,6 +118,8 @@ export type LeagueScoringSlotComputed = {
 };
 
 export type LeagueScoringEngineState = {
+  /** League `season_year` when set and positive; mirrors StatTracker API. */
+  seasonYear: number | null;
   currentRound: number;
   lastSyncedAt: string | null;
   partialDataWarning: boolean;
@@ -191,12 +193,19 @@ export async function loadLeagueScoringEngineState(
     (id) => id > 0
   );
 
-  const { data: seasonTeams } =
+  const userIdsForProfiles = leagueTeamRows.map((t) => t.user_id).filter(Boolean);
+  const [gamesAll, seasonTeamsRes, profilesRes] = await Promise.all([
+    fetchAllR1ThroughR6GamesForScoring(supabase),
     seasonYear > 0
-      ? await supabase.from("teams").select("id").ilike("external_team_id", `%-${seasonYear}`)
-      : { data: [] as Array<{ id?: unknown }> };
+      ? supabase.from("teams").select("id").ilike("external_team_id", `%-${seasonYear}`)
+      : Promise.resolve({ data: [] as Array<{ id?: unknown }>, error: null as null }),
+    userIdsForProfiles.length > 0
+      ? supabase.from("profiles").select("id, display_name").in("id", userIdsForProfiles)
+      : Promise.resolve({ data: [] as any[], error: null as null })
+  ]);
+
   const seasonTeamIdSet = new Set<number>();
-  for (const t of seasonTeams ?? []) {
+  for (const t of seasonTeamsRes.data ?? []) {
     const tid = safeNum((t as { id?: unknown }).id);
     if (tid > 0) seasonTeamIdSet.add(tid);
   }
@@ -210,7 +219,6 @@ export async function loadLeagueScoringEngineState(
   //   provider rows where the season label/team linkage did not match local season filters.
   // - Keep this filter permissive: include by season date window OR season team-id membership.
   // - If this becomes over-restrictive again, elimination can silently disappear for whole teams.
-  const gamesAll = await fetchAllR1ThroughR6GamesForScoring(supabase);
   const seasonStartMs = seasonYear > 0 ? Date.UTC(seasonYear, 0, 1, 0, 0, 0, 0) : 0;
   const seasonEndMs = seasonYear > 0 ? Date.UTC(seasonYear + 1, 0, 1, 0, 0, 0, 0) : 0;
   const seasonScopedGames =
@@ -229,6 +237,13 @@ export async function loadLeagueScoringEngineState(
   // never drop elimination entirely; fall back to the full synced tournament game set.
   // This specifically protects mapping-heavy schools that had split team rows during imports.
   const games = seasonScopedGames.length >= 8 ? seasonScopedGames : gamesAll;
+
+  const profileById = new Map<string, { display_name?: string | null }>(
+    (profilesRes.data ?? []).map((p: { id: string; display_name?: string | null }) => [
+      String(p.id),
+      p
+    ])
+  );
 
   const gameRows: GameRow[] = games.map((g: any) => ({
     id: safeNum(g.id),
@@ -316,16 +331,6 @@ export async function loadLeagueScoringEngineState(
     if (g.team_a_id > 0) teamIdsInLiveGame.add(g.team_a_id);
     if (g.team_b_id > 0) teamIdsInLiveGame.add(g.team_b_id);
   }
-
-  // Preload profiles to map ownerName.
-  const userIds = leagueTeamRows.map((t: any) => t.user_id as string);
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, display_name")
-    .in("id", userIds);
-  const profileById = new Map<string, any>(
-    (profiles ?? []).map((p: any) => [p.id, p])
-  );
 
   // Compute per roster slot:
   // - total points for the player across all games we have box-score stats for
@@ -471,6 +476,7 @@ export async function loadLeagueScoringEngineState(
   }
 
   return {
+    seasonYear: seasonYear > 0 ? seasonYear : null,
     currentRound,
     lastSyncedAt,
     partialDataWarning,

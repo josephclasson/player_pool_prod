@@ -1451,7 +1451,7 @@ function StatTrackerTabPageInner() {
             {api?.lastSyncedAt ? (
               <div
                 className={[
-                  "mt-0.5 text-center text-[9px] tabular-nums text-foreground/50 sm:text-[10px] overflow-x-auto overflow-y-hidden",
+                  "pool-hero-sync-meta mt-0.5 text-center text-[9px] tabular-nums text-foreground/50 sm:text-[10px] overflow-x-auto overflow-y-hidden",
                   heroPulse ? "motion-safe:animate-pulse" : ""
                 ]
                   .filter(Boolean)
@@ -1465,7 +1465,7 @@ function StatTrackerTabPageInner() {
                 </span>
               </div>
             ) : (
-              <div className="text-[10px] text-foreground/45 mt-0.5 text-center">
+              <div className="pool-hero-sync-meta text-[10px] text-foreground/45 mt-0.5 text-center">
                 Live R1–R6 scoring &amp; projections
               </div>
             )}
@@ -1776,6 +1776,9 @@ function StatTrackerTabPageInner() {
         if (visiblePlayersAfterTeamFilter.length === 0) return null;
 
         const footer = computeFooterTotals(visiblePlayersAfterTeamFilter, api?.currentRound ?? 0);
+        const rosterCountFooterLabel = showOnlyActivePlayers
+          ? `${visiblePlayersAfterTeamFilter.length} playing`
+          : `${footer.remainingPlayers} remaining`;
 
         const tppgFooterText =
           footer.tppgDeltaHasAny
@@ -2192,10 +2195,15 @@ function StatTrackerTabPageInner() {
                         <span className="md:hidden">TOT</span>
                         <span className="hidden md:inline">TOTALS</span>
                       </td>
-                      <td className="px-1 py-2 text-center text-[11px] font-normal tabular-nums opacity-90 align-middle leading-tight pool-table-player-col min-w-0">
-                        {showOnlyActivePlayers
-                          ? `${footer.livePlayingCount} playing`
-                          : `${footer.remainingPlayers} remaining`}
+                      <td
+                        className="px-1 py-2 text-center text-[11px] font-normal tabular-nums opacity-90 align-middle leading-tight pool-table-player-col min-w-0"
+                        title={
+                          showOnlyActivePlayers
+                            ? "Players on this roster currently in a live game"
+                            : "Players on this roster not yet eliminated from the tournament"
+                        }
+                      >
+                        {rosterCountFooterLabel}
                       </td>
                       {ownerViewMode === "base" ? (
                         <td className="px-1 py-2 text-center font-semibold">

@@ -100,18 +100,17 @@ export async function buildStatTrackerApiResponse(
   supabase: SupabaseClient,
   leagueId: string
 ): Promise<StatTrackerApiResponse> {
-  const { data: leagueRow } = await supabase
-    .from("leagues")
-    .select("season_year")
-    .eq("id", leagueId)
-    .maybeSingle();
-  const seasonYear =
-    leagueRow && (leagueRow as { season_year?: number }).season_year != null
-      ? Number((leagueRow as { season_year: number }).season_year)
-      : null;
-
   const engine = await loadLeagueScoringEngineState(supabase, leagueId);
   if (!engine) {
+    const { data: leagueRow } = await supabase
+      .from("leagues")
+      .select("season_year")
+      .eq("id", leagueId)
+      .maybeSingle();
+    const seasonYear =
+      leagueRow && (leagueRow as { season_year?: number }).season_year != null
+        ? Number((leagueRow as { season_year: number }).season_year)
+        : null;
     return {
       leagueId,
       seasonYear,
@@ -124,6 +123,7 @@ export async function buildStatTrackerApiResponse(
     };
   }
 
+  const seasonYear = engine.seasonYear;
   const allSlots = engine.slots;
   const playerIds = Array.from(
     new Set(allSlots.map((s) => safeNum(s.player_id)).filter((id) => id > 0))

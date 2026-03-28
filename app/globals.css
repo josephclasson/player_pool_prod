@@ -296,13 +296,16 @@ html[data-theme="crazy_people"] .pool-draft-page .pool-draft-board-table tbody t
   backdrop-filter: none !important;
 }
 
-@media (min-width: 768px) {
-  html[data-theme="crazy_people"] .pool-hero [class*="text-foreground/"],
-  html[data-theme="crazy_people"] .pool-hero [class*="text-muted-foreground"],
-  html[data-theme="crazy_people"] .pool-hero strong,
-  html[data-theme="crazy_people"] .pool-hero code {
-    color: rgb(245 245 248) !important;
-  }
+/* Hero is dark on Crazy People; keep sublines (e.g. Last synced) readable at all breakpoints. */
+html[data-theme="crazy_people"] .pool-hero .pool-hero-sync-meta {
+  color: rgb(245 245 248) !important;
+}
+
+html[data-theme="crazy_people"] .pool-hero [class*="text-foreground/"],
+html[data-theme="crazy_people"] .pool-hero [class*="text-muted-foreground"],
+html[data-theme="crazy_people"] .pool-hero strong,
+html[data-theme="crazy_people"] .pool-hero code {
+  color: rgb(245 245 248) !important;
 }
 
 html[data-theme="red"] body,
