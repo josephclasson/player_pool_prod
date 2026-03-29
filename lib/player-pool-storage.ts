@@ -5,6 +5,8 @@ export const STAT_TRACKER_SHOW_TPPG_COLUMNS_KEY = "stat_tracker_show_tppg_column
 /** @deprecated Old key; migrated once on read. */
 const STAT_TRACKER_SHOW_PROJECTIONS_KEY_LEGACY = "stat_tracker_show_projections";
 export const STAT_TRACKER_SHOW_INLINE_RANKS_KEY = "stat_tracker_show_inline_ranks";
+/** Scores (StatTracker): gold sub-ranks under stats on viewports below `md` (default off). */
+export const STAT_TRACKER_SHOW_MOBILE_INLINE_RANKS_KEY = "stat_tracker_show_mobile_inline_ranks";
 /** Leaderboard: Win %, Odds, Line, Money % (default show). */
 export const LEADERBOARD_SHOW_PROBABILITY_ODDS_KEY = "leaderboard_show_probability_odds";
 export const PLAYER_STATS_SNAPSHOT_PREFIX = "player_stats_snapshot_v1";
@@ -93,6 +95,28 @@ export function writeStoredStatTrackerShowInlineRanks(show: boolean): void {
   if (typeof window === "undefined") return;
   try {
     localStorage.setItem(STAT_TRACKER_SHOW_INLINE_RANKS_KEY, show ? "1" : "0");
+  } catch {
+    /* private mode / quota */
+  }
+}
+
+export function readStoredStatTrackerShowMobileInlineRanks(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = localStorage.getItem(STAT_TRACKER_SHOW_MOBILE_INLINE_RANKS_KEY);
+    if (raw == null) return false;
+    if (raw === "1") return true;
+    if (raw === "0") return false;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+export function writeStoredStatTrackerShowMobileInlineRanks(show: boolean): void {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(STAT_TRACKER_SHOW_MOBILE_INLINE_RANKS_KEY, show ? "1" : "0");
   } catch {
     /* private mode / quota */
   }

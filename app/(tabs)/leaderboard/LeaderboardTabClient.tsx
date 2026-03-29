@@ -67,6 +67,14 @@ const LeaderboardWorstSelectionByRoundTable = dynamic(
   { ssr: false, loading: () => null }
 );
 
+const LeaderboardLowestOverallScorersTable = dynamic(
+  () =>
+    import("@/components/stats/LeaderboardAllTournamentTeamTable").then(
+      (m) => m.LeaderboardLowestOverallScorersTable
+    ),
+  { ssr: false, loading: () => null }
+);
+
 const LeaderboardUndraftedAllTournamentTeamTable = dynamic(
   () =>
     import("@/components/stats/LeaderboardAllTournamentTeamTable").then(
@@ -1684,6 +1692,12 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
             showInlineRanks={showInlineRanks}
           />
           <LeaderboardWorstSelectionByRoundTable
+            teams={teamsSorted}
+            currentRound={leaderboardDerived.currentRound}
+            showTppgColumns={showTppgColumns}
+            showInlineRanks={showInlineRanks}
+          />
+          <LeaderboardLowestOverallScorersTable
             teams={teamsSorted}
             currentRound={leaderboardDerived.currentRound}
             showTppgColumns={showTppgColumns}

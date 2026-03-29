@@ -9,6 +9,7 @@ import { espnMensCollegeBasketballPlayerProfileUrl } from "@/lib/espn-mbb-direct
 import {
   allLeagueDraftedPlayers,
   bestPlayerPerDraftRound,
+  bottomKAllTournamentPlayers,
   HIGHLIGHT_DRAFT_ROUNDS,
   sumTournamentPoints,
   topKAllTournamentPlayers,
@@ -1015,6 +1016,46 @@ export function LeaderboardWorstSelectionByRoundTable({
         <span>
           Lowest scorer per draft round (rows 1–{HIGHLIGHT_DRAFT_ROUNDS}); overall pick # and league size (
           {numTeams} {numTeams === 1 ? "team" : "teams"})
+        </span>
+      }
+      bodyRows={bodyRows}
+      allTablePlayers={allTablePlayers}
+      currentRound={currentRound}
+      showTppgColumns={showTppgColumns}
+      showInlineRanks={showInlineRanks}
+      collapseByDefaultOnMobile
+    />
+  );
+}
+
+/** Same row count as All-Tournament / undrafted highlights (8). */
+const LOWEST_OVERALL_SCORERS_SIZE = ALL_TOURNAMENT_TEAM_SIZE;
+
+export function LeaderboardLowestOverallScorersTable({
+  teams,
+  currentRound,
+  showTppgColumns,
+  showInlineRanks
+}: {
+  teams: Array<{ players?: LeaderboardRosterPlayerApi[] }>;
+  currentRound: number;
+  showTppgColumns: boolean;
+  showInlineRanks: boolean;
+}) {
+  const drafted = allLeagueDraftedPlayers(teams);
+  if (drafted.length === 0) return null;
+
+  const allTablePlayers = drafted.map(rosterRowToTablePlayer);
+  const bottomApi = bottomKAllTournamentPlayers(drafted, LOWEST_OVERALL_SCORERS_SIZE);
+  const bodyRows: (TablePlayer | null)[] = bottomApi.map(rosterRowToTablePlayer);
+
+  return (
+    <LeaderboardPlayersHighlightTable
+      title="Lowest Overall Scorers"
+      subtitle={
+        <span>
+          Bottom {LOWEST_OVERALL_SCORERS_SIZE} drafted picks in the league by tournament points (e.g. 8 teams × 9
+          rounds = 72 picks)
         </span>
       }
       bodyRows={bodyRows}

@@ -11,10 +11,12 @@ import { statTrackerPollIntervalMs } from "@/lib/pool-refresh-intervals";
 import {
   readStoredSnapshot,
   readStoredStatTrackerShowInlineRanks,
+  readStoredStatTrackerShowMobileInlineRanks,
   statTrackerSnapshotKey,
   writeStoredSnapshot,
   writeStoredActiveLeagueId,
-  writeStoredStatTrackerShowInlineRanks
+  writeStoredStatTrackerShowInlineRanks,
+  writeStoredStatTrackerShowMobileInlineRanks
 } from "@/lib/player-pool-storage";
 import type { StatTrackerApiResponse } from "@/lib/stat-tracker/build-stat-tracker-response";
 import { readJsonResponse } from "@/lib/read-json-response";
@@ -512,21 +514,30 @@ function buildLeagueStatRanks(players: TrackerPlayerRow[]): LeagueStatRanks {
 function InlineLeagueStatRank({
   rank,
   draftedCount,
-  context = "player-league"
+  context = "player-league",
+  showOnDesktop,
+  showOnMobile
 }: {
   rank: number | undefined;
   draftedCount: number;
   /** `owner-aggregate` = this roster’s total vs other owners (footer row). */
   context?: "player-league" | "owner-aggregate";
+  showOnDesktop: boolean;
+  showOnMobile: boolean;
 }) {
   if (rank == null || draftedCount <= 0) return null;
+  if (!showOnDesktop && !showOnMobile) return null;
   const title =
     context === "owner-aggregate"
       ? `Owner rank ${rank} of ${draftedCount} teams (1 = best)`
       : `League rank ${rank} of ${draftedCount} drafted players (1 = best)`;
+  const vis = [
+    showOnMobile ? "max-md:block" : "max-md:hidden",
+    showOnDesktop ? "md:block" : "md:hidden"
+  ].join(" ");
   return (
     <span
-      className="pool-inline-rank hidden md:block text-[9px] sm:text-[10px] font-bold tabular-nums leading-none mt-0.5 text-[rgb(var(--pool-stats-accent))]"
+      className={`pool-inline-rank ${vis} text-[9px] sm:text-[10px] font-bold tabular-nums leading-none mt-0.5 text-[rgb(var(--pool-stats-accent))]`}
       title={title}
     >
       {rank}
@@ -540,21 +551,30 @@ function StatCellWithRank({
   draftedCount,
   className,
   showRank = true,
+  showRankMobile = false,
   rankContext = "player-league"
 }: {
   children: ReactNode;
   rank: number | undefined;
   draftedCount: number;
   className?: string;
-  /** When false, gold league rank subtext is hidden (same idea as hiding projection columns). */
+  /** When false, gold league rank subtext is hidden on `md+` (toolbar “show inline ranks”). */
   showRank?: boolean;
+  /** When true, gold sub-rank also shows below `md` (mobile “Inline” toggle). */
+  showRankMobile?: boolean;
   rankContext?: "player-league" | "owner-aggregate";
 }) {
   return (
     <div className={className ?? "flex flex-col items-center justify-center"}>
       {children}
-      {showRank ? (
-        <InlineLeagueStatRank rank={rank} draftedCount={draftedCount} context={rankContext} />
+      {showRank || showRankMobile ? (
+        <InlineLeagueStatRank
+          rank={rank}
+          draftedCount={draftedCount}
+          context={rankContext}
+          showOnDesktop={showRank}
+          showOnMobile={showRankMobile}
+        />
       ) : null}
     </div>
   );
@@ -1191,6 +1211,23 @@ function StatTrackerTabPageInner() {
     [collegeTeamOptions.length, selectedCollegeTeams.length]
   );
 
+  const ownerFilterPickerSummary = useMemo(() => {
+    if (selectedOwnerIds.length === 0) return "None selected";
+    if (selectedOwnerIds.length === ownersSorted.length) return "All owners";
+    if (selectedOwnerIds.length === 1) {
+      const nm = ownersSorted.find((o) => o.ownerId === selectedOwnerIds[0])?.ownerName;
+      return nm?.trim() ? nm.trim() : "1 owner";
+    }
+    return `${selectedOwnerIds.length} owners`;
+  }, [selectedOwnerIds, ownersSorted]);
+
+  const teamFilterPickerSummary = useMemo(() => {
+    if (selectedCollegeTeams.length === 0) return "None selected";
+    if (allTeamsSelected) return "All teams";
+    if (selectedCollegeTeams.length === 1) return selectedCollegeTeams[0];
+    return `${selectedCollegeTeams.length} teams`;
+  }, [selectedCollegeTeams, allTeamsSelected]);
+
   const didInitTeamsRef = useRef(false);
   useEffect(() => {
     if (didInitTeamsRef.current) return;
@@ -1357,6 +1394,7 @@ function StatTrackerTabPageInner() {
     setCollapsedOwnerStripWidthPx(Math.min(Math.ceil(max), MAX_OWNER_STRIP_PX));
   }, [selectedOwners, rankByOwnerId, statTrackerViewByOwner, projectedRankByOwnerId]);
   const [showInlineRanks, setShowInlineRanks] = useState(true);
+  const [showMobileInlineRanks, setShowMobileInlineRanks] = useState(false);
 
   const [commissionerSession, setCommissionerSession] = useState(false);
   useEffect(() => {
@@ -1373,6 +1411,14 @@ function StatTrackerTabPageInner() {
   useEffect(() => {
     writeStoredStatTrackerShowInlineRanks(showInlineRanks);
   }, [showInlineRanks]);
+
+  useEffect(() => {
+    setShowMobileInlineRanks(readStoredStatTrackerShowMobileInlineRanks());
+  }, []);
+
+  useEffect(() => {
+    writeStoredStatTrackerShowMobileInlineRanks(showMobileInlineRanks);
+  }, [showMobileInlineRanks]);
 
   async function onManualRefresh() {
     setRefreshBusy(true);
@@ -1538,18 +1584,31 @@ function StatTrackerTabPageInner() {
             <span>{toBookTitleCase("show inline ranks")}</span>
           </label>
           {ownersSorted.length > 0 ? (
-            <label
-              className="pool-filter-chip"
-              title="Checked: every owner shows the compact summary row only. Unchecked: full roster tables."
-            >
-              <input
-                type="checkbox"
-                checked={allOwnersCollapsed}
-                onChange={(e) => setAllOwnersCollapsed(e.target.checked)}
-              />
-              <span className="md:hidden">Collapse</span>
-              <span className="hidden md:inline">{toBookTitleCase("collapse all")}</span>
-            </label>
+            <>
+              <label
+                className="pool-filter-chip"
+                title="Checked: every owner shows the compact summary row only. Unchecked: full roster tables."
+              >
+                <input
+                  type="checkbox"
+                  checked={allOwnersCollapsed}
+                  onChange={(e) => setAllOwnersCollapsed(e.target.checked)}
+                />
+                <span className="md:hidden">Collapse</span>
+                <span className="hidden md:inline">{toBookTitleCase("collapse all")}</span>
+              </label>
+              <label
+                className="pool-filter-chip md:hidden"
+                title="Gold league ranks under stat values on this screen size."
+              >
+                <input
+                  type="checkbox"
+                  checked={showMobileInlineRanks}
+                  onChange={(e) => setShowMobileInlineRanks(e.target.checked)}
+                />
+                <span>Inline</span>
+              </label>
+            </>
           ) : null}
           <div className="pool-filter-select">
             <span className="pool-filter-label">Owner</span>
@@ -1586,6 +1645,8 @@ function StatTrackerTabPageInner() {
               ref={teamButtonRef}
               type="button"
               onClick={toggleTeamPicker}
+              title={`Teams: ${teamFilterPickerSummary}`}
+              aria-label={`Open team filter. Current: ${teamFilterPickerSummary}.`}
               className={
                 selectedCollegeTeams.length > 0 && allTeamsSelected
                   ? "pool-filter-select-trigger pool-filter-select-trigger--all"
@@ -2051,20 +2112,20 @@ function StatTrackerTabPageInner() {
                           </td>
                           {ownerViewMode === "base" ? (
                             <td className="px-1 py-2 text-center transition-colors">
-                              <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.tppg.get(rowKey)} draftedCount={dc}>
+                              <StatCellWithRank showRank={showInlineRanks} showRankMobile={showMobileInlineRanks} rank={leagueStatRanks.tppg.get(rowKey)} draftedCount={dc}>
                                 {computeDisplayTournamentPpg(p).toFixed(1)}
                               </StatCellWithRank>
                             </td>
                           ) : (
                             <td className="px-1 py-2 text-center text-foreground/80 transition-colors">
-                              <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.tppg.get(rowKey)} draftedCount={dc}>
+                              <StatCellWithRank showRank={showInlineRanks} showRankMobile={showMobileInlineRanks} rank={leagueStatRanks.tppg.get(rowKey)} draftedCount={dc}>
                                 {computeDisplayTournamentPpg(p).toFixed(1)}
                               </StatCellWithRank>
                             </td>
                           )}
                           {ownerViewMode === "proj" ? (
                             <td className="px-1 py-2 text-center transition-colors">
-                              <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.ppg.get(rowKey)} draftedCount={dc}>
+                              <StatCellWithRank showRank={showInlineRanks} showRankMobile={showMobileInlineRanks} rank={leagueStatRanks.ppg.get(rowKey)} draftedCount={dc}>
                                 {p.seasonPpg.toFixed(1)}
                               </StatCellWithRank>
                             </td>
@@ -2072,7 +2133,7 @@ function StatTrackerTabPageInner() {
                           {ownerViewMode === "proj" ? (
                             <td className="px-1 py-2 text-center transition-colors">
                               <StatCellWithRank
-                                showRank={showInlineRanks}
+                                showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                                 rank={leagueStatRanks.tppgDelta.get(rowKey)}
                                 draftedCount={dc}
                               >
@@ -2089,32 +2150,32 @@ function StatTrackerTabPageInner() {
                           {ownerViewMode === "base" ? (
                             <>
                               <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                                <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r1.get(rowKey)} draftedCount={dc}>
+                                <StatCellWithRank showRank={showInlineRanks} showRankMobile={showMobileInlineRanks} rank={leagueStatRanks.r1.get(rowKey)} draftedCount={dc}>
                                   {displayRoundScoreCell(p, 1)}
                                 </StatCellWithRank>
                               </td>
                               <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                                <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r2.get(rowKey)} draftedCount={dc}>
+                                <StatCellWithRank showRank={showInlineRanks} showRankMobile={showMobileInlineRanks} rank={leagueStatRanks.r2.get(rowKey)} draftedCount={dc}>
                                   {displayRoundScoreCell(p, 2)}
                                 </StatCellWithRank>
                               </td>
                               <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                                <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r3.get(rowKey)} draftedCount={dc}>
+                                <StatCellWithRank showRank={showInlineRanks} showRankMobile={showMobileInlineRanks} rank={leagueStatRanks.r3.get(rowKey)} draftedCount={dc}>
                                   {displayRoundScoreCell(p, 3)}
                                 </StatCellWithRank>
                               </td>
                               <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                                <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r4.get(rowKey)} draftedCount={dc}>
+                                <StatCellWithRank showRank={showInlineRanks} showRankMobile={showMobileInlineRanks} rank={leagueStatRanks.r4.get(rowKey)} draftedCount={dc}>
                                   {displayRoundScoreCell(p, 4)}
                                 </StatCellWithRank>
                               </td>
                               <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                                <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r5.get(rowKey)} draftedCount={dc}>
+                                <StatCellWithRank showRank={showInlineRanks} showRankMobile={showMobileInlineRanks} rank={leagueStatRanks.r5.get(rowKey)} draftedCount={dc}>
                                   {displayRoundScoreCell(p, 5)}
                                 </StatCellWithRank>
                               </td>
                               <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
-                                <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.r6.get(rowKey)} draftedCount={dc}>
+                                <StatCellWithRank showRank={showInlineRanks} showRankMobile={showMobileInlineRanks} rank={leagueStatRanks.r6.get(rowKey)} draftedCount={dc}>
                                   {displayRoundScoreCell(p, 6)}
                                 </StatCellWithRank>
                               </td>
@@ -2126,14 +2187,14 @@ function StatTrackerTabPageInner() {
                               ownerViewMode === "proj" ? "hidden md:table-cell" : "pool-table-col-primary",
                             ].join(" ")}
                           >
-                            <StatCellWithRank showRank={showInlineRanks} rank={leagueStatRanks.total.get(rowKey)} draftedCount={dc}>
+                            <StatCellWithRank showRank={showInlineRanks} showRankMobile={showMobileInlineRanks} rank={leagueStatRanks.total.get(rowKey)} draftedCount={dc}>
                               {p.total}
                             </StatCellWithRank>
                           </td>
                           {showProjectionColumns ? (
                             <td className="px-1 py-2 text-center transition-colors sleeper-score-font">
                               <StatCellWithRank
-                                showRank={showInlineRanks}
+                                showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                                 rank={leagueStatRanks.origProj.get(rowKey)}
                                 draftedCount={dc}
                               >
@@ -2144,7 +2205,7 @@ function StatTrackerTabPageInner() {
                           {showProjectionColumns ? (
                             <td className="px-1 py-2 text-center transition-colors sleeper-score-font pool-table-col-primary">
                               <StatCellWithRank
-                                showRank={showInlineRanks}
+                                showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                                 rank={leagueStatRanks.liveProj.get(rowKey)}
                                 draftedCount={dc}
                               >
@@ -2155,7 +2216,7 @@ function StatTrackerTabPageInner() {
                           {showProjectionColumns ? (
                             <td className="w-10 px-1 py-2 text-center transition-colors sleeper-score-font md:w-11">
                               <StatCellWithRank
-                                showRank={showInlineRanks}
+                                showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                                 rank={leagueStatRanks.projPlusMinus.get(rowKey)}
                                 draftedCount={dc}
                               >
@@ -2201,7 +2262,7 @@ function StatTrackerTabPageInner() {
                       {ownerViewMode === "base" ? (
                         <td className="px-1 py-2 text-center font-semibold">
                           <StatCellWithRank
-                            showRank={showInlineRanks}
+                            showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                             rank={fo.tppg.rank}
                             draftedCount={fo.tppg.pool}
                             rankContext="owner-aggregate"
@@ -2212,7 +2273,7 @@ function StatTrackerTabPageInner() {
                       ) : (
                         <td className="px-1 py-2 text-center font-semibold">
                           <StatCellWithRank
-                            showRank={showInlineRanks}
+                            showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                             rank={fo.tppg.rank}
                             draftedCount={fo.tppg.pool}
                             rankContext="owner-aggregate"
@@ -2224,7 +2285,7 @@ function StatTrackerTabPageInner() {
                       {ownerViewMode === "proj" ? (
                         <td className="px-1 py-2 text-center font-semibold">
                           <StatCellWithRank
-                            showRank={showInlineRanks}
+                            showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                             rank={fo.seasonPpg.rank}
                             draftedCount={fo.seasonPpg.pool}
                             rankContext="owner-aggregate"
@@ -2236,7 +2297,7 @@ function StatTrackerTabPageInner() {
                       {ownerViewMode === "proj" ? (
                         <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                           <StatCellWithRank
-                            showRank={showInlineRanks}
+                            showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                             rank={fo.tppgDelta.rank}
                             draftedCount={fo.tppgDelta.pool}
                             rankContext="owner-aggregate"
@@ -2249,7 +2310,7 @@ function StatTrackerTabPageInner() {
                         <>
                           <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                             <StatCellWithRank
-                              showRank={showInlineRanks}
+                              showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                               rank={fo.r1.rank}
                               draftedCount={fo.r1.pool}
                               rankContext="owner-aggregate"
@@ -2259,7 +2320,7 @@ function StatTrackerTabPageInner() {
                           </td>
                           <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                             <StatCellWithRank
-                              showRank={showInlineRanks}
+                              showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                               rank={fo.r2.rank}
                               draftedCount={fo.r2.pool}
                               rankContext="owner-aggregate"
@@ -2269,7 +2330,7 @@ function StatTrackerTabPageInner() {
                           </td>
                           <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                             <StatCellWithRank
-                              showRank={showInlineRanks}
+                              showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                               rank={fo.r3.rank}
                               draftedCount={fo.r3.pool}
                               rankContext="owner-aggregate"
@@ -2279,7 +2340,7 @@ function StatTrackerTabPageInner() {
                           </td>
                           <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                             <StatCellWithRank
-                              showRank={showInlineRanks}
+                              showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                               rank={fo.r4.rank}
                               draftedCount={fo.r4.pool}
                               rankContext="owner-aggregate"
@@ -2289,7 +2350,7 @@ function StatTrackerTabPageInner() {
                           </td>
                           <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                             <StatCellWithRank
-                              showRank={showInlineRanks}
+                              showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                               rank={fo.r5.rank}
                               draftedCount={fo.r5.pool}
                               rankContext="owner-aggregate"
@@ -2299,7 +2360,7 @@ function StatTrackerTabPageInner() {
                           </td>
                           <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                             <StatCellWithRank
-                              showRank={showInlineRanks}
+                              showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                               rank={fo.r6.rank}
                               draftedCount={fo.r6.pool}
                               rankContext="owner-aggregate"
@@ -2316,7 +2377,7 @@ function StatTrackerTabPageInner() {
                         ].join(" ")}
                       >
                         <StatCellWithRank
-                          showRank={showInlineRanks}
+                          showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                           rank={fo.total.rank}
                           draftedCount={fo.total.pool}
                           rankContext="owner-aggregate"
@@ -2327,7 +2388,7 @@ function StatTrackerTabPageInner() {
                       {showProjectionColumns ? (
                         <td className="px-1 py-2 text-center font-semibold sleeper-score-font">
                           <StatCellWithRank
-                            showRank={showInlineRanks}
+                            showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                             rank={fo.origProj.rank}
                             draftedCount={fo.origProj.pool}
                             rankContext="owner-aggregate"
@@ -2339,7 +2400,7 @@ function StatTrackerTabPageInner() {
                       {showProjectionColumns ? (
                         <td className="px-1 py-2 text-center font-semibold sleeper-score-font pool-table-col-primary">
                           <StatCellWithRank
-                            showRank={showInlineRanks}
+                            showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                             rank={fo.liveProj.rank}
                             draftedCount={fo.liveProj.pool}
                             rankContext="owner-aggregate"
@@ -2351,7 +2412,7 @@ function StatTrackerTabPageInner() {
                       {showProjectionColumns ? (
                         <td className="w-10 px-1 py-2 text-center font-semibold sleeper-score-font md:w-11">
                           <StatCellWithRank
-                            showRank={showInlineRanks}
+                            showRank={showInlineRanks} showRankMobile={showMobileInlineRanks}
                             rank={fo.projPlusMinus.rank}
                             draftedCount={fo.projPlusMinus.pool}
                             rankContext="owner-aggregate"

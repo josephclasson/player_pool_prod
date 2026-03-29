@@ -1705,23 +1705,71 @@ body {
     min-width: unset !important;
   }
 
-  /* Scores mobile filters: keep Owner/Team dropdowns visible without side-scroll. */
+  /* Scores mobile filters: one row, items share full width (no dead space on the right). Scroll if needed on very narrow viewports. */
   .pool-stattracker-toolbar {
-    display: grid;
-    grid-template-columns: auto auto minmax(0, 1fr) minmax(0, 1fr);
-    align-items: center;
-    gap: 0.35rem;
-    overflow-x: visible;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: stretch;
+    gap: 0.22rem;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-gutter: stable;
+    scrollbar-width: thin;
+    padding-bottom: 2px;
+  }
+
+  .pool-stattracker-toolbar > .pool-filter-chip {
+    flex: 1 1 0;
+    min-width: 0;
+    justify-content: center;
+    box-sizing: border-box;
+  }
+
+  .pool-stattracker-toolbar > .pool-filter-select {
+    flex: 1 1 0;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
+  .pool-stattracker-toolbar .pool-filter-chip {
+    font-size: 0.625rem;
+    padding: 0.18rem 0.32rem;
+    gap: 0.3rem;
+  }
+
+  .pool-stattracker-toolbar .pool-filter-chip input[type="checkbox"] {
+    transform: scale(0.92);
+    transform-origin: center;
   }
 
   .pool-stattracker-toolbar .pool-filter-select {
-    min-width: 0;
+    font-size: 0.625rem;
+  }
+
+  .pool-stattracker-toolbar .pool-filter-select .pool-filter-label {
+    padding: 0.18rem 0.28rem !important;
+    font-size: 0.625rem !important;
+    line-height: 1.2 !important;
+    flex-shrink: 0;
   }
 
   .pool-stattracker-toolbar .pool-filter-select .pool-filter-select-trigger {
-    min-width: 0;
-    max-width: none;
-    width: 100%;
+    flex: 1 1 0;
+    min-width: 1.55rem !important;
+    max-width: none !important;
+    width: auto !important;
+    justify-content: center;
+    gap: 0;
+    padding: 0.18rem 0.3rem !important;
+  }
+
+  .pool-stattracker-toolbar .pool-filter-select-trigger-text {
+    display: none !important;
   }
 
   /* Draft mobile layout: match dense page rhythm used by other tabs. */
