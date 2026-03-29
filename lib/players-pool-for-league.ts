@@ -171,8 +171,9 @@ export async function buildPlayerPoolRecordsForLeague(
     const playingInLiveGame = tid > 0 ? bundle.teamIdsInLiveGame.has(tid) : false;
     const teamMeta = tid > 0 ? bundle.allTeams.get(String(tid)) : null;
     /** Matches leaderboard/scoring: final-loss elimination, not `chalkGamesRemaining === 0` alone. */
-    const tournamentEliminated =
-      tid <= 0 ? false : teamMeta != null ? !teamMeta.isActive : undefined;
+    const tournamentEliminated = tid <= 0 ? false : teamMeta != null ? !teamMeta.isActive : false;
+    const eliminatedRound =
+      tid > 0 ? bundle.eliminatedDisplayRoundByInternalTeamId.get(tid) ?? null : null;
     const byR = bundle.pointsByDisplayRoundByPlayer.get(pid) ?? {};
     const tournamentRoundPoints: Record<number, number> = {};
     for (const key of Object.keys(byR)) {
@@ -214,6 +215,7 @@ export async function buildPlayerPoolRecordsForLeague(
       completedTournamentGames: tproj.completedTournamentGames,
       playingInLiveGame,
       tournamentEliminated,
+      eliminatedRound,
       ownerTeamName: leagueId ? (ownerByPlayerId.get(pid) ?? null) : null,
       team: t
         ? {

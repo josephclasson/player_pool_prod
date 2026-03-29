@@ -151,6 +151,11 @@ export type SeasonProjectionBundle = {
    * projections use max(team count, this set’s size) per player.
    */
   tournamentStatGameIdsByPlayerId: Map<number, Set<number>>;
+  /**
+   * Fantasy display round (1–6) where this internal `teams.id` was eliminated, or null if still alive / unknown.
+   * Matches roster rows’ `eliminatedRound` (canonical elimination from tournament games).
+   */
+  eliminatedDisplayRoundByInternalTeamId: Map<number, number | null>;
 };
 
 export type PlayerTournamentProjectionDetail = {
@@ -359,6 +364,13 @@ export async function loadSeasonProjectionBundle(
     canonicalByInternalTeamId,
     canonRowById
   );
+
+  const eliminatedDisplayRoundByInternalTeamId = new Map<number, number | null>();
+  for (const tid of allCanonTeamIds) {
+    const slug = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
+    const round = slug != null ? eliminationRoundByCanonical.get(slug) : undefined;
+    eliminatedDisplayRoundByInternalTeamId.set(tid, round !== undefined ? round : null);
+  }
 
   function isInternalTeamIdEliminated(tid: number): boolean {
     const slug = stablePoolSlugForTeamContext(tid, canonicalByInternalTeamId, canonRowById);
@@ -617,7 +629,8 @@ export async function loadSeasonProjectionBundle(
     teamIdsInLiveGame,
     expectedChalkGamesTotalByTeamId,
     completedTournamentGamesByTeamId,
-    tournamentStatGameIdsByPlayerId
+    tournamentStatGameIdsByPlayerId,
+    eliminatedDisplayRoundByInternalTeamId
   };
 }
 

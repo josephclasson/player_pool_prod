@@ -224,8 +224,11 @@ export function poolApiRowToLeaderboardRosterPlayerApi(row: Record<string, unkno
     projection: liveRounded,
     originalProjection: origRounded,
     plusMinus: origRounded != null ? liveRounded - origRounded : null,
-    eliminated: false,
-    eliminatedRound: null,
+    eliminated: row.tournamentEliminated === true,
+    eliminatedRound:
+      row.eliminatedRound != null && Number.isFinite(Number(row.eliminatedRound))
+        ? Math.trunc(Number(row.eliminatedRound))
+        : null,
     advancedPastActiveRound: false,
     pickOverall: null
   };
