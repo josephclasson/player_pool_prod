@@ -724,7 +724,8 @@ export function LeaderboardTabClient({ leagueId }: { leagueId?: string }) {
     const currentRound = data?.currentRound ?? 0;
     const ownersForProb = teamsSorted.map((t) => ({
       leagueTeamId: t.leagueTeamId,
-      players: rosterPlayersToOwnerMetrics(t.players)
+      players: rosterPlayersToOwnerMetrics(t.players),
+      liveTeamProjection: t.projection
     }));
     const outcomeProb = computeLeaderboardOwnerWinAndTop3Probabilities(ownersForProb, currentRound);
     const rowInputs = teamsSorted.map((t) => ({

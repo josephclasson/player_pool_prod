@@ -62,6 +62,12 @@ export function projectedRankByTeamId(
 export type LeaderboardOwnerForProbabilities = {
   leagueTeamId: string;
   players: LeaderboardOwnerPlayerMetrics[];
+  /**
+   * Optional league team **live** projection total (GET leaderboard `projection` / scoreboard `projByLt`).
+   * When set, this is used for the projection component of win / top‑3 strength instead of summing
+   * per-player projections (which may be incomplete) or falling back to scored points only.
+   */
+  liveTeamProjection?: number | null;
 };
 
 export function displayTournamentRoundForAdvancement(currentRound: number): number {
@@ -129,6 +135,8 @@ function computeOwnerTotalsFromPlayers(players: LeaderboardOwnerPlayerMetrics[])
 
 /**
  * Heuristic win and “in the money” (top 3) probabilities — full league cohort only.
+ * **Projection signal** prefers each owner’s `liveTeamProjection` (league live total) when provided,
+ * so it stays aligned with hybrid live roster projections even if some player rows omit `projection`.
  */
 export function computeLeaderboardOwnerWinAndTop3Probabilities(
   owners: LeaderboardOwnerForProbabilities[],
@@ -144,12 +152,18 @@ export function computeLeaderboardOwnerWinAndTop3Probabilities(
 
   for (const o of owners) {
     const { total, projection } = computeOwnerTotalsFromPlayers(o.players);
+    const teamLive =
+      o.liveTeamProjection != null && Number.isFinite(Number(o.liveTeamProjection))
+        ? Math.round(Number(o.liveTeamProjection))
+        : null;
+    const strengthProj =
+      teamLive ??
+      (projection != null && Number.isFinite(projection) ? projection : total);
     const sz = o.players.length;
     const remN = sz === 0 ? 0 : o.players.filter((p) => !p.eliminated).length;
     const advN =
       sz === 0 ? 0 : o.players.filter((p) => playerAdvancedThroughCurrentRound(p, currentRound)).length;
-    const p = projection != null && Number.isFinite(projection) ? projection : total;
-    projOrTotal.push(p);
+    projOrTotal.push(strengthProj);
     fracRem.push(sz === 0 ? 0 : remN / sz);
     fracAdv.push(sz === 0 ? 0 : advN / sz);
   }
