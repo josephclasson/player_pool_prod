@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * Official committee 1–68 (`teams.overall_seed`) — **not** from the daily scoreboard.
  *
  * - CBS/SI committee list: commissioner **Apply seeds from CBS/SI article** only (`lib/committee-report-scrape.ts`).
+ *   Use each season’s article that lists the full NCAA S-curve 1–68 (SI often titles this “official 1–68 seed rankings”).
  * - Automated fallback: henrygd **bracket** endpoint (`henrygd-bracket-seeds.ts`) for full tournament setup / demo.
  * - Daily scoreboard sync (`lib/henrygd.ts`) updates games and regional pod seeds only.
  */

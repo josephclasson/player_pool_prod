@@ -1161,6 +1161,7 @@ export function CommissionerForm() {
             <strong>https</strong> URL of a CBS Sports or Sports Illustrated story that lists the full 1–68
             order. The server fetches and parses that page once (rate-limited per minute). Teams match by
             display name to your pool; check the response for unmatched rows.
+            Each March, paste that season’s story (SI example shape: “official 1–68 seed rankings”).
           </p>
           <label className="flex flex-col gap-1">
             <span className="pool-label">Article URL</span>
@@ -1169,7 +1170,7 @@ export function CommissionerForm() {
               type="url"
               value={committeeReportUrl}
               onChange={(e) => setCommitteeReportUrl(e.target.value)}
-              placeholder="https://www.cbssports.com/college-basketball/news/…"
+              placeholder="https://www.si.com/college-basketball/…/official-1-68-seed-rankings-…"
               spellCheck={false}
             />
           </label>
